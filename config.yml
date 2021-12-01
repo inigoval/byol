@@ -1,0 +1,29 @@
+type: 'byol'
+project_name: 'byol'
+
+model:
+    architecture: 'resnet18'
+
+projection_head:
+    mlp_hidden_size: 256
+    projection_size: 100 
+train:
+    n_epochs: 200
+    opt: 'sgd'
+
+data:
+    mu: 0
+    sig: 1
+
+###############################
+### optimisable hyperparams ###
+###############################
+cut_threshold: 17
+center_crop_size: 90
+
+lr: 0.2
+batch_size: 256 
+momentum: 0.9
+weight_decay: 0.0000005
+
+m: 0.996
