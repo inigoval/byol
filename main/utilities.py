@@ -45,6 +45,7 @@ def byol_loss(x, y):
     y = F.normalize(y, dim=1)
     return 2 - 2 * (x * y).sum(dim=-1)
 
+
 def fig2img(fig):
     """Convert a Matplotlib figure to a PIL Image and return it"""
     import io
@@ -54,6 +55,7 @@ def fig2img(fig):
     buf.seek(0)
     img = Image.open(buf)
     return img
+
 
 def flip(labels, p_flip):
     """Flip a number of labels"""
@@ -87,3 +89,8 @@ def batch_eval(fn_dict, dset, batch_size=200):
             outs[key].append(fn(x, y))
 
     return outs
+
+
+def freeze_model(model):
+    for param in model.parameters():
+        param.requires_grad = False

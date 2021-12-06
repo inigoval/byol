@@ -89,8 +89,8 @@ class GaussianBlur(object):
         return img
 
 
-class MultiViewTransform(nn.Module):
-    def __init__(self, config, s=1):
+class MultiView(nn.Module):
+    def __init__(self, config, n_views=1, s=1):
         super().__init__()
         cropsize = config["center_crop_size"]
         # Color jitter parameters are taken from the BYOL paper
@@ -99,6 +99,7 @@ class MultiViewTransform(nn.Module):
         # Define a view
         self.view = T.Compose(
             [
+                T.RandomRotation(180),
                 T.CenterCrop(cropsize),
                 T.RandomResizedCrop(cropsize),
                 T.RandomHorizontalFlip(),
@@ -108,19 +109,20 @@ class MultiViewTransform(nn.Module):
             ]
         )
         self.normalize = T.Normalize((0,), (1,))
+        self.n_views = n_views
 
     def __call__(self, x):
-        x1, x2 = self.view(x), self.view(x)
-        return self.normalize(x1), self.normalize(x2)
-
-    def naked_call(self, x):
-        return self.view(x)
+        views = []
+        for i in np.arange(self.n_views):
+            view = self.normalize(self.view(x))
+            views.append(view)
+        return *views
 
     def update_normalization(self, mu, sig):
         self.normalize = T.Normalize((mu,), (sig,))
 
 
-def IdentityTransform(crop_size, mu=0, sig=1):
+def Identity(crop_size, mu=0, sig=1):
     return T.Compose(
         [
             T.CenterCrop(crop_size),
@@ -128,3 +130,31 @@ def IdentityTransform(crop_size, mu=0, sig=1):
             T.Normalize((mu,), (sig,)),
         ]
     )
+
+
+class ReduceView(nn.Module):
+    def __init__(self, encoder, config):
+        super().__init__()
+
+        # Define a view
+        cropsize = config["center_crop_size"]
+        self.aug = T.Compose(
+            [
+                T.RandomRotation(180),
+                T.CenterCrop(cropsize),
+                T.RandomHorizontalFlip(),
+                T.ToTensor(),
+            ]
+        )
+
+        self.reduce = lambda x: encoder(x)
+        self.normalize = T.Normalize((0,), (1,))
+
+    def __call__(self, x):
+        x = self.aug(x)
+        x = self.reduce(x)
+        x = self.normalize(x)
+        return x
+
+    def update_normalization(self, mu, sig):
+        self.normalize = T.Normalize((mu,), (sig,))

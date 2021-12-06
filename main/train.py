@@ -4,9 +4,10 @@ import numpy as np
 import pytorch_lightning as pl
 
 from paths import Path_Handler
-from dataloading.datamodules import mbDataModule
-from model import net
+from dataloading.datamodules import mbDataModule, reduce_mbDataModule
+from models import pretrain_net, linear_net
 from config import load_config
+from utilities import freeze_model
 
 config = load_config()
 
@@ -15,7 +16,7 @@ path_dict = paths._dict()
 
 
 # Save model with best accuracy for test evaluation, model will be saved in wandb and also #
-checkpoint_callback = pl.callbacks.ModelCheckpoint(
+pretrain_checkpoint = pl.callbacks.ModelCheckpoint(
     monitor="train/loss",
     mode="min",
     every_n_epochs=1,
@@ -45,13 +46,11 @@ wandb_logger.log_hyperparams(data.hyperparams)
 config["data"]["mu"] = data.mu.item()
 config["data"]["sig"] = data.sig.item()
 
-# you can add ImpurityLogger if NOT using rgz unlabelled data to track impurities and mask rate
-callbacks = [
-    checkpoint_callback,
-]
+# List of callbacks
+callbacks = [pretrain_checkpoint]
 
 
-trainer = pl.Trainer(
+pretrainer = pl.Trainer(
     gpus=1,
     max_epochs=config["train"]["n_epochs"],
     logger=wandb_logger,
@@ -62,15 +61,51 @@ trainer = pl.Trainer(
 )
 
 # Initialise model #
-model = net(config)
+model = pretrain_net(config)
+config["model"]["output_dim"] = model.m_online.projection.net[0]
 
 # Train model #
-trainer.fit(model, data)
+pretrainer.fit(model, data)
 
 # Run test loop #
-trainer.test(ckpt_path="best")
+pretrainer.test(ckpt_path="best")
 
 # Save model in wandb #
-wandb.save(checkpoint_callback.best_model_path)
+wandb.save(pretrain_checkpoint.best_model_path)
+
+
+##################################################
+########## LINEAR EVALUATION PROTOCOL ############
+##################################################
+
+# Switch loader to linear evaluation mode
+linear_checkpoint = pl.callbacks.ModelCheckpoint(
+    monitor="val/loss",
+    mode="min",
+    every_n_epochs=1,
+    verbose=True,
+)
+
+best_model_path = pretrain_checkpoint.best_model_path
+pretrained_model = pretrain_net.load_from_checkpoint(best_model_path)
+encoder = pretrained_model.m_online.encoder
+freeze_model(encoder)
+
+eval_data = reduce_mbDataModule(config, encoder)
+eval_data.setup()
+config["eval"]["mu"] = eval_data.mu.item()
+config["eval"]["sig"] = eval_data.sig.item()
+
+linear_trainer = pl.Trainer(
+    gpus=1,
+    max_epochs=config["linear"]["n_epochs"],
+    logger=wandb_logger,
+    deterministic=True,
+    #    check_val_every_n_epoch=3,
+    #    log_every_n_steps=10,
+)
+
+
+linear_model = linear_net(config, encoder)
 
 wandb_logger.experiment.finish()

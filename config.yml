@@ -8,10 +8,18 @@ projection_head:
     mlp_hidden_size: 256
     projection_size: 100 
 train:
-    n_epochs: 200
+    n_epochs: 3 
     opt: 'sgd'
 
 data:
+    mu: 0
+    sig: 1
+
+linear_model:
+    n_epochs: 3
+    lr: 0.0005
+
+eval:
     mu: 0
     sig: 1
 

@@ -110,3 +110,12 @@ class ResNet18(torch.nn.Module):
         h = self.encoder(x)
         h = h.view(h.shape[0], h.shape[1])
         return self.projection(h)
+
+
+class LogisticRegression(torch.nn.Module):
+    def __init__(self, input_dim, output_dim):
+        super(LogisticRegression, self).__init__()
+        self.linear = torch.nn.Linear(input_dim, output_dim)
+
+    def forward(self, x):
+        return self.linear(x)

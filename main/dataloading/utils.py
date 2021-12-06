@@ -93,7 +93,7 @@ def random_subset(dset, size):
 def size_cut(threshold, dset, inplace=True):
     """Cut the RGZ DR1 dataset based on angular size"""
     length = len(dset)
-    idx = np.argwhere(dset.sizes > threshold).flatten()
+    idx = np.argwhere(dset.sizes > threshold)
     if inplace == True:
         dset.data = dset.data[idx, ...]
         dset.names = dset.names[idx, ...]
@@ -137,8 +137,4 @@ def compute_mu_sig(dset, batch_size=0):
 
     else:
         x, _ = dset2tens(dset)
-        x = x[0]
         return torch.mean(x), torch.std(x)
-
-
-
