@@ -93,10 +93,17 @@ def rgz_cut(rgz_dset, threshold, mb_cut=True):
     """Cut rgz data-set based on angular size and whether data-point is contained in MiraBest"""
 
     n_i = len(rgz_dset)
-
     idx_bool = rgz_dset.sizes > threshold
+
+    n_cut = n_i - np.count_nonzero(idx_bool)
+    print(f"Removing {n_cut} samples below angular size threshold.")
+
     if mb_cut:
         idx_bool *= rgz_dset.mbflg == 0
+
+        # Print number of MB samples removed
+        n_mb = np.count_nonzero(rgz_dset.mbflg == 1)
+        print(f"Removed {n_mb} MiraBest samples from RGZ")
 
     idx = np.argwhere(idx_bool)
 

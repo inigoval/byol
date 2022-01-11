@@ -96,13 +96,16 @@ class MultiView(nn.Module):
         random_crop = (config["random_crop_min"], config["random_crop_max"])
         # Color jitter parameters are taken from the BYOL paper
         color_jitter = T.ColorJitter(0.8 * s, 0.8 * s, 0.8 * s, 0)
+        blur = T.GaussianBlur(
+            self.config["blur_kernel"], sigma=(self.config["blur_sig"])
+        )
 
         # Define a view
         self.view = T.Compose(
             [
                 T.RandomRotation(180),
                 T.RandomApply([color_jitter], p=0.8),
-                T.GaussianBlur(9, sigma=(0.1, 2.0)),
+                T.RandomApply([blur], p=self.config["p_blur"]),
                 T.CenterCrop(center_crop),
                 T.RandomResizedCrop(center_crop, scale=random_crop),
                 T.RandomHorizontalFlip(),
