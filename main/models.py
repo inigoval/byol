@@ -10,7 +10,7 @@ import numpy as np
 from statistics import mean
 
 from networks.models import ResNet18, MLPHead, LogisticRegression
-from utilities import byol_loss, freeze_model
+from utilities import byol_loss, freeze_model, LARSWrapper
 from paths import Path_Handler
 
 
@@ -28,6 +28,8 @@ class pretrain_net(pl.LightningModule):
             **config["projection_head"]
         )
 
+        # print(torch.cuda.get_device_name(torch.cuda.current_device()))
+        # print(torch.cuda.is_available())
         self.best_acc = 0
 
     def forward(self, x):
@@ -56,9 +58,6 @@ class pretrain_net(pl.LightningModule):
 
         return loss
 
-    def test_step(self, batch, batch_idx):
-        x, y = batch
-
     def configure_optimizers(self):
         opts = {
             "adam": torch.optim.Adam(self.m_online.parameters(), lr=self.config["lr"]),
@@ -70,7 +69,12 @@ class pretrain_net(pl.LightningModule):
             ),
         }
 
-        return opts[self.config["train"]["opt"]]
+        opt = opts[self.config["train"]["opt"]]
+
+        if self.config["lars"]:
+            opt = LARSWrapper(opt)
+
+        return opt
 
     @torch.no_grad()
     def update_m_target(self):
@@ -83,11 +87,10 @@ class pretrain_net(pl.LightningModule):
 
 
 class linear_net(pl.LightningModule):
-    def __init__(self, config, encoder):
+    def __init__(self, config):
         super().__init__()
         self.config = config
-        self.encoder = encoder
-        self.logreg = LogisticRegression(self.output_feature_dim, 2)
+        self.logreg = LogisticRegression(self.config["model"]["output_dim"], 2)
         self.ce_loss = torch.nn.CrossEntropyLoss()
 
         paths = Path_Handler()
@@ -95,33 +98,36 @@ class linear_net(pl.LightningModule):
 
     def forward(self, x):
         """Return prediction"""
-        y = self.logreg(x)
+        return self.logreg(x)
 
     def training_step(self, batch, batch_idx):
         # Load data and targets
         x, y = batch
-        print(x.shape)
+        x = x.view(x.shape[0], -1)
         logits = self.forward(x)
+        y_pred = logits.softmax(dim=-1)
         loss = self.ce_loss(logits, y)
         self.log("linear_eval/train/loss", loss)
 
-        predictions = torch.argmax(logits, dim=1)
-        acc = tmF.accuracy(predictions.softmax(dim=-1), y)
+        # predictions = torch.argmax(logits, dim=1).int()
+        acc = tmF.accuracy(y_pred, y)
         self.log("linear_eval/train/acc", acc)
         return loss
 
     def test_step(self, batch, batch_idx):
         x, y = batch
+        x = x.view(x.shape[0], -1)
         logits = self.forward(x)
+        y_pred = logits.softmax(dim=-1)
         loss = self.ce_loss(logits, y)
         self.log("linear_eval/test/loss", loss)
 
-        predictions = torch.argmax(logits, dim=1)
-        acc = tmF.accuracy(predictions.softmax(dim=-1), y)
-        self.log("linear_eval/test/acc")
+        # predictions = torch.argmax(logits, dim=1).int()
+        acc = tmF.accuracy(y_pred, y)
+        self.log("linear_eval/test/acc", acc)
 
     def configure_optimizers(self):
-        lr = self.config["linear_model"]["lr"]
+        lr = self.config["linear"]["lr"]
         opt = torch.optim.Adam(self.logreg.parameters(), lr=lr)
 
         return opt

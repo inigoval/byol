@@ -8,7 +8,7 @@ import torch.utils.data as D
 
 from paths import Path_Handler
 from dataloading.datasets import MB_nohybrids, RGZ20k, MiraBest_full
-from dataloading.utils import size_cut, compute_mu_sig, mb_cut
+from dataloading.utils import size_cut, compute_mu_sig, mb_cut, rgz_cut, rgz_cut
 from dataloading.transforms import MultiView, Identity, ReduceView
 
 paths = Path_Handler()
@@ -22,7 +22,7 @@ class mbDataModule(pl.LightningDataModule):
         self.path = path
         self.config = config
         self.hyperparams = {}
-        self.view_transform = MultiView(config)
+        self.view_transform = MultiView(config, n_views=2)
 
     def prepare_data(self):
         MB_nohybrids(self.path, train=False, download=True)
@@ -34,13 +34,12 @@ class mbDataModule(pl.LightningDataModule):
         D_train = self.cut_and_cat()
 
         # Calculate mean and std of data
-        mu, sig = compute_mu_sig(D_train)
+        mu, sig = compute_mu_sig(D_train, batch_size=1000)
         self.mu, self.sig = mu, sig
 
         # Define transforms with calculated values
         self.view_transform.update_normalization(mu, sig)
         identity = Identity(self.config["center_crop_size"], mu=mu, sig=sig)
-        self.view_transform.n_views = 2
 
         # Re-initialise dataset with new mu and sig values
         self.data["train"] = self.cut_and_cat()
@@ -73,8 +72,9 @@ class mbDataModule(pl.LightningDataModule):
     def cut_and_cat(self):
         # Load and cut data-sets
         D_rgz = RGZ20k(self.path, train=True, transform=self.view_transform)
-        size_cut(self.config["cut_threshold"], D_rgz)
-        mb_cut(D_rgz)
+        # size_cut(self.config["cut_threshold"], D_rgz)
+        # mb_cut(D_rgz)
+        D_rgz = rgz_cut(D_rgz, self.config["cut_threshold"], mb_cut=True)
         D_mb = MB_nohybrids(self.path, train=True, transform=self.view_transform)
 
         # Concatenate datasets
@@ -82,19 +82,19 @@ class mbDataModule(pl.LightningDataModule):
 
 
 class reduce_mbDataModule(pl.LightningDataModule):
-    def __init__(self, config, path=path_dict["data"]):
+    def __init__(self, encoder, config, path=path_dict["data"]):
         super().__init__()
         self.path = path
         self.config = config
         self.hyperparams = {}
-        self.aug = ReduceView(config)
+        self.aug = ReduceView(encoder, config)
+        self.data = {}
         # self.identity = Identity()
 
     def prepare_data(self):
         MB_nohybrids(self.path, train=False, download=True)
         MB_nohybrids(self.path, train=True, download=True)
         RGZ20k(self.path, train=True, download=True)
-        self.data = {}
 
     def setup(self, stage=None):
         # D_train = self.cut_and_cat()
@@ -106,20 +106,22 @@ class reduce_mbDataModule(pl.LightningDataModule):
 
         # Define transforms with calculated values
         self.aug.update_normalization(mu, sig)
-        identity = Identity(self.config["center_crop_size"], mu=mu, sig=sig)
+        # identity = Identity(self.config["center_crop_size"], mu=mu, sig=sig)
 
         # Re-initialise dataset with new mu and sig values
         # self.data["train"] = self.cut_and_cat()
         self.data["train"] = MB_nohybrids(self.path, train=True, transform=self.aug)
 
         # Initialise individual datasets with identity transform (for evaluation)
-        self.data["test"] = MB_nohybrids(self.path, train=False, transform=identity)
-        self.data["mb"] = MB_nohybrids(self.path, train=True, transform=identity)
-        self.data["rgz"] = RGZ20k(self.path, train=True, transform=identity)
+        self.data["test"] = MB_nohybrids(self.path, train=False, transform=self.aug)
+        self.data["mb"] = MB_nohybrids(self.path, train=True, transform=self.aug)
+        self.data["rgz"] = RGZ20k(self.path, train=True, transform=self.aug)
 
     def train_dataloader(self):
         # Batch only labelled data
-        loader = DataLoader(self.data["train"], 50, shuffle=True)
+        loader = DataLoader(
+            self.data["train"], self.config["linear"]["batch_size"], shuffle=True
+        )
         return loader
 
     def test_dataloader(self):

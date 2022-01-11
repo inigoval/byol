@@ -13,36 +13,6 @@ from paths import Path_Handler
 from utilities import batch_eval
 
 
-class Circle_Crop(torch.nn.Module):
-    """
-    PyTorch transform to set all values outside largest possible circle that fits inside image to 0.
-    """
-
-    def __init__(self):
-        super().__init__()
-
-    def forward(self, img):
-        """
-        Returns an image with all values outside the central circle bounded by image edge masked to 0.
-
-        !!! Support for multiple channels not implemented yet !!!
-        """
-        H, W, C = img.shape[-1], img.shape[-2], img.shape[-3]
-        assert H == W
-        x = torch.arange(W, dtype=torch.float).repeat(H, 1)
-        x = (x - 74.5) / 74.5
-        y = torch.transpose(x, 0, 1)
-        r = torch.sqrt(torch.pow(x, 2) + torch.pow(y, 2))
-        r = r / torch.max(r)
-        r[r < 0.5] = -1
-        r[r == 0.5] = -1
-        r[r != -1] = 0
-        r = torch.pow(r, 2).view(C, H, W)
-        assert r.shape == img.shape
-        img = torch.mul(r, img)
-        return img
-
-
 def data_splitter_strat(dset, seed=None, split=1, val_frac=0.2, u_cut=False):
     if seed == None:
         seed = np.random.randint(9999999)
@@ -119,21 +89,50 @@ def mb_cut(dset, inplace=True):
     print(f"RGZ dataset cut from {length} to {len(dset)} samples")
 
 
+def rgz_cut(rgz_dset, threshold, mb_cut=True):
+    """Cut rgz data-set based on angular size and whether data-point is contained in MiraBest"""
+
+    n_i = len(rgz_dset)
+
+    idx_bool = rgz_dset.sizes > threshold
+    if mb_cut:
+        idx_bool *= rgz_dset.mbflg == 0
+
+    idx = np.argwhere(idx_bool)
+
+    subset = D.Subset(rgz_dset, idx)
+    print(f"RGZ dataset cut from {n_i} to {len(subset)} samples")
+    return subset
+
+
 def dset2tens(dset):
     """Return a tuple (x, y) containing the entire input dataset (carefuwith large datasets)"""
     return next(iter(DataLoader(dset, int(len(dset)))))
 
 
 def compute_mu_sig(dset, batch_size=0):
-    """Compute mean and standard variance of a dataset (careful with large datasets)"""
-    if batch_size == True:
+    """Compute mean and standard variance of a dataset (use batching with large datasets)"""
+    if batch_size:
         # Load samples in batches
+        n_dset = len(dset)
         loader = DataLoader(dset, batch_size)
-        n, x_sum = 0, 0
+
+        # Calculate mean
+        mean = 0
         for x, _ in loader:
-            n += torch.numel(x)
-            x_sum += torch.sum(x)
-        # Calculate average
+            x = x[0]
+            weight = x.shape[0] / n_dset
+            mean += weight * torch.mean(x)
+
+        # Calculate std
+        D_sq = 0
+        for x, _ in loader:
+            x = x[0]
+            D_sq += torch.sum((x - mean) ** 2)
+        std = (D_sq / (n_dset * x.shape[-1] * x.shape[-2])) ** 0.5
+
+        print(f"mean: {mean}, std: {std}")
+        return mean, std
 
     else:
         x, _ = dset2tens(dset)

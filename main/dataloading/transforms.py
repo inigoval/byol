@@ -90,21 +90,22 @@ class GaussianBlur(object):
 
 
 class MultiView(nn.Module):
-    def __init__(self, config, n_views=1, s=1):
+    def __init__(self, config, n_views=2, s=1):
         super().__init__()
-        cropsize = config["center_crop_size"]
+        center_crop = config["center_crop_size"]
+        random_crop = (config["random_crop_min"], config["random_crop_max"])
         # Color jitter parameters are taken from the BYOL paper
-        color_jitter = T.ColorJitter(0.8 * s, 0.8 * s, 0.8 * s, 0.2 * s)
+        color_jitter = T.ColorJitter(0.8 * s, 0.8 * s, 0.8 * s, 0)
 
         # Define a view
         self.view = T.Compose(
             [
                 T.RandomRotation(180),
-                T.CenterCrop(cropsize),
-                T.RandomResizedCrop(cropsize),
-                T.RandomHorizontalFlip(),
                 T.RandomApply([color_jitter], p=0.8),
-                # GaussianBlur(kernel_size=int(0.1 * cropsize)),
+                T.GaussianBlur(9, sigma=(0.1, 2.0)),
+                T.CenterCrop(center_crop),
+                T.RandomResizedCrop(center_crop, scale=random_crop),
+                T.RandomHorizontalFlip(),
                 T.ToTensor(),
             ]
         )
@@ -116,7 +117,7 @@ class MultiView(nn.Module):
         for i in np.arange(self.n_views):
             view = self.normalize(self.view(x))
             views.append(view)
-        return *views
+        return views
 
     def update_normalization(self, mu, sig):
         self.normalize = T.Normalize((mu,), (sig,))
@@ -152,7 +153,8 @@ class ReduceView(nn.Module):
 
     def __call__(self, x):
         x = self.aug(x)
-        x = self.reduce(x)
+        x = x.view(1, 1, x.shape[-2], x.shape[-1])
+        x = self.reduce(x).view(-1, 1, 1)
         x = self.normalize(x)
         return x
 

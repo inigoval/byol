@@ -7,7 +7,7 @@ from paths import Path_Handler
 from dataloading.datamodules import mbDataModule, reduce_mbDataModule
 from models import pretrain_net, linear_net
 from config import load_config
-from utilities import freeze_model
+from utilities import freeze_model, log_examples
 
 config = load_config()
 
@@ -45,13 +45,17 @@ wandb_logger.log_hyperparams(data.hyperparams)
 # Record mean and standard deviation used in normalisation for inference #
 config["data"]["mu"] = data.mu.item()
 config["data"]["sig"] = data.sig.item()
+log_examples(wandb_logger, data.data["train"])
+
 
 # List of callbacks
 callbacks = [pretrain_checkpoint]
 
 
-pretrainer = pl.Trainer(
-    gpus=1,
+pre_trainer = pl.Trainer(
+    # gpus=1,
+    devices=1,
+    accelerator="gpu",
     max_epochs=config["train"]["n_epochs"],
     logger=wandb_logger,
     deterministic=True,
@@ -62,13 +66,13 @@ pretrainer = pl.Trainer(
 
 # Initialise model #
 model = pretrain_net(config)
-config["model"]["output_dim"] = model.m_online.projection.net[0]
+config["model"]["output_dim"] = model.m_online.projection.net[0].in_features
 
 # Train model #
-pretrainer.fit(model, data)
+pre_trainer.fit(model, data)
 
 # Run test loop #
-pretrainer.test(ckpt_path="best")
+# pre_trainer.test(ckpt_path="best")
 
 # Save model in wandb #
 wandb.save(pretrain_checkpoint.best_model_path)
@@ -91,13 +95,16 @@ pretrained_model = pretrain_net.load_from_checkpoint(best_model_path)
 encoder = pretrained_model.m_online.encoder
 freeze_model(encoder)
 
-eval_data = reduce_mbDataModule(config, encoder)
+eval_data = reduce_mbDataModule(encoder, config)
+eval_data.prepare_data()
 eval_data.setup()
+
 config["eval"]["mu"] = eval_data.mu.item()
 config["eval"]["sig"] = eval_data.sig.item()
 
 linear_trainer = pl.Trainer(
-    gpus=1,
+    devices=1,
+    accelerator="gpu",
     max_epochs=config["linear"]["n_epochs"],
     logger=wandb_logger,
     deterministic=True,
@@ -105,7 +112,8 @@ linear_trainer = pl.Trainer(
     #    log_every_n_steps=10,
 )
 
-
-linear_model = linear_net(config, encoder)
+linear_model = linear_net(config)
+linear_trainer.fit(linear_model, eval_data)
+linear_trainer.test(linear_model, dataloaders=eval_data, ckpt_path="best")
 
 wandb_logger.experiment.finish()
