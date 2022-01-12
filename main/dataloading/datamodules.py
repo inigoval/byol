@@ -16,13 +16,20 @@ path_dict = paths._dict()
 
 
 class mbDataModule(pl.LightningDataModule):
-    def __init__(self, config, stage="pretrain", path=path_dict["data"]):
+    def __init__(self, config, path=path_dict["data"]):
         super().__init__()
-        self.stage = stage
         self.path = path
         self.config = config
         self.hyperparams = {}
-        self.view_transform = MultiView(config, n_views=2)
+
+        # Define different transforms for different algorithms
+        train_transforms = {
+            "byol": MultiView(config, n_views=2),
+            "pca": Identity(config, train=True),
+        }
+
+        self.T_train = train_transforms[self.config["type"]]
+        self.T_test = Identity(config, train=False)
 
     def prepare_data(self):
         MB_nohybrids(self.path, train=False, download=True)
@@ -31,34 +38,32 @@ class mbDataModule(pl.LightningDataModule):
         self.data = {}
 
     def setup(self, stage=None):
-        D_train = self.cut_and_cat()
+        D_train = self.cut_and_cat(self.T_train)
 
         # Calculate mean and std of data
         mu, sig = compute_mu_sig(D_train, batch_size=1000)
         self.mu, self.sig = mu, sig
 
         # Define transforms with calculated values
-        self.view_transform.update_normalization(mu, sig)
-        identity = Identity(self.config["center_crop_size"], mu=mu, sig=sig)
+        self.T_train.update_normalization(mu, sig)
 
         # Re-initialise dataset with new mu and sig values
-        self.data["train"] = self.cut_and_cat()
+        self.data["train"] = self.cut_and_cat(self.T_train)
 
         # Initialise individual datasets with identity transform (for evaluation)
-        self.data["test"] = MB_nohybrids(self.path, train=False, transform=identity)
-        self.data["mb"] = MB_nohybrids(self.path, train=True, transform=identity)
-        self.data["rgz"] = RGZ20k(self.path, train=True, transform=identity)
+        self.data["test"] = MB_nohybrids(self.path, train=False, transform=self.T_test)
+        self.data["mb"] = MB_nohybrids(self.path, train=True, transform=self.T_test)
+        self.data["rgz"] = RGZ20k(self.path, train=True, transform=self.T_test)
 
     def train_dataloader(self):
         # Batch all data together
-        if self.stage == "pretrain":
-            batch_size = self.config["batch_size"]
-            loader = DataLoader(self.data["train"], batch_size, shuffle=True)
+        batch_size = self.config["batch_size"]
+        loader = DataLoader(self.data["train"], batch_size, shuffle=True)
 
-        # Batch only labelled data
-        if self.stage == "linear_eval":
-            loader = DataLoader(self.data["mb"], 50, shuffle=True)
+        return loader
 
+    def val_dataloader(self):
+        loader = DataLoader(self.data["test"], len(self.data["test"]))
         return loader
 
     def test_dataloader(self):
@@ -69,13 +74,22 @@ class mbDataModule(pl.LightningDataModule):
     ####### HELPER FUNCTIONS ########
     #################################
 
-    def cut_and_cat(self):
-        # Load and cut data-sets
-        D_rgz = RGZ20k(self.path, train=True, transform=self.view_transform)
-        # size_cut(self.config["cut_threshold"], D_rgz)
-        # mb_cut(D_rgz)
+    #    def cut_and_cat(self):
+    #        # Load and cut data-sets
+    #        D_rgz = RGZ20k(self.path, train=True, transform=self.view_transform)
+    #        # size_cut(self.config["cut_threshold"], D_rgz)
+    #        # mb_cut(D_rgz)
+    #        D_rgz = rgz_cut(D_rgz, self.config["cut_threshold"], mb_cut=True)
+    #        D_mb = MB_nohybrids(self.path, train=True, transform=self.view_transform)
+    #
+    #        # Concatenate datasets
+    #        return D.ConcatDataset([D_rgz, D_mb])
+
+    def cut_and_cat(self, transform):
+        """Load MiraBest & RGZ datasets, cut MiraBest by angular size, remove duplicates from RGZ and concatenate the two"""
+        D_rgz = RGZ20k(self.path, train=True, transform=transform)
         D_rgz = rgz_cut(D_rgz, self.config["cut_threshold"], mb_cut=True)
-        D_mb = MB_nohybrids(self.path, train=True, transform=self.view_transform)
+        D_mb = MB_nohybrids(self.path, train=True, transform=transform)
 
         # Concatenate datasets
         return D.ConcatDataset([D_rgz, D_mb])
@@ -122,6 +136,10 @@ class reduce_mbDataModule(pl.LightningDataModule):
         loader = DataLoader(
             self.data["train"], self.config["linear"]["batch_size"], shuffle=True
         )
+        return loader
+
+    def val_dataloader(self):
+        loader = DataLoader(self.data["test"], len(self.data["test"]))
         return loader
 
     def test_dataloader(self):

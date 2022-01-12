@@ -6,8 +6,10 @@ import torchvision.transforms as T
 import pytorch_lightning as pl
 import torchmetrics.functional as tmF
 import numpy as np
+from tqdm import tqdm
 
 from statistics import mean
+from sklearn.decomposition import IncrementalPCA
 
 from networks.models import ResNet18, MLPHead, LogisticRegression
 from utilities import byol_loss, freeze_model, LARSWrapper
@@ -25,7 +27,7 @@ class pretrain_net(pl.LightningModule):
         self.m_target = ResNet18(**config)
         self.predictor = MLPHead(
             in_channels=self.m_online.projection.net[-1].out_features,
-            **config["projection_head"]
+            **config["projection_head"],
         )
 
         # print(torch.cuda.get_device_name(torch.cuda.current_device()))
@@ -107,12 +109,24 @@ class linear_net(pl.LightningModule):
         logits = self.forward(x)
         y_pred = logits.softmax(dim=-1)
         loss = self.ce_loss(logits, y)
-        self.log("linear_eval/train/loss", loss)
+        self.log("linear_eval/train_loss", loss)
 
         # predictions = torch.argmax(logits, dim=1).int()
         acc = tmF.accuracy(y_pred, y)
-        self.log("linear_eval/train/acc", acc)
+        self.log("linear_eval/train_acc", acc)
         return loss
+
+    def validation_step(self, batch, batch_idx):
+        x, y = batch
+        x = x.view(x.shape[0], -1)
+        logits = self.forward(x)
+        y_pred = logits.softmax(dim=-1)
+        loss = self.ce_loss(logits, y)
+        self.log("linear_eval/val_loss", loss)
+
+        # predictions = torch.argmax(logits, dim=1).int()
+        acc = tmF.accuracy(y_pred, y)
+        self.log("linear_eval/val_acc", acc)
 
     def test_step(self, batch, batch_idx):
         x, y = batch
@@ -120,14 +134,34 @@ class linear_net(pl.LightningModule):
         logits = self.forward(x)
         y_pred = logits.softmax(dim=-1)
         loss = self.ce_loss(logits, y)
-        self.log("linear_eval/test/loss", loss)
+        self.log("linear_eval/test_loss", loss)
 
         # predictions = torch.argmax(logits, dim=1).int()
         acc = tmF.accuracy(y_pred, y)
-        self.log("linear_eval/test/acc", acc)
+        self.log("linear_eval/test_acc", acc)
 
     def configure_optimizers(self):
         lr = self.config["linear"]["lr"]
         opt = torch.optim.Adam(self.logreg.parameters(), lr=lr)
-
         return opt
+
+
+class pca_net(nn.Module):
+    def __init__(self, config):
+        super(pca_net, self).__init__()
+        self.config = config
+        self.pca = IncrementalPCA(config["pca"]["n_dim"])
+
+    def forward(self, x):
+        x = x.view(x.shape[0], -1)
+        x = self.pca.transform(x)
+        return torch.from_numpy(x).float()
+
+    def fit(self, loader):
+        print("Fitting PCA")
+        for epoch in tqdm(np.arange(self.config["pca"]["n_epochs"])):
+            print(f"Epoch {epoch}")
+            for x, _ in tqdm(loader):
+                x = x.view(x.shape[0], -1)
+                x = x.cpu().detach().numpy()
+                self.pca.partial_fit(x)

@@ -8,6 +8,7 @@ from dataloading.datamodules import mbDataModule, reduce_mbDataModule
 from models import pretrain_net, linear_net
 from config import load_config
 from utilities import freeze_model, log_examples
+from eval import lin_eval_protocol
 
 config = load_config()
 
@@ -84,8 +85,8 @@ wandb.save(pretrain_checkpoint.best_model_path)
 
 # Switch loader to linear evaluation mode
 linear_checkpoint = pl.callbacks.ModelCheckpoint(
-    monitor="val/loss",
-    mode="min",
+    monitor="linear_eval/val_acc",
+    mode="max",
     every_n_epochs=1,
     verbose=True,
 )
@@ -95,25 +96,27 @@ pretrained_model = pretrain_net.load_from_checkpoint(best_model_path)
 encoder = pretrained_model.m_online.encoder
 freeze_model(encoder)
 
-eval_data = reduce_mbDataModule(encoder, config)
-eval_data.prepare_data()
-eval_data.setup()
+lin_eval_protocol(config, encoder, wandb_logger)
 
-config["eval"]["mu"] = eval_data.mu.item()
-config["eval"]["sig"] = eval_data.sig.item()
-
-linear_trainer = pl.Trainer(
-    devices=1,
-    accelerator="gpu",
-    max_epochs=config["linear"]["n_epochs"],
-    logger=wandb_logger,
-    deterministic=True,
-    #    check_val_every_n_epoch=3,
-    #    log_every_n_steps=10,
-)
-
-linear_model = linear_net(config)
-linear_trainer.fit(linear_model, eval_data)
-linear_trainer.test(linear_model, dataloaders=eval_data, ckpt_path="best")
+# eval_data = reduce_mbDataModule(encoder, config)
+# eval_data.prepare_data()
+# eval_data.setup()
+#
+# config["eval"]["mu"] = eval_data.mu.item()
+# config["eval"]["sig"] = eval_data.sig.item()
+#
+# linear_trainer = pl.Trainer(
+#     devices=1,
+#     accelerator="gpu",
+#     max_epochs=config["linear"]["n_epochs"],
+#     logger=wandb_logger,
+#     deterministic=True,
+#     #    check_val_every_n_epoch=3,
+#     #    log_every_n_steps=10,
+# )
+#
+# linear_model = linear_net(config)
+# linear_trainer.fit(linear_model, eval_data)
+# linear_trainer.test(linear_model, dataloaders=eval_data, ckpt_path="best")
 
 wandb_logger.experiment.finish()
