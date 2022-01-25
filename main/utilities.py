@@ -123,11 +123,26 @@ def log_examples(wandb_logger, dset, n=18):
     wandb_logger.log_image(key=f"image_pairs", images=save_list)
 
 
-# Yoinked from pl_bolts
+"""
+Directly copied from pl_bolts
+https://github.com/PyTorchLightning/lightning-bolts/blob/0.3.0/pl_bolts/optimizers/lars_scheduling.py#L62-L81
+
+References:
+    - https://github.com/NVIDIA/apex/blob/master/apex/parallel/LARC.py
+    - https://arxiv.org/pdf/1708.03888.pdf
+    - https://github.com/noahgolmant/pytorch-lars/blob/master/lars.py
+"""
+import torch
+from torch.optim import Optimizer
+
+
 class LARSWrapper(object):
+    """
+    Wrapper that adds LARS scheduling to any optimizer. This helps stability with huge batch sizes.
+    """
+
     def __init__(self, optimizer, eta=0.02, clip=True, eps=1e-8):
         """
-        Wrapper that adds LARS scheduling to any optimizer. This helps stability with huge batch sizes.
         Args:
             optimizer: torch optimizer
             eta: LARS coefficient (trust)
@@ -137,8 +152,7 @@ class LARSWrapper(object):
         self.optim = optimizer
         self.eta = eta
         self.eps = eps
-        self.clip = clip
-
+        self.clip = clip 
         # transfer optim methods
         self.state_dict = self.optim.state_dict
         self.load_state_dict = self.optim.load_state_dict
@@ -147,6 +161,14 @@ class LARSWrapper(object):
         self.__setstate__ = self.optim.__setstate__
         self.__getstate__ = self.optim.__getstate__
         self.__repr__ = self.optim.__repr__
+
+    @property
+    def defaults(self):
+        return self.optim.defaults
+
+    @defaults.setter
+    def defaults(self, defaults):
+        self.optim.defaults = defaults
 
     @property
     def __class__(self):
@@ -158,13 +180,14 @@ class LARSWrapper(object):
 
     @property
     def param_groups(self):
-        return self.optim.param_groups 
+        return self.optim.param_groups
+
     @param_groups.setter
     def param_groups(self, value):
         self.optim.param_groups = value
 
     @torch.no_grad()
-    def step(self):
+    def step(self, closure=None):
         weight_decays = []
 
         for group in self.optim.param_groups:
@@ -182,7 +205,7 @@ class LARSWrapper(object):
             ]
 
         # update the optimizer
-        self.optim.step()
+        self.optim.step(closure=closure)
 
         # return weight decay control to optimizer
         for group_idx, group in enumerate(self.optim.param_groups):

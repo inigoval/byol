@@ -7,13 +7,14 @@ import pytorch_lightning as pl
 import torchmetrics.functional as tmF
 import numpy as np
 from tqdm import tqdm
+from utilities import LARSWrapper
 
 from statistics import mean
 from sklearn.decomposition import IncrementalPCA
 
 from networks.models import MLPHead, LogisticRegression
 from networks.models import ResNet18, ResNet50, WideResNet50_2
-from utilities import byol_loss, freeze_model, LARSWrapper
+from utilities import byol_loss, freeze_model
 from paths import Path_Handler
 
 
