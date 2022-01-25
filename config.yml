@@ -2,16 +2,18 @@ type: 'byol'
 project_name: 'byol'
 
 model:
-    architecture: 'resnet18'
+    arch: 'resnet18'
 
 projection_head:
     mlp_hidden_size: 256
     projection_size: 100 
 
 train:
-    n_epochs: 100
+    n_epochs: 200
     opt: 'sgd'
+
 data:
+    color_channels: 1
     mu: 0
     sig: 1
 
@@ -32,7 +34,7 @@ pca:
 ###############################
 ### optimisable hyperparams ###
 ###############################
-cut_threshold: 19
+cut_threshold: 50
 
 ## AUGMENTATIONS ##
 center_crop_size: 85

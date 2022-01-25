@@ -5,7 +5,7 @@ import pytorch_lightning as pl
 
 from paths import Path_Handler
 from dataloading.datamodules import mbDataModule, reduce_mbDataModule
-from models import pretrain_net, linear_net
+from models import byol, linear_net
 from config import load_config
 from utilities import freeze_model, log_examples
 from eval import lin_eval_protocol
@@ -41,11 +41,10 @@ wandb_logger = pl.loggers.WandbLogger(
 data = mbDataModule(config)
 data.prepare_data()
 data.setup()
-wandb_logger.log_hyperparams(data.hyperparams)
 
 # Record mean and standard deviation used in normalisation for inference #
-config["data"]["mu"] = data.mu.item()
-config["data"]["sig"] = data.sig.item()
+config["data"]["mu"] = data.mu
+config["data"]["sig"] = data.sig
 log_examples(wandb_logger, data.data["train"])
 
 
@@ -66,7 +65,7 @@ pre_trainer = pl.Trainer(
 )
 
 # Initialise model #
-model = pretrain_net(config)
+model = byol(config)
 config["model"]["output_dim"] = model.m_online.projection.net[0].in_features
 
 # Train model #
@@ -92,31 +91,10 @@ linear_checkpoint = pl.callbacks.ModelCheckpoint(
 )
 
 best_model_path = pretrain_checkpoint.best_model_path
-pretrained_model = pretrain_net.load_from_checkpoint(best_model_path)
+pretrained_model = byol.load_from_checkpoint(best_model_path)
 encoder = pretrained_model.m_online.encoder
 freeze_model(encoder)
 
 lin_eval_protocol(config, encoder, wandb_logger)
-
-# eval_data = reduce_mbDataModule(encoder, config)
-# eval_data.prepare_data()
-# eval_data.setup()
-#
-# config["eval"]["mu"] = eval_data.mu.item()
-# config["eval"]["sig"] = eval_data.sig.item()
-#
-# linear_trainer = pl.Trainer(
-#     devices=1,
-#     accelerator="gpu",
-#     max_epochs=config["linear"]["n_epochs"],
-#     logger=wandb_logger,
-#     deterministic=True,
-#     #    check_val_every_n_epoch=3,
-#     #    log_every_n_steps=10,
-# )
-#
-# linear_model = linear_net(config)
-# linear_trainer.fit(linear_model, eval_data)
-# linear_trainer.test(linear_model, dataloaders=eval_data, ckpt_path="best")
 
 wandb_logger.experiment.finish()

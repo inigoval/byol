@@ -20,7 +20,6 @@ class mbDataModule(pl.LightningDataModule):
         super().__init__()
         self.path = path
         self.config = config
-        self.hyperparams = {}
 
         # Define different transforms for different algorithms
         train_transforms = {
@@ -30,6 +29,8 @@ class mbDataModule(pl.LightningDataModule):
 
         self.T_train = train_transforms[self.config["type"]]
         self.T_test = Identity(config, train=False)
+
+        # self.save_hyperparameters(ignore=["T_test", "T_train"])
 
     def prepare_data(self):
         MB_nohybrids(self.path, train=False, download=True)
@@ -73,18 +74,6 @@ class mbDataModule(pl.LightningDataModule):
     #################################
     ####### HELPER FUNCTIONS ########
     #################################
-
-    #    def cut_and_cat(self):
-    #        # Load and cut data-sets
-    #        D_rgz = RGZ20k(self.path, train=True, transform=self.view_transform)
-    #        # size_cut(self.config["cut_threshold"], D_rgz)
-    #        # mb_cut(D_rgz)
-    #        D_rgz = rgz_cut(D_rgz, self.config["cut_threshold"], mb_cut=True)
-    #        D_mb = MB_nohybrids(self.path, train=True, transform=self.view_transform)
-    #
-    #        # Concatenate datasets
-    #        return D.ConcatDataset([D_rgz, D_mb])
-
     def cut_and_cat(self, transform):
         """Load MiraBest & RGZ datasets, cut MiraBest by angular size, remove duplicates from RGZ and concatenate the two"""
         D_rgz = RGZ20k(self.path, train=True, transform=transform)
@@ -100,7 +89,6 @@ class reduce_mbDataModule(pl.LightningDataModule):
         super().__init__()
         self.path = path
         self.config = config
-        self.hyperparams = {}
         self.aug = ReduceView(encoder, config)
         self.data = {}
         # self.identity = Identity()

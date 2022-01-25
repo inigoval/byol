@@ -11,20 +11,28 @@ from tqdm import tqdm
 from statistics import mean
 from sklearn.decomposition import IncrementalPCA
 
-from networks.models import ResNet18, MLPHead, LogisticRegression
+from networks.models import MLPHead, LogisticRegression
+from networks.models import ResNet18, ResNet50, WideResNet50_2
 from utilities import byol_loss, freeze_model, LARSWrapper
 from paths import Path_Handler
 
 
-class pretrain_net(pl.LightningModule):
+class byol(pl.LightningModule):
     def __init__(self, config):
         super().__init__()
         self.save_hyperparameters()  # save hyperparameters for easy inference
         self.config = config
         paths = Path_Handler()
         self.paths = paths.dict
-        self.m_online = ResNet18(**config)
-        self.m_target = ResNet18(**config)
+
+        model_dict = {
+            "resnet18": ResNet18,
+            "resnet50": ResNet50,
+            "wideresnet50_2": WideResNet50_2,
+        }
+
+        self.m_online = model_dict[config["model"]["arch"]](**config)
+        self.m_target = model_dict[config["model"]["arch"]](**config)
         self.predictor = MLPHead(
             in_channels=self.m_online.projection.net[-1].out_features,
             **config["projection_head"],

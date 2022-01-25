@@ -93,8 +93,49 @@ class MLPHead(nn.Module):
 class ResNet18(torch.nn.Module):
     def __init__(self, *args, **kwargs):
         super(ResNet18, self).__init__()
-        if kwargs["model"]["architecture"] == "resnet18":
-            resnet = models.resnet18(pretrained=False)
+        resnet = models.resnet18(pretrained=False)
+
+        self.encoder = torch.nn.Sequential(*list(resnet.children())[:-1])
+
+        # Change first layer for 1 channel B/W images
+        self.encoder[0] = nn.Conv2d(1, 64, 7, 2, 3)
+
+        # Add projection layer
+        self.projection = MLPHead(
+            in_channels=resnet.fc.in_features, **kwargs["projection_head"]
+        )
+
+    def forward(self, x):
+        h = self.encoder(x)
+        h = h.view(h.shape[0], h.shape[1])
+        return self.projection(h)
+
+
+class ResNet50(torch.nn.Module):
+    def __init__(self, *args, **kwargs):
+        super(ResNet50, self).__init__()
+        resnet = models.resnet50(pretrained=False)
+
+        self.encoder = torch.nn.Sequential(*list(resnet.children())[:-1])
+
+        # Change first layer for 1 channel B/W images
+        self.encoder[0] = nn.Conv2d(1, 64, 7, 2, 3)
+
+        # Add projection layer
+        self.projection = MLPHead(
+            in_channels=resnet.fc.in_features, **kwargs["projection_head"]
+        )
+
+    def forward(self, x):
+        h = self.encoder(x)
+        h = h.view(h.shape[0], h.shape[1])
+        return self.projection(h)
+
+
+class WideResNet50_2(torch.nn.Module):
+    def __init__(self, *args, **kwargs):
+        super(WideResNet50_2, self).__init__()
+        resnet = models.wide_resnet50_2(pretrained=False)
 
         self.encoder = torch.nn.Sequential(*list(resnet.children())[:-1])
 

@@ -139,8 +139,8 @@ def compute_mu_sig(dset, batch_size=0):
         std = (D_sq / (n_dset * x.shape[-1] * x.shape[-2])) ** 0.5
 
         print(f"mean: {mean}, std: {std}")
-        return mean, std
+        return mean.item(), std.item()
 
     else:
         x, _ = dset2tens(dset)
-        return torch.mean(x), torch.std(x)
+        return torch.mean(x).item(), torch.std(x).item()

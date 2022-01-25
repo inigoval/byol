@@ -1,7 +1,9 @@
 import pytorch_lightning as pl
+import umap
 
 from dataloading.datamodules import reduce_mbDataModule
 from models import linear_net
+from dataloading.utils import dset2tens
 
 
 def lin_eval_protocol(config, encoder, wandb_logger):
@@ -33,3 +35,9 @@ def lin_eval_protocol(config, encoder, wandb_logger):
     linear_model = linear_net(config)
     linear_trainer.fit(linear_model, eval_data)
     linear_trainer.test(linear_model, dataloaders=eval_data, ckpt_path="best")
+
+
+def umap(dset):
+    x, y = dset2tens(dset)
+    mapper = umap.UMAP().fit(x.view(x.shape[0], -1))
+    umap.plot.points(mapper, labels=y)
