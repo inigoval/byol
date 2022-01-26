@@ -1,12 +1,11 @@
 import pytorch_lightning as pl
 import umap
 
-from dataloading.datamodules import reduce_mbDataModule
 from models import linear_net
 from dataloading.utils import dset2tens
 
 
-def lin_eval_protocol(config, encoder, wandb_logger):
+def lin_eval_protocol(config, data, encoder, wandb_logger):
     # Switch loader to linear evaluation mode
     linear_checkpoint = pl.callbacks.ModelCheckpoint(
         monitor="linear_eval/val_acc",
@@ -14,13 +13,6 @@ def lin_eval_protocol(config, encoder, wandb_logger):
         every_n_epochs=1,
         verbose=True,
     )
-
-    eval_data = reduce_mbDataModule(encoder, config)
-    eval_data.prepare_data()
-    eval_data.setup()
-
-    config["eval"]["mu"] = eval_data.mu.item()
-    config["eval"]["sig"] = eval_data.sig.item()
 
     linear_trainer = pl.Trainer(
         devices=1,
@@ -33,8 +25,8 @@ def lin_eval_protocol(config, encoder, wandb_logger):
     )
 
     linear_model = linear_net(config)
-    linear_trainer.fit(linear_model, eval_data)
-    linear_trainer.test(linear_model, dataloaders=eval_data, ckpt_path="best")
+    linear_trainer.fit(linear_model, data)
+    linear_trainer.test(linear_model, dataloaders=data, ckpt_path="best")
 
 
 def umap(dset):

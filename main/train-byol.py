@@ -69,7 +69,7 @@ model = byol(config)
 config["model"]["output_dim"] = model.m_online.projection.net[0].in_features
 
 # Train model #
-pre_trainer.fit(model, data)
+pre_trainer.fit(model, pretrain_data)
 
 # Run test loop #
 # pre_trainer.test(ckpt_path="best")
@@ -82,7 +82,21 @@ wandb.save(pretrain_checkpoint.best_model_path)
 ########## LINEAR EVALUATION PROTOCOL ############
 ##################################################
 
-# Switch loader to linear evaluation mode
+
+# Extract and load best encoder from pretraining
+best_model_path = pretrain_checkpoint.best_model_path
+pretrained_model = byol.load_from_checkpoint(best_model_path)
+encoder = pretrained_model.m_online.encoder
+
+# Freeze encoder weights
+freeze_model(encoder)
+
+# Switch data-loader to linear evaluation mode
+eval_data = datasets[config["dataset"]]["linear"](encoder, config)
+eval_data.prepare_data()
+eval_data.setup()
+
+
 linear_checkpoint = pl.callbacks.ModelCheckpoint(
     monitor="linear_eval/val_acc",
     mode="max",
@@ -90,11 +104,17 @@ linear_checkpoint = pl.callbacks.ModelCheckpoint(
     verbose=True,
 )
 
-best_model_path = pretrain_checkpoint.best_model_path
-pretrained_model = byol.load_from_checkpoint(best_model_path)
-encoder = pretrained_model.m_online.encoder
-freeze_model(encoder)
+linear_trainer = pl.Trainer(
+    devices=1,
+    accelerator="gpu",
+    max_epochs=config["linear"]["n_epochs"],
+    logger=wandb_logger,
+    deterministic=True,
+)
 
-lin_eval_protocol(config, encoder, wandb_logger)
+linear_model = linear_net(config)
+linear_trainer.fit(linear_model, eval_data)
+linear_trainer.test(linear_model, dataloaders=eval_data, ckpt_path="best")
+
 
 wandb_logger.experiment.finish()

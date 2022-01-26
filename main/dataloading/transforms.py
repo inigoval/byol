@@ -124,7 +124,7 @@ class MultiView(nn.Module):
         return views
 
     def update_normalization(self, mu, sig):
-        self.normalize = T.Normalize((mu,), (sig,))
+        self.normalize = T.Normalize(mu, sig)
 
 
 class Identity(nn.Module):
@@ -146,32 +146,41 @@ class Identity(nn.Module):
         return x
 
     def update_normalization(self, mu, sig):
-        self.normalize = T.Normalize((mu,), (sig,))
+        self.normalize = T.Normalize(mu, sig)
 
 
 class ReduceView(nn.Module):
-    def __init__(self, encoder, config):
+    def __init__(self, encoder, config, train=True):
         super().__init__()
 
         # Define a view
         cropsize = config["center_crop_size"]
-        self.aug = T.Compose(
-            [
-                T.RandomRotation(180),
-                T.CenterCrop(cropsize),
-                T.RandomHorizontalFlip(),
-                T.ToTensor(),
-            ]
-        )
+
+        if train:
+            self.aug = T.Compose(
+                [
+                    T.RandomRotation(180),
+                    T.CenterCrop(cropsize),
+                    T.RandomHorizontalFlip(),
+                    T.ToTensor(),
+                ]
+            )
+        else:
+            self.aug = T.Compose(
+                [
+                    T.CenterCrop(cropsize),
+                    T.ToTensor(),
+                ]
+            )
 
         self.reduce = lambda x: encoder(x)
-        self.normalize = T.Normalize((0,), (1,))
+        # self.normalize = T.Normalize((0,), (1,))
 
     def __call__(self, x):
         x = self.aug(x)
         x = x.view(1, 1, x.shape[-2], x.shape[-1])
         x = self.reduce(x).view(-1, 1, 1)
-        x = self.normalize(x)
+        # x = self.normalize(x)
         return x
 
     def update_normalization(self, mu, sig):

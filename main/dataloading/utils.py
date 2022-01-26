@@ -129,7 +129,7 @@ def compute_mu_sig(dset, batch_size=0):
         for x, _ in loader:
             x = x[0]
             weight = x.shape[0] / n_dset
-            mean += weight * torch.mean(x)
+            mean += weight * torch.mean(x).item()
 
         # Calculate std
         D_sq = 0
@@ -139,7 +139,7 @@ def compute_mu_sig(dset, batch_size=0):
         std = (D_sq / (n_dset * x.shape[-1] * x.shape[-2])) ** 0.5
 
         print(f"mean: {mean}, std: {std}")
-        return mean.item(), std.item()
+        return mean, std.item()
 
     else:
         x, _ = dset2tens(dset)
