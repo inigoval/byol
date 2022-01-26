@@ -40,8 +40,7 @@ cut_threshold: 60
 
 ## AUGMENTATIONS ##
 center_crop_size: 85
-random_crop_min: 0.3
-random_crop_max: 1
+random_crop: !!python/tuple [0.3, 1]
 blur_kernel: 23
 blur_sig: !!python/tuple [0.1, 2.0]
 p_blur: 0.5

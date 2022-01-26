@@ -115,14 +115,10 @@ class cifar10_DataModule(pl.LightningDataModule):
         self.path = path
         self.config = config
 
-        self.T_train = MultiView(config, n_views=2)
-        self.T_test = Identity(config, train=False)
-
         self.mu = (0.4914, 0.4822, 0.4465)
         self.sig = (0.247, 0.243, 0.261)
-
-        self.T_train.update_normalization((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-        self.T_test.update_normalization((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        self.T_train = MultiView(config, n_views=2, mu=self.mu, sig=self.sig)
+        self.T_test = Identity(config, train=False, mu=self.mu, sig=self.sig)
 
     def prepare_data(self):
         CIFAR10(self.path, train=True, download=True)
@@ -155,9 +151,10 @@ class cifar10_DataModule_eval(pl.LightningDataModule):
         self.path = path
         self.config = config
 
-        mu, sig = config["data"]["mu"], config["data"]["sig"]
-        self.T_train = ReduceView(encoder, config, train=True, mu=mu, sig=sig)
-        self.T_test = ReduceView(encoder, config, train=False)
+        self.mu = (0.4914, 0.4822, 0.4465)
+        self.sig = (0.247, 0.243, 0.261)
+        self.T_train = ReduceView(encoder, config, train=True, mu=self.mu, sig=self.sig)
+        self.T_test = ReduceView(encoder, config, train=False, mu=self.mu, sig=self.sig)
 
     def prepare_data(self):
         CIFAR10(self.path, train=True, download=True)
