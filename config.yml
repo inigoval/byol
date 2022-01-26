@@ -1,5 +1,6 @@
 type: 'byol'
 project_name: 'byol'
+dataset: 'rgz'
 
 model:
     arch: 'resnet18'
@@ -9,11 +10,12 @@ projection_head:
     projection_size: 100 
 
 train:
-    n_epochs: 200
+    n_epochs: 1
     opt: 'sgd'
 
 data:
     color_channels: 1
+    classes: 2
     mu: 0
     sig: 1
 
@@ -34,7 +36,7 @@ pca:
 ###############################
 ### optimisable hyperparams ###
 ###############################
-cut_threshold: 50
+cut_threshold: 60
 
 ## AUGMENTATIONS ##
 center_crop_size: 85
@@ -48,6 +50,6 @@ lr: 0.03
 batch_size: 256 
 momentum: 0.9
 weight_decay: 0.0000005
-lars: False
+lars: True
 
 m: 0.996

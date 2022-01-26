@@ -101,7 +101,9 @@ class linear_net(pl.LightningModule):
     def __init__(self, config):
         super().__init__()
         self.config = config
-        self.logreg = LogisticRegression(self.config["model"]["output_dim"], 2)
+
+        n_classes = self.config["data"]["classes"]
+        self.logreg = LogisticRegression(self.config["model"]["output_dim"], n_classes)
         self.ce_loss = torch.nn.CrossEntropyLoss()
 
         paths = Path_Handler()

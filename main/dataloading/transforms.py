@@ -150,10 +150,9 @@ class Identity(nn.Module):
 
 
 class ReduceView(nn.Module):
-    def __init__(self, encoder, config, train=True):
+    def __init__(self, encoder, config, train=True, mu=(0,), sig=(1,)):
         super().__init__()
 
-        # Define a view
         cropsize = config["center_crop_size"]
 
         if train:
@@ -165,6 +164,7 @@ class ReduceView(nn.Module):
                     T.ToTensor(),
                 ]
             )
+
         else:
             self.aug = T.Compose(
                 [
@@ -173,15 +173,15 @@ class ReduceView(nn.Module):
                 ]
             )
 
+        self.normalize = T.Normalize(mu, sig)
         self.reduce = lambda x: encoder(x)
-        # self.normalize = T.Normalize((0,), (1,))
 
     def __call__(self, x):
         x = self.aug(x)
+        x = self.normalize(x)
         x = x.view(1, 1, x.shape[-2], x.shape[-1])
         x = self.reduce(x).view(-1, 1, 1)
-        # x = self.normalize(x)
         return x
 
     def update_normalization(self, mu, sig):
-        self.normalize = T.Normalize((mu,), (sig,))
+        self.normalize = T.Normalize(mu, sig)

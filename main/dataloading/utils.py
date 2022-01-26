@@ -123,13 +123,47 @@ def compute_mu_sig(dset, batch_size=0):
         # Load samples in batches
         n_dset = len(dset)
         loader = DataLoader(dset, batch_size)
+        n, c, h, w = next(iter(loader))[0][0].shape
 
         # Calculate mean
         mean = 0
         for x, _ in loader:
             x = x[0]
             weight = x.shape[0] / n_dset
-            mean += weight * torch.mean(x).item()
+            mean += weight * torch.mean(x)
+
+        # Calculate std
+        D_sq = 0
+        for x, _ in loader:
+            x = x[0]
+            D_sq += torch.sum((x - mean) ** 2)
+        std = (D_sq / (n_dset * h * w)) ** 0.5
+
+        print(f"mean: {mean}, std: {std}")
+        return mean, std.item()
+
+    else:
+        x, _ = dset2tens(dset)
+        return torch.mean(x).item(), torch.std(x).item()
+
+
+def compute_mu_sig_multiple_channels(dset, batch_size=0):
+    """Compute mean and standard variance of a dataset (use batching with large datasets)"""
+    if batch_size:
+        # Load samples in batches
+        n_dset = len(dset)
+        loader = DataLoader(dset, batch_size)
+        n_channels = next(iter(loader))[0].shape[1]
+
+        # Calculate mean
+        mean = torch.zeros(n_channels)
+        for x, _ in loader:
+            x = x[0]
+
+            for c in np.arange(n_channels):
+                x_c = x[:, c, :, :]
+                weight = x.shape[0] / n_dset
+                mean[c] += weight * torch.mean(x_c).item()
 
         # Calculate std
         D_sq = 0

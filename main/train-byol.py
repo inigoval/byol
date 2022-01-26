@@ -4,7 +4,8 @@ import numpy as np
 import pytorch_lightning as pl
 
 from paths import Path_Handler
-from dataloading.datamodules import mbDataModule, reduce_mbDataModule
+from dataloading.datamodules import cifar10_DataModule, cifar10_DataModule_eval
+from dataloading.datamodules import mb_DataModule, mb_DataModule_eval
 from models import byol, linear_net
 from config import load_config
 from utilities import freeze_model, log_examples
@@ -38,15 +39,18 @@ wandb_logger = pl.loggers.WandbLogger(
 )
 
 # Load data and record hyperparameters #
-data = mbDataModule(config)
-data.prepare_data()
-data.setup()
+datasets = {
+    "cifar10": {"pretrain": cifar10_DataModule},
+    "rgz": {"pretrain": mb_DataModule, "linear": mb_DataModule_eval},
+}
+pretrain_data = datasets[config["dataset"]]["pretrain"](config)
+pretrain_data.prepare_data()
+pretrain_data.setup()
 
 # Record mean and standard deviation used in normalisation for inference #
-config["data"]["mu"] = data.mu
-config["data"]["sig"] = data.sig
-log_examples(wandb_logger, data.data["train"])
-
+config["data"]["mu"] = pretrain_data.mu
+config["data"]["sig"] = pretrain_data.sig
+log_examples(wandb_logger, pretrain_data.data["train"])
 
 # List of callbacks
 callbacks = [pretrain_checkpoint]
