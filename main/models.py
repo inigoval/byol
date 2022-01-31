@@ -152,8 +152,12 @@ class linear_net(pl.LightningModule):
         self.log("linear_eval/test_acc", acc)
 
     def configure_optimizers(self):
-        lr = self.config["linear"]["lr"]
-        opt = torch.optim.Adam(self.logreg.parameters(), lr=lr)
+        opt = torch.optim.SGD(
+            self.logreg.parameters(),
+            lr=self.config["linear"]["lr"],
+            momentum=self.config["linear"]["momentum"],
+            weight_decay=self.config["linear"]["weight_decay"],
+        )
         return opt
 
 
