@@ -12,3 +12,8 @@ def load_config():
     with open(path, "r") as ymlconfig:
         config = yaml.load(ymlconfig, Loader=yaml.FullLoader)
     return config
+
+
+def update_config(config):
+    """Update config with values requiring initialisation of config"""
+    config["lr"] = config["lr"] * config["batch_size"] / 256

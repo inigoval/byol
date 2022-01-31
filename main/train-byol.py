@@ -7,11 +7,12 @@ from paths import Path_Handler
 from dataloading.datamodules import cifar10_DataModule, cifar10_DataModule_eval
 from dataloading.datamodules import mb_DataModule, mb_DataModule_eval
 from models import byol, linear_net
-from config import load_config
+from config import load_config, update_config
 from utilities import freeze_model, log_examples
 from eval import lin_eval_protocol
 
 config = load_config()
+update_config(config)
 
 paths = Path_Handler()
 path_dict = paths._dict()
@@ -40,9 +41,10 @@ wandb_logger = pl.loggers.WandbLogger(
 
 # Load data and record hyperparameters #
 datasets = {
-    "cifar10": {"pretrain": cifar10_DataModule},
+    "cifar10": {"pretrain": cifar10_DataModule, "linear": cifar10_DataModule_eval},
     "rgz": {"pretrain": mb_DataModule, "linear": mb_DataModule_eval},
 }
+
 pretrain_data = datasets[config["dataset"]]["pretrain"](config)
 pretrain_data.prepare_data()
 pretrain_data.setup()
@@ -50,6 +52,8 @@ pretrain_data.setup()
 # Record mean and standard deviation used in normalisation for inference #
 config["data"]["mu"] = pretrain_data.mu
 config["data"]["sig"] = pretrain_data.sig
+config["data"]["n_steps"] = len(pretrain_data.train_dataloader())
+
 log_examples(wandb_logger, pretrain_data.data["train"])
 
 # List of callbacks
