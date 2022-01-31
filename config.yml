@@ -23,6 +23,8 @@ linear:
     n_epochs: 40
     lr: 0.0005
     batch_size: 50
+    momentum: 0.9
+    weight_decay: 0
 
 eval:
     mu: 0
@@ -42,13 +44,19 @@ cut_threshold: 60
 center_crop_size: 85
 random_crop: !!python/tuple [0.3, 1]
 blur_kernel: 23
-blur_sig: !!python/tuple [0.1, 2.0]
+blur_sig: !!python/tuple [!!python/tuple [0.1, 2.0]]
+#blur_sig: !!python/tuple [!!python/tuple [0.1, 2.0]]
 p_blur: 0.5
+s: 1
 
+# Optimiser
+warmup_epochs: 10
+scheduler: False
 lr: 0.03
 batch_size: 256 
 momentum: 0.9
-weight_decay: 0.0000005
+weight_decay: 0.0000015
 lars: True
+trust_coef: 0.003
 
 m: 0.996
