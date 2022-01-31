@@ -132,8 +132,6 @@ References:
     - https://arxiv.org/pdf/1708.03888.pdf
     - https://github.com/noahgolmant/pytorch-lars/blob/master/lars.py
 """
-import torch
-from torch.optim import Optimizer
 
 
 class LARSWrapper(object):
@@ -152,7 +150,7 @@ class LARSWrapper(object):
         self.optim = optimizer
         self.eta = eta
         self.eps = eps
-        self.clip = clip 
+        self.clip = clip
         # transfer optim methods
         self.state_dict = self.optim.state_dict
         self.load_state_dict = self.optim.load_state_dict

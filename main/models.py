@@ -11,6 +11,8 @@ from utilities import LARSWrapper
 
 from statistics import mean
 from sklearn.decomposition import IncrementalPCA
+from pl_bolts.optimizers.lr_scheduler import LinearWarmupCosineAnnealingLR
+
 
 from networks.models import MLPHead, LogisticRegression
 from networks.models import ResNet18, ResNet50, WideResNet50_2
@@ -83,7 +85,17 @@ class byol(pl.LightningModule):
         opt = opts[self.config["train"]["opt"]]
 
         if self.config["lars"]:
-            opt = LARSWrapper(opt)
+            opt = LARSWrapper(opt, eta=self.config["trust_coef"])
+
+        if self.config["scheduler"]:
+            scheduler = LinearWarmupCosineAnnealingLR(
+                opt,
+                self.config["warmup_epochs"],
+                max_epochs=self.config["train"]["n_epochs"],
+            )
+            lr_scheduler_config = {"scheduler": scheduler, "interval": "epoch"}
+
+            return {"optimizer": opt, "scheduler": lr_scheduler_config}
 
         return opt
 
