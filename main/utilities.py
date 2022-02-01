@@ -12,6 +12,8 @@ from torch.optim import Optimizer
 from PIL import Image
 from mpl_toolkits.axes_grid1 import ImageGrid
 from torch.utils.data import DataLoader
+from torchvision.utils import make_grid
+from torchvision.transforms import ToPILImage
 
 from paths import Path_Handler
 
@@ -98,19 +100,20 @@ def freeze_model(model):
         param.requires_grad = False
 
 
-def log_examples(wandb_logger, dset, n=18):
+def log_examples__(wandb_logger, dset, n=18):
     save_list = []
     count = 0
     for x, _ in DataLoader(dset, 1):
         if count > n:
             break
         x1, x2 = x
+        C, H, W = x1.shape[-3], x1.shape[-2], x1.shape[-1]
         fig = plt.figure(figsize=(13.0, 13.0))
         grid = ImageGrid(fig, 111, nrows_ncols=(1, 2), axes_pad=0)
 
         img_list = [x1, x2]
         for ax, im in zip(grid, img_list):
-            im = im.reshape((im.shape[-1], im.shape[-2]))
+            im = im.reshape((H, W, C))
             ax.axis("off")
             ax.imshow(im, cmap="hot")
 
@@ -118,6 +121,24 @@ def log_examples(wandb_logger, dset, n=18):
         pil_img = fig2img(fig)
         save_list.append(pil_img)
         plt.close(fig)
+        count += 1
+
+    wandb_logger.log_image(key=f"image_pairs", images=save_list)
+
+
+def log_examples(wandb_logger, dset, n=18):
+    save_list = []
+    count = 0
+    for x, _ in DataLoader(dset, 1):
+        if count > n:
+            break
+        x1, x2 = x
+        C, H, W = x1.shape[-3], x1.shape[-2], x1.shape[-1]
+        img_list = [x_i.view(C, H, W) for x_i in x]
+        img = make_grid(img_list)
+        tens2pil = ToPILImage()
+        save_list.append(tens2pil(img))
+
         count += 1
 
     wandb_logger.log_image(key=f"image_pairs", images=save_list)

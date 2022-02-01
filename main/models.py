@@ -7,13 +7,14 @@ import pytorch_lightning as pl
 import torchmetrics.functional as tmF
 import numpy as np
 from tqdm import tqdm
-from utilities import LARSWrapper
 
 from statistics import mean
 from sklearn.decomposition import IncrementalPCA
 from pl_bolts.optimizers.lr_scheduler import LinearWarmupCosineAnnealingLR
+from math import cos, pi
 
 
+from utilities import LARSWrapper
 from networks.models import MLPHead, LogisticRegression
 from networks.models import ResNet18, ResNet50, WideResNet50_2
 from utilities import byol_loss, freeze_model
@@ -103,6 +104,9 @@ class byol(pl.LightningModule):
     def update_m_target(self):
         """Update target network without gradients"""
         m = self.config["m"]
+        epoch = self.current_epoch
+        n_epochs = self.config["train"]["n_epochs"]
+        m = 1 - (1 - m) * (cos(pi * epoch / n_epochs) + 1) / 2
         for param_q, param_k in zip(
             self.m_online.parameters(), self.m_target.parameters()
         ):
@@ -144,6 +148,7 @@ class linear_net(pl.LightningModule):
         x = x.view(x.shape[0], -1)
         logits = self.forward(x)
         y_pred = logits.softmax(dim=-1)
+
         loss = self.ce_loss(logits, y)
         self.log("linear_eval/val_loss", loss)
 
@@ -156,6 +161,7 @@ class linear_net(pl.LightningModule):
         x = x.view(x.shape[0], -1)
         logits = self.forward(x)
         y_pred = logits.softmax(dim=-1)
+
         loss = self.ce_loss(logits, y)
         self.log("linear_eval/test_loss", loss)
 

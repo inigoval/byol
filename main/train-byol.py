@@ -1,15 +1,12 @@
 import wandb
-import torch
-import numpy as np
 import pytorch_lightning as pl
 
 from paths import Path_Handler
-from dataloading.datamodules import cifar10_DataModule, cifar10_DataModule_eval
+from dataloading.datamodules import imagenette_DataModule, imagenette_DataModule_eval
 from dataloading.datamodules import mb_DataModule, mb_DataModule_eval
 from models import byol, linear_net
 from config import load_config, update_config
 from utilities import freeze_model, log_examples
-from eval import lin_eval_protocol
 
 config = load_config()
 update_config(config)
@@ -41,7 +38,10 @@ wandb_logger = pl.loggers.WandbLogger(
 
 # Load data and record hyperparameters #
 datasets = {
-    "cifar10": {"pretrain": cifar10_DataModule, "linear": cifar10_DataModule_eval},
+    "imagenette": {
+        "pretrain": imagenette_DataModule,
+        "linear": imagenette_DataModule_eval,
+    },
     "rgz": {"pretrain": mb_DataModule, "linear": mb_DataModule_eval},
 }
 

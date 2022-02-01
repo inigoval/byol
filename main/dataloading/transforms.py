@@ -90,29 +90,12 @@ class GaussianBlur(object):
 
 
 class MultiView(nn.Module):
-    def __init__(self, config, n_views=2, s=1, mu=(0,), sig=(1,)):
+    def __init__(self, config, n_views=2, mu=(0,), sig=(1,)):
         super().__init__()
         self.config = config
-        center_crop = config["center_crop_size"]
-        random_crop = config["random_crop"]
-        # Color jitter parameters are taken from the BYOL paper
-        color_jitter = T.ColorJitter(0.8 * s, 0.8 * s, 0.8 * s, 0)
-        blur = T.GaussianBlur(
-            self.config["blur_kernel"], sigma=(self.config["blur_sig"])
-        )
 
         # Define a view
-        self.view = T.Compose(
-            [
-                T.RandomRotation(180),
-                T.RandomApply([color_jitter], p=0.8),
-                T.RandomApply([blur], p=self.config["p_blur"]),
-                T.CenterCrop(center_crop),
-                T.RandomResizedCrop(center_crop, scale=random_crop),
-                T.RandomHorizontalFlip(),
-                T.ToTensor(),
-            ]
-        )
+        self.view = self._view()
         self.normalize = T.Normalize(mu, sig)
         self.n_views = n_views
 
@@ -123,24 +106,80 @@ class MultiView(nn.Module):
             views.append(view)
         return views
 
+    def _view(self):
+        if self.config["dataset"] == "rgz":
+
+            # Gaussian blurring
+            blur_kernel = self.config["blur_kernel"]
+            blur_sig = self.config["blur_sig"]
+            blur = T.GaussianBlur(blur_kernel, sigma=blur_sig)
+
+            # Cropping
+            center_crop = self.config["center_crop_size"]
+            random_crop = self.config["random_crop"]
+
+            # Color jitter
+            s = self.config["s"]
+            color_jitter = T.ColorJitter(0.8 * s, 0.8 * s, 0.8 * s, 0)
+
+            # Define a view
+            view = T.Compose(
+                [
+                    T.RandomRotation(180),
+                    T.RandomResizedCrop(center_crop, scale=random_crop),
+                    T.RandomApply([color_jitter], p=0.8),
+                    T.RandomApply([blur], p=self.config["p_blur"]),
+                    T.CenterCrop(center_crop),
+                    T.RandomHorizontalFlip(),
+                    T.ToTensor(),
+                ]
+            )
+
+        if self.config["dataset"] == "imagenette":
+
+            # Gaussian blurring, kernel 10% of image size (SimCLR paper)
+            blur = T.GaussianBlur(13, sigma=(0.1, 2.0))
+
+            # Cropping
+            # random_crop = self.config["random_crop"]
+
+            # Color jitter
+            # s = self.config["s"]
+            s = 1
+            color_jitter = T.ColorJitter(0.8 * s, 0.8 * s, 0.8 * s, 0)
+
+            # Define a view
+            view = T.Compose(
+                [
+                    T.RandomResizedCrop(128, scale=(0.08, 1)),
+                    T.RandomHorizontalFlip(),
+                    T.RandomApply([color_jitter], p=0.8),
+                    T.RandomApply([blur], p=self.config["p_blur"]),
+                    T.RandomGrayscale(p=0.2),
+                    T.ToTensor(),
+                ]
+            )
+
+        return view
+
     def update_normalization(self, mu, sig):
         self.normalize = T.Normalize(mu, sig)
 
 
-class Identity(nn.Module):
-    def __init__(self, config, train=True, mu=(0,), sig=(1,)):
+class SimpleView(nn.Module):
+    def __init__(self, config, rotate=True, mu=(0,), sig=(1,)):
         super().__init__()
         self.config = config
         self.crop_size = config["center_crop_size"]
-        self.train = train
-        self.rotate = T.RandomRotation(180)
+        self.rotate = rotate
+        self.T_rotate = T.RandomRotation(180)
         self.view = T.Compose([T.CenterCrop(self.crop_size), T.ToTensor()])
         self.normalize = T.Normalize(mu, sig)
 
     def __call__(self, x):
         # Use rotation if training
-        if self.train:
-            x = self.rotate(x)
+        if self.rot:
+            x = self.T_rotate(x)
 
         x = self.normalize(self.view(x))
         return x
@@ -179,7 +218,7 @@ class ReduceView(nn.Module):
     def __call__(self, x):
         x = self.aug(x)
         x = self.normalize(x)
-        x = x.view(1, 1, x.shape[-2], x.shape[-1])
+        x = x.view(1, x.shape[-3], x.shape[-2], x.shape[-1])
         x = self.reduce(x).view(-1, 1, 1)
         return x
 

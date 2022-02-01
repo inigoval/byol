@@ -119,6 +119,7 @@ def dset2tens(dset):
 
 def compute_mu_sig(dset, batch_size=0):
     """Compute mean and standard variance of a dataset (use batching with large datasets)"""
+    print("Computing mean and std of dataset")
     if batch_size:
         # Load samples in batches
         n_dset = len(dset)

@@ -97,8 +97,9 @@ class ResNet18(torch.nn.Module):
 
         self.encoder = torch.nn.Sequential(*list(resnet.children())[:-1])
 
-        # Change first layer for 1 channel B/W images
-        self.encoder[0] = nn.Conv2d(1, 64, 7, 2, 3)
+        # Change first layer for color channels B/W images
+        n_c = kwargs["data"]["color_channels"]
+        self.encoder[0] = nn.Conv2d(n_c, 64, 7, 2, 3)
 
         # Add projection layer
         self.projection = MLPHead(
