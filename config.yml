@@ -1,10 +1,9 @@
 type: 'byol'
 project_name: 'byol'
-dataset: 'rgz'
+dataset: 'imagenette'
 
 model:
-    arch: 'resnet18'
-
+    arch: 'resnet18' 
 projection_head:
     mlp_hidden_size: 256
     projection_size: 100 
@@ -14,13 +13,13 @@ train:
     opt: 'sgd'
 
 data:
-    color_channels: 1
-    classes: 2
+    color_channels: None
+    classes: None
     mu: 0
     sig: 1
 
 linear:
-    n_epochs: 40
+    n_epochs: 400
     lr: 0.0005
     batch_size: 50
     momentum: 0.9
@@ -51,7 +50,7 @@ s: 1
 
 # Optimiser
 warmup_epochs: 10
-scheduler: False
+scheduler: True
 lr: 0.03
 batch_size: 256 
 momentum: 0.9

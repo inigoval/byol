@@ -17,3 +17,11 @@ def load_config():
 def update_config(config):
     """Update config with values requiring initialisation of config"""
     config["lr"] = config["lr"] * config["batch_size"] / 256
+
+    if config["dataset"] == "imagenette":
+        config["data"]["color_channels"] = 3
+        config["data"]["classes"] = 10
+
+    if config["dataset"] == "rgz":
+        config["data"]["color_channels"] = 1
+        config["data"]["classes"] = 2
