@@ -16,8 +16,11 @@ def load_config():
 
 def update_config(config):
     """Update config with values requiring initialisation of config"""
+
+    # Learning rate scaling from BYOL
     config["lr"] = config["lr"] * config["batch_size"] / 256
 
+    # Adjust parameters for different data-sets
     if config["dataset"] == "imagenette":
         config["data"]["color_channels"] = 3
         config["data"]["classes"] = 10

@@ -163,7 +163,7 @@ class imagenette_DataModule_eval(pl.LightningDataModule):
     def setup(self):
         # Initialise individual datasets with identity transform (for evaluation)
         self.data["train"] = ImageFolder(self.path / "train", transform=self.T_train)
-        self.data["test"] = ImageFolder(self.path / "val", transform=self.T_test)
+        self.data["val"] = ImageFolder(self.path / "val", transform=self.T_test)
 
     def train_dataloader(self):
         # Batch only labelled data
@@ -172,12 +172,11 @@ class imagenette_DataModule_eval(pl.LightningDataModule):
         return loader
 
     def val_dataloader(self):
-        loader = DataLoader(self.data["test"], len(self.data["test"]))
+        loader = DataLoader(self.data["val"], len(self.data["test"]))
         return loader
 
     def test_dataloader(self):
-        loader = DataLoader(self.data["test"], len(self.data["test"]))
-        return loader
+        return
 
 
 class cifar10_DataModule_eval(pl.LightningDataModule):

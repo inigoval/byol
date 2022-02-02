@@ -1,6 +1,7 @@
 type: 'byol'
 project_name: 'byol'
-dataset: 'imagenette'
+dataset: 'rgz'
+compute: 'gpu'
 
 model:
     arch: 'resnet18' 
@@ -9,7 +10,7 @@ projection_head:
     projection_size: 100 
 
 train:
-    n_epochs: 1
+    n_epochs: 200
     opt: 'sgd'
 
 data:
@@ -19,8 +20,8 @@ data:
     sig: 1
 
 linear:
-    n_epochs: 400
-    lr: 0.0005
+    n_epochs: 200
+    lr: 0.001
     batch_size: 50
     momentum: 0.9
     weight_decay: 0
@@ -37,25 +38,33 @@ pca:
 ###############################
 ### optimisable hyperparams ###
 ###############################
-cut_threshold: 60
+
+## DATA ## 
+cut_threshold: 20
 
 ## AUGMENTATIONS ##
 center_crop_size: 85
 random_crop: !!python/tuple [0.3, 1]
 blur_kernel: 23
-blur_sig: !!python/tuple [!!python/tuple [0.1, 2.0]]
+blur_sig: !!python/tuple [0.1, 2.0]
 #blur_sig: !!python/tuple [!!python/tuple [0.1, 2.0]]
 p_blur: 0.5
 s: 1
 
-# Optimiser
-warmup_epochs: 10
-scheduler: True
+## Optimiser ## 
+# Base settings
 lr: 0.03
 batch_size: 256 
 momentum: 0.9
 weight_decay: 0.0000015
+# Scheduler
+scheduler: False
+warmup_epochs: 10
+
+# LARS
 lars: True
 trust_coef: 0.003
 
+## BYOL ## 
 m: 0.996
+m_decay: True

@@ -104,9 +104,12 @@ class byol(pl.LightningModule):
     def update_m_target(self):
         """Update target network without gradients"""
         m = self.config["m"]
-        epoch = self.current_epoch
-        n_epochs = self.config["train"]["n_epochs"]
-        m = 1 - (1 - m) * (cos(pi * epoch / n_epochs) + 1) / 2
+
+        if self.config["m_decay"]:
+            epoch = self.current_epoch
+            n_epochs = self.config["train"]["n_epochs"]
+            m = 1 - (1 - m) * (cos(pi * epoch / n_epochs) + 1) / 2
+
         for param_q, param_k in zip(
             self.m_online.parameters(), self.m_target.parameters()
         ):
@@ -155,19 +158,6 @@ class linear_net(pl.LightningModule):
         # predictions = torch.argmax(logits, dim=1).int()
         acc = tmF.accuracy(y_pred, y)
         self.log("linear_eval/val_acc", acc)
-
-    def test_step(self, batch, batch_idx):
-        x, y = batch
-        x = x.view(x.shape[0], -1)
-        logits = self.forward(x)
-        y_pred = logits.softmax(dim=-1)
-
-        loss = self.ce_loss(logits, y)
-        self.log("linear_eval/test_loss", loss)
-
-        # predictions = torch.argmax(logits, dim=1).int()
-        acc = tmF.accuracy(y_pred, y)
-        self.log("linear_eval/test_acc", acc)
 
     def configure_optimizers(self):
         opt = torch.optim.SGD(

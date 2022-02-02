@@ -61,16 +61,6 @@ def fig2img(fig):
     return img
 
 
-def flip(labels, p_flip):
-    """Flip a number of labels"""
-    n_labels = labels.shape[0]
-    n_flip = int(p_flip * n_labels)
-    if n_flip:
-        idx = torch.randint(labels.shape[0], (n_flip))
-    else:
-        return labels
-
-
 def batch_eval(fn_dict, dset, batch_size=200):
     """
     Take functions which acts on data x,y and evaluates over the whole dataset in batches, returning a list of results for each calculated metric
@@ -103,15 +93,32 @@ def freeze_model(model):
 def log_examples(wandb_logger, dset, n=18):
     save_list = []
     count = 0
-    for x, _ in DataLoader(dset, 1, shuffle=True):
+    for x, _ in DataLoader(dset, 1):
         if count > n:
             break
         x1, x2 = x
         C, H, W = x1.shape[-3], x1.shape[-2], x1.shape[-1]
-        img_list = [x_i.view(C, H, W) for x_i in x]
-        img = make_grid(img_list)
-        tens2pil = ToPILImage()
-        save_list.append(tens2pil(img))
+
+        if C == 1:
+            fig = plt.figure(figsize=(13.0, 13.0))
+            grid = ImageGrid(fig, 111, nrows_ncols=(1, 2), axes_pad=0)
+
+            img_list = [x1, x2]
+            for ax, im in zip(grid, img_list):
+                im = im.reshape((H, W, C))
+                ax.axis("off")
+                ax.imshow(im, cmap="hot")
+
+            plt.axis("off")
+            pil_img = fig2img(fig)
+            save_list.append(pil_img)
+            plt.close(fig)
+
+        else:
+            img_list = [x_i.view(C, H, W) for x_i in x]
+            img = make_grid(img_list)
+            tens2pil = ToPILImage()
+            save_list.append(tens2pil(img))
 
         count += 1
 
