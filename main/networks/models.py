@@ -101,6 +101,15 @@ class ResNet18(torch.nn.Module):
         n_c = kwargs["data"]["color_channels"]
         self.encoder[0] = nn.Conv2d(n_c, 64, 7, 2, 3)
 
+        c_out = list(resnet.children())[-1].in_features
+        features = kwargs["model"]["features"]
+
+        self.encoder = nn.Sequential(
+            self.encoder,
+            #            nn.Conv2d(c_out, features, 1),
+            #            nn.AdaptiveAvgPool2d(1),
+        )
+
         # Add projection layer
         self.projection = MLPHead(
             in_channels=resnet.fc.in_features, **kwargs["projection_head"]
@@ -121,6 +130,15 @@ class ResNet50(torch.nn.Module):
 
         # Change first layer for 1 channel B/W images
         self.encoder[0] = nn.Conv2d(1, 64, 7, 2, 3)
+
+        c_out = list(resnet.children())[-1].in_features
+        features = kwargs["model"]["features"]
+
+        self.encoder = nn.Sequential(
+            self.encoder,
+            #            nn.Conv2d(c_out, features, 1),
+            #             nn.AdaptiveAvgPool2d(1),
+        )
 
         # Add projection layer
         self.projection = MLPHead(

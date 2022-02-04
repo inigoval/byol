@@ -44,11 +44,6 @@ def entropy(p, eps=0.0000001, loss=False):
     return H
 
 
-def byol_loss(x, y):
-    x = F.normalize(x, dim=1)
-    y = F.normalize(y, dim=1)
-    return 2 - 2 * (x * y).sum(dim=-1)
-
 
 def fig2img(fig):
     """Convert a Matplotlib figure to a PIL Image and return it"""
