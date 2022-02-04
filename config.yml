@@ -5,12 +5,14 @@ compute: 'gpu'
 
 model:
     arch: 'resnet18' 
+    features: 512
+
 projection_head:
     mlp_hidden_size: 256
     projection_size: 100 
 
 train:
-    n_epochs: 200
+    n_epochs: 150
     opt: 'sgd'
 
 data:
@@ -20,8 +22,8 @@ data:
     sig: 1
 
 linear:
-    n_epochs: 200
-    lr: 0.001
+    n_epochs: 150
+    lr: 0.0005
     batch_size: 50
     momentum: 0.9
     weight_decay: 0
@@ -45,7 +47,7 @@ cut_threshold: 20
 ## AUGMENTATIONS ##
 center_crop_size: 85
 random_crop: !!python/tuple [0.3, 1]
-blur_kernel: 23
+blur_kernel: 23 # Odd non-integer number
 blur_sig: !!python/tuple [0.1, 2.0]
 #blur_sig: !!python/tuple [!!python/tuple [0.1, 2.0]]
 p_blur: 0.5
@@ -55,16 +57,16 @@ s: 1
 # Base settings
 lr: 0.03
 batch_size: 256 
-momentum: 0.9
-weight_decay: 0.0000015
+momentum: 0
+weight_decay: 0.00000
 # Scheduler
-scheduler: False
-warmup_epochs: 10
+scheduler: None # [None, 'cosine', 'warmupcosine']
+warmup_epochs: 10  # Only used in linear warmup cosine annealing
 
 # LARS
-lars: True
+lars: False
 trust_coef: 0.003
 
 ## BYOL ## 
 m: 0.996
-m_decay: True
+m_decay: False

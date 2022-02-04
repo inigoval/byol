@@ -126,10 +126,10 @@ class MultiView(nn.Module):
             view = T.Compose(
                 [
                     T.RandomRotation(180),
-                    T.CenterCrop(center_crop),
-                    T.RandomResizedCrop(center_crop, scale=random_crop),
                     T.RandomApply([color_jitter], p=0.8),
                     T.RandomApply([blur], p=self.config["p_blur"]),
+                    T.CenterCrop(center_crop),
+                    T.RandomResizedCrop(center_crop, scale=random_crop),
                     T.RandomHorizontalFlip(),
                     T.ToTensor(),
                 ]
@@ -178,7 +178,7 @@ class SimpleView(nn.Module):
 
     def __call__(self, x):
         # Use rotation if training
-        if self.rot:
+        if self.rotate:
             x = self.T_rotate(x)
 
         x = self.normalize(self.view(x))
