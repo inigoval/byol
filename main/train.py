@@ -5,7 +5,8 @@ import logging
 from paths import Path_Handler
 from dataloading.datamodules import imagenette_DataModule, imagenette_DataModule_eval
 from dataloading.datamodules import mb_DataModule, mb_DataModule_eval
-from models import byol, linear_net
+from byol import byol
+from eval import linear_net, Feature_Bank
 from config import load_config, update_config
 from utilities import freeze_model, log_examples
 
@@ -67,7 +68,7 @@ if __name__ == "__main__":
     log_examples(wandb_logger, pretrain_data.data["train"])
 
     # List of callbacks
-    callbacks = [pretrain_checkpoint]
+    callbacks = [pretrain_checkpoint, Feature_Bank()]
 
     trainer_settings = {
         "slurm": {"gpus": 1, "num_nodes": 4, "strategy": "ddp"},
