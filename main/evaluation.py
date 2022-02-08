@@ -13,6 +13,7 @@ from torch.utils.data import DataLoader
 from dataloading.utils import dset2tens
 from paths import Path_Handler
 from networks.models import MLPHead, LogisticRegression
+from dataloading.datamodules import mb_DataModule_eval
 
 
 def umap(x, y):
@@ -196,3 +197,31 @@ class pca_net(nn.Module):
                 x = x.view(x.shape[0], -1)
                 x = x.cpu().detach().numpy()
                 self.pca.partial_fit(x)
+
+
+def lin_eval_protocol(config, encoder, wandb_logger):
+    # Switch loader to linear evaluation mode
+    linear_checkpoint = pl.callbacks.ModelCheckpoint(
+        monitor="linear_eval/val_acc",
+        mode="max",
+        every_n_epochs=1,
+        verbose=True,
+    )
+
+    eval_data = mb_DataModule_eval(encoder, config)
+    eval_data.prepare_data()
+    eval_data.setup()
+
+    linear_trainer = pl.Trainer(
+        devices=1,
+        accelerator="gpu",
+        max_epochs=config["linear"]["n_epochs"],
+        logger=wandb_logger,
+        deterministic=True,
+        #    check_val_every_n_epoch=3,
+        #    log_every_n_steps=10,
+    )
+
+    linear_model = linear_net(config)
+    linear_trainer.fit(linear_model, eval_data)
+    linear_trainer.test(linear_model, dataloaders=eval_data, ckpt_path="best")

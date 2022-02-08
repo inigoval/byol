@@ -189,12 +189,12 @@ class SimpleView(nn.Module):
 
 
 class ReduceView(nn.Module):
-    def __init__(self, encoder, config, train=True, mu=(0,), sig=(1,)):
+    def __init__(self, encoder, config, rotate=False, mu=(0,), sig=(1,)):
         super().__init__()
 
         cropsize = config["center_crop_size"]
 
-        if train:
+        if rotate:
             self.aug = T.Compose(
                 [
                     T.RandomRotation(180),

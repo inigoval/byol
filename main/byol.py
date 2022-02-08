@@ -18,7 +18,7 @@ from networks.models import MLPHead, LogisticRegression
 from networks.models import ResNet18, ResNet50, WideResNet50_2
 from utilities import freeze_model
 from paths import Path_Handler
-from eval import knn_predict
+from evaluation import knn_predict
 
 
 def byol_loss(x, y):

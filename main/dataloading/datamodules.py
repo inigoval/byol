@@ -84,8 +84,10 @@ class mb_DataModule_eval(pl.LightningDataModule):
 
         self.mu = (self.config["data"]["mu"],)
         self.sig = (self.config["data"]["sig"],)
-        self.T_train = ReduceView(encoder, config, train=True, mu=self.mu, sig=self.sig)
-        self.T_test = ReduceView(encoder, config, train=False, mu=self.mu, sig=self.sig)
+        self.T_train = ReduceView(
+            encoder, config, rotate=True, mu=self.mu, sig=self.sig
+        )
+        self.T_test = ReduceView(encoder, config, rotate=True, mu=self.mu, sig=self.sig)
 
         self.data = {}
 
@@ -124,7 +126,7 @@ class imagenette_DataModule(pl.LightningDataModule):
         self.config = config
 
         self.mu = (0.485, 0.456, 0.406)
-        self.sig = (0.485, 0.456, 0.406)
+        self.sig = (0.229, 0.224, 0.225)
 
         self.T_train = MultiView(config, mu=self.mu, sig=self.sig)
         self.T_test = SimpleView(config, rotate=False, mu=self.mu, sig=self.sig)
@@ -155,12 +157,10 @@ class imagenette_DataModule_eval(pl.LightningDataModule):
         self.config = config
 
         self.mu = (0.485, 0.456, 0.406)
-        self.sig = (0.485, 0.456, 0.406)
-        # self.mu = (self.config["data"]["mu"],)
-        # self.sig = (self.config["data"]["sig"],)
+        self.sig = (0.229, 0.224, 0.225)
 
-        self.T_train = ReduceView(encoder, config, train=True, mu=self.mu, sig=self.sig)
-        self.T_test = ReduceView(encoder, config, train=False, mu=self.mu, sig=self.sig)
+        self.T_train = ReduceView(encoder, config, mu=self.mu, sig=self.sig)
+        self.T_test = ReduceView(encoder, config, mu=self.mu, sig=self.sig)
 
         self.data = {}
 

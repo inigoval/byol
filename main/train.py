@@ -6,7 +6,7 @@ from paths import Path_Handler
 from dataloading.datamodules import imagenette_DataModule, imagenette_DataModule_eval
 from dataloading.datamodules import mb_DataModule, mb_DataModule_eval
 from byol import byol
-from eval import linear_net, Feature_Bank
+from evaluation import linear_net, Feature_Bank
 from config import load_config, update_config
 from utilities import freeze_model, log_examples
 
@@ -132,6 +132,6 @@ if __name__ == "__main__":
 
     linear_model = linear_net(config)
     linear_trainer.fit(linear_model, eval_data)
-    # linear_trainer.test(linear_model, dataloaders=eval_data, ckpt_path="best")
+    linear_trainer.test(linear_model, dataloaders=eval_data, ckpt_path="best")
 
     wandb_logger.experiment.finish()
