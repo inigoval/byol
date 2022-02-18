@@ -8,7 +8,7 @@ from dataloading.datamodules import mb_DataModule, mb_DataModule_eval
 from dataloading.datamodules import stl10_DataModule, stl10_DataModule_eval
 from dataloading.datamodules import cifar10_DataModule, cifar10_DataModule_eval
 
-from byol import byol
+from byol_lightly import byol
 from evaluation import linear_net, Feature_Bank
 from config import load_config, update_config
 from utilities import freeze_model, log_examples
@@ -18,7 +18,8 @@ if __name__ == "__main__":
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s: %(message)s",
-    ) 
+    )
+
     config = load_config()
     update_config(config)
 
@@ -80,13 +81,10 @@ if __name__ == "__main__":
     log_examples(wandb_logger, pretrain_data.data["train"])
 
     # List of callbacks
-    callbacks = [
-        pretrain_checkpoint,
-        Feature_Bank(),
-    ]
+    callbacks = [pretrain_checkpoint, Feature_Bank()]
 
     trainer_settings = {
-        "slurm": {"gpus": 1, "num_nodes": 4, "strategy": "ddp"},
+        "slurm": {"gpus": 1, "num_nodes": 1},
         "gpu": {"devices": 1, "accelerator": "gpu"},
     }
 
@@ -104,7 +102,7 @@ if __name__ == "__main__":
 
     # Initialise model #
     model = byol(config)
-    config["model"]["output_dim"] = model.m_online.projection.net[0].in_features
+    config["model"]["output_dim"] = config["model"]["features"]
 
     # Train model #
     pre_trainer.fit(model, pretrain_data)
@@ -122,11 +120,11 @@ if __name__ == "__main__":
 
     # Extract and load best encoder from pretraining
     if config["debug"] is True:
-        encoder = model.m_online.encoder
+        encoder = model.backbone
     else:
         best_model_path = pretrain_checkpoint.best_model_path
         pretrained_model = byol.load_from_checkpoint(best_model_path)
-        encoder = pretrained_model.m_online.encoder
+        encoder = model.backbone
 
     # Freeze encoder weights
     freeze_model(encoder)

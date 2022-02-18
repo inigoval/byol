@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchmetrics.functional as tmF
+import torchmetrics as tm
 
 from tqdm import tqdm
 from sklearn.decomposition import IncrementalPCA
@@ -102,7 +103,10 @@ class Feature_Bank(Callback):
         super().__init__()
 
     def on_validation_epoch_start(self, trainer, pl_module):
-        data_bank = pl_module.trainer.datamodule.data["bank"]
+        encoder = pl_module.backbone
+        # encoder = pl_module.m_online.encoder
+
+        data_bank = pl_module.trainer.datamodule.data["l"]
         data_bank_loader = DataLoader(data_bank, 2000)
         feature_bank = []
         target_bank = []
@@ -115,7 +119,7 @@ class Feature_Bank(Callback):
             # y = y.to(pl_module.dummy_param.device)
 
             # Encode data and normalize features (for kNN)
-            feature = pl_module.m_online.encoder(x).squeeze()
+            feature = encoder(x).squeeze()
             feature = F.normalize(feature, dim=1)
             feature_bank.append(feature)
             target_bank.append(y)
@@ -131,7 +135,8 @@ class linear_net(pl.LightningModule):
         self.config = config
 
         n_classes = self.config["data"]["classes"]
-        self.logreg = LogisticRegression(self.config["model"]["output_dim"], n_classes)
+        output_dim = self.config["model"]["output_dim"]
+        self.logreg = LogisticRegression(output_dim, n_classes)
         self.ce_loss = torch.nn.CrossEntropyLoss()
 
         paths = Path_Handler()
@@ -169,12 +174,26 @@ class linear_net(pl.LightningModule):
         self.log("linear_eval/val_acc", acc)
 
     def configure_optimizers(self):
-        opt = torch.optim.SGD(
-            self.logreg.parameters(),
-            lr=self.config["linear"]["lr"],
-            momentum=self.config["linear"]["momentum"],
-            weight_decay=self.config["linear"]["weight_decay"],
-        )
+        lr = self.config["linear"]["lr"]
+        mom = self.config["linear"]["momentum"]
+        w_decay = self.config["linear"]["weight_decay"]
+
+        opts = {
+            "adam": torch.optim.Adam(
+                self.logreg.parameters(),
+                lr=lr,
+                weight_decay=w_decay,
+            ),
+            "sgd": torch.optim.SGD(
+                self.logreg.parameters(),
+                lr=lr,
+                momentum=mom,
+                weight_decay=w_decay,
+            ),
+        }
+
+        opt = opts[self.config["linear"]["opt"]]
+
         return opt
 
 
@@ -197,31 +216,3 @@ class pca_net(nn.Module):
                 x = x.view(x.shape[0], -1)
                 x = x.cpu().detach().numpy()
                 self.pca.partial_fit(x)
-
-
-def lin_eval_protocol(config, encoder, wandb_logger):
-    # Switch loader to linear evaluation mode
-    linear_checkpoint = pl.callbacks.ModelCheckpoint(
-        monitor="linear_eval/val_acc",
-        mode="max",
-        every_n_epochs=1,
-        verbose=True,
-    )
-
-    eval_data = mb_DataModule_eval(encoder, config)
-    eval_data.prepare_data()
-    eval_data.setup()
-
-    linear_trainer = pl.Trainer(
-        devices=1,
-        accelerator="gpu",
-        max_epochs=config["linear"]["n_epochs"],
-        logger=wandb_logger,
-        deterministic=True,
-        #    check_val_every_n_epoch=3,
-        #    log_every_n_steps=10,
-    )
-
-    linear_model = linear_net(config)
-    linear_trainer.fit(linear_model, eval_data)
-    linear_trainer.test(linear_model, dataloaders=eval_data, ckpt_path="best")

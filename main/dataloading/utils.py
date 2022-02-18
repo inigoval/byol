@@ -3,11 +3,13 @@ import torchvision
 import numpy as np
 import torchvision.transforms as T
 import pytorch_lightning as pl
+import torch.utils.data as D
+
+from sklearn.model_selection import train_test_split
+from tqdm import tqdm
 from torchvision.datasets import MNIST
 from torch.utils.data import DataLoader, random_split
 from pytorch_lightning.trainer.supporters import CombinedLoader
-import torch.utils.data as D
-from sklearn.model_selection import train_test_split
 
 from paths import Path_Handler
 from utilities import batch_eval
@@ -124,19 +126,21 @@ def compute_mu_sig(dset, batch_size=0):
         # Load samples in batches
         n_dset = len(dset)
         loader = DataLoader(dset, batch_size)
-        n, c, h, w = next(iter(loader))[0][0].shape
+        x, _ = next(iter(loader))
+        n, c, h, w = x.shape
 
         # Calculate mean
         mean = 0
-        for x, _ in loader:
-            x = x[0]
+        print("Computing mean")
+        for x, _ in tqdm(loader):
+            x = x
             weight = x.shape[0] / n_dset
             mean += weight * torch.mean(x)
 
         # Calculate std
         D_sq = 0
-        for x, _ in loader:
-            x = x[0]
+        print("Computing std")
+        for x, _ in tqdm(loader):
             D_sq += torch.sum((x - mean) ** 2)
         std = (D_sq / (n_dset * h * w)) ** 0.5
 
@@ -148,7 +152,7 @@ def compute_mu_sig(dset, batch_size=0):
         return torch.mean(x).item(), torch.std(x).item()
 
 
-def compute_mu_sig_multiple_channels(dset, batch_size=0):
+def compute_mu_sig_images(dset, batch_size=0):
     """Compute mean and standard variance of a dataset (use batching with large datasets)"""
     if batch_size:
         # Load samples in batches
@@ -159,19 +163,58 @@ def compute_mu_sig_multiple_channels(dset, batch_size=0):
         # Calculate mean
         mean = torch.zeros(n_channels)
         for x, _ in loader:
-            x = x[0]
-
             for c in np.arange(n_channels):
                 x_c = x[:, c, :, :]
                 weight = x.shape[0] / n_dset
                 mean[c] += weight * torch.mean(x_c).item()
 
         # Calculate std
-        D_sq = 0
+        D_sq = torch.zeros(n_channels)
         for x, _ in loader:
-            x = x[0]
+            for c in np.arange(n_channels):
+                x_c = x[:, c, :, :]
+                D_sq += torch.sum((x_c - mean[c]) ** 2)
+        sig = (D_sq / (n_dset * x.shape[-1] * x.shape[-2])) ** 0.5
+
+        mean, sig = tuple(mean.tolist()), tuple(sig.tolist())
+        print(f"mean: {mean}, std: {sig}")
+        return mean, sig
+
+    else:
+        x, _ = dset2tens(dset)
+        n_channels = x.shape[1]
+        mean, sig = [], []
+        for c in n_channels:
+            x_c = x[:, c, :, :]
+            mean.append(torch.mean(x).item())
+            sig.append(torch.std(x).item())
+        return tuple(mean), tuple(sig)
+
+
+def compute_mu_sig_features(dset, batch_size=0):
+    """Compute mean and standard variance of a dataset (use batching with large datasets)"""
+    print("Computing mean and std of dataset")
+    if batch_size:
+        # Load samples in batches
+        n_dset = len(dset)
+        loader = DataLoader(dset, batch_size)
+        x, _ = next(iter(loader))
+        n, c, h, w = x.shape
+
+        # Calculate mean
+        mean = 0
+        print("Computing mean")
+        for x, _ in tqdm(loader):
+            x = x
+            weight = x.shape[0] / n_dset
+            mean += weight * torch.mean(x)
+
+        # Calculate std
+        D_sq = 0
+        print("Computing std")
+        for x, _ in tqdm(loader):
             D_sq += torch.sum((x - mean) ** 2)
-        std = (D_sq / (n_dset * x.shape[-1] * x.shape[-2])) ** 0.5
+        std = (D_sq / (n_dset * h * w)) ** 0.5
 
         print(f"mean: {mean}, std: {std}")
         return mean, std.item()
@@ -179,3 +222,7 @@ def compute_mu_sig_multiple_channels(dset, batch_size=0):
     else:
         x, _ = dset2tens(dset)
         return torch.mean(x).item(), torch.std(x).item()
+
+
+def _get_imagenet_norms():
+    return {"mean": (0.485, 0.456, 0.406), "sig": (0.229, 0.224, 0.225)}

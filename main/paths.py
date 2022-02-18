@@ -19,6 +19,8 @@ class Path_Handler:
         path_dict["rgz"] = root / "data" / "rgz"
         path_dict["mb"] = root / "data" / "mb"
         path_dict["imagenette"] = root / "data" / "imagenette2"
+        path_dict["stl10"] = root / "data" / "stl10"
+        path_dict["cifar10"] = root / "data" / "cifar10"
 
         self.dict = path_dict
 

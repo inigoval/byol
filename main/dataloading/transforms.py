@@ -3,6 +3,7 @@ import torchvision.transforms as T
 import torchvision
 import numpy as np
 from torch import nn
+import cv2
 
 
 class Circle_Crop(torch.nn.Module):
@@ -35,60 +36,6 @@ class Circle_Crop(torch.nn.Module):
         return img
 
 
-class GaussianBlur(object):
-    """Blur a single image on CPU"""
-
-    def __init__(self, kernel_size, color_channels=1):
-        radius = kernel_size // 2
-        kernel_size = radius * 2 + 1
-        self.blur_h = nn.Conv2d(
-            color_channels,
-            color_channels,
-            kernel_size=(kernel_size, 1),
-            stride=1,
-            padding=0,
-            bias=False,
-            groups=1,
-        )
-        self.blur_v = nn.Conv2d(
-            color_channels,
-            color_channels,
-            kernel_size=(1, kernel_size),
-            stride=1,
-            padding=0,
-            bias=False,
-            groups=1,
-        )
-        self.k = kernel_size
-        self.r = radius
-        self.n_c = color_channels
-
-        self.blur = nn.Sequential(nn.ReflectionPad2d(radius), self.blur_h, self.blur_v)
-
-        self.pil_to_tensor = T.ToTensor()
-        self.tensor_to_pil = T.ToPILImage()
-
-    def __call__(self, img):
-        img = self.pil_to_tensor(img).unsqueeze(0)
-
-        sigma = np.random.uniform(0.1, 2.0)
-        x = np.arange(-self.r, self.r + 1)
-        x = np.exp(-np.power(x, 2) / (2 * sigma * sigma))
-        x = x / x.sum()
-        x = torch.from_numpy(x).view(1, -1).repeat(3, 1)
-
-        self.blur_h.weight.data.copy_(x.view(3, 1, self.k, 1))
-        self.blur_v.weight.data.copy_(x.view(3, 1, 1, self.k))
-
-        with torch.no_grad():
-            img = self.blur(img)
-            img = img.squeeze()
-
-        img = self.tensor_to_pil(img)
-
-        return img
-
-
 class MultiView(nn.Module):
     def __init__(self, config, n_views=2, mu=(0,), sig=(1,)):
         super().__init__()
@@ -100,11 +47,15 @@ class MultiView(nn.Module):
         self.n_views = n_views
 
     def __call__(self, x):
-        views = []
-        for i in np.arange(self.n_views):
+        if self.n_views > 1:
+            views = []
+            for i in np.arange(self.n_views):
+                view = self.normalize(self.view(x))
+                views.append(view)
+            return views
+        else:
             view = self.normalize(self.view(x))
-            views.append(view)
-        return views
+            return view
 
     def _view(self):
         if self.config["dataset"] == "rgz":
@@ -135,51 +86,44 @@ class MultiView(nn.Module):
                 ]
             )
 
-        if self.config["dataset"] == "imagenette":
+            return view
 
-            # Gaussian blurring, kernel 10% of image size (SimCLR paper)
-            blur = T.GaussianBlur(13, sigma=(0.1, 2.0))
+        elif self.config["dataset"] == "imagenette":
+            return _simclr_view(self.config)
 
-            # Cropping
-            # random_crop = self.config["random_crop"]
+        elif self.config["dataset"] == "stl10":
+            return _simclr_view(self.config)
 
-            # Color jitter
-            # s = self.config["s"]
-            s = 1
-            color_jitter = T.ColorJitter(0.8 * s, 0.8 * s, 0.8 * s, 0)
-
-            # Define a view
-            view = T.Compose(
-                [
-                    T.RandomResizedCrop(128, scale=(0.08, 1)),
-                    T.RandomHorizontalFlip(),
-                    T.RandomApply([color_jitter], p=0.8),
-                    T.RandomApply([blur], p=self.config["p_blur"]),
-                    T.RandomGrayscale(p=0.2),
-                    T.ToTensor(),
-                ]
-            )
-
-        return view
+        elif self.config["dataset"] == "cifar10":
+            return _simclr_view(self.config)
 
     def update_normalization(self, mu, sig):
         self.normalize = T.Normalize(mu, sig)
 
 
 class SimpleView(nn.Module):
-    def __init__(self, config, rotate=True, mu=(0,), sig=(1,)):
+    def __init__(self, config, mu=(0,), sig=(1,)):
         super().__init__()
         self.config = config
-        self.crop_size = config["center_crop_size"]
-        self.rotate = rotate
-        self.T_rotate = T.RandomRotation(180)
-        self.view = T.Compose([T.CenterCrop(self.crop_size), T.ToTensor()])
+
+        augs = []
+
+        if config["data"]["rotate"]:
+            augs.append(T.RandomRotation(180))
+            augs.append(T.RandomHorizontalFlip())
+
+        augs.append(T.Resize(config["data"]["input_height"]))
+        augs.append(T.CenterCrop(config["center_crop_size"]))
+        augs.append(T.ToTensor())
+
+        self.view = T.Compose(augs)
+
         self.normalize = T.Normalize(mu, sig)
+
+        self.T_rotate = T.RandomRotation(180)
 
     def __call__(self, x):
         # Use rotation if training
-        if self.rotate:
-            x = self.T_rotate(x)
 
         x = self.normalize(self.view(x))
         return x
@@ -189,38 +133,96 @@ class SimpleView(nn.Module):
 
 
 class ReduceView(nn.Module):
-    def __init__(self, encoder, config, rotate=False, mu=(0,), sig=(1,)):
+    def __init__(self, encoder, config, mu=(0,), sig=(1,)):
         super().__init__()
 
-        cropsize = config["center_crop_size"]
+        augs = []
 
-        if rotate:
-            self.aug = T.Compose(
-                [
-                    T.RandomRotation(180),
-                    T.CenterCrop(cropsize),
-                    T.RandomHorizontalFlip(),
-                    T.ToTensor(),
-                ]
-            )
+        if config["data"]["rotate"]:
+            augs.append(T.RandomRotation(180))
+            augs.append(T.RandomHorizontalFlip())
 
-        else:
-            self.aug = T.Compose(
-                [
-                    T.CenterCrop(cropsize),
-                    T.ToTensor(),
-                ]
-            )
+        augs.append(T.Resize(config["data"]["input_height"]))
+        augs.append(T.CenterCrop(config["center_crop_size"]))
+        augs.append(T.ToTensor())
 
-        self.normalize = T.Normalize(mu, sig)
+        self.view = T.Compose(augs)
+
+        self.pre_normalize = T.Normalize(mu, sig)
         self.reduce = lambda x: encoder(x)
+        self.normalize = T.Normalize(0, 1)
 
     def __call__(self, x):
-        x = self.aug(x)
-        x = self.normalize(x)
+        x = self.view(x)
+        x = self.pre_normalize(x)
         x = x.view(1, x.shape[-3], x.shape[-2], x.shape[-1])
         x = self.reduce(x).view(-1, 1, 1)
+        # x = self.normalize(x.view(1, -1)
+        x = self.normalize(x)
         return x
 
     def update_normalization(self, mu, sig):
         self.normalize = T.Normalize(mu, sig)
+
+
+def _simclr_view(config):
+    # Returns a SIMCLR view
+
+    s = config["s"]
+    input_height = config["data"]["input_height"]
+    # p_blur = config["p_blur"]
+    blur_kernel = _blur_kernel(input_height)
+
+    color_jitter = T.ColorJitter(0.8 * s, 0.8 * s, 0.8 * s, 0.2 * s)
+
+    # Gaussian blurring, kernel 10% of image size (SimCLR paper)
+    blur = SIMCLR_GaussianBlur(blur_kernel, p=0.5, min=0.1, max=2.0)
+
+    # Define a view
+    view = T.Compose(
+        [
+            T.RandomResizedCrop(input_height, scale=(0.08, 1)),
+            T.RandomHorizontalFlip(),
+            T.RandomApply([color_jitter], p=0.8),
+            T.RandomGrayscale(p=0.2),
+            blur,
+            T.ToTensor(),
+        ]
+    )
+
+    return view
+
+
+def _blur_kernel(input_height):
+    blur_kernel = int(input_height * 0.1)
+    if blur_kernel % 2 == 0:
+        blur_kernel += 1
+    return blur_kernel
+
+
+class SIMCLR_GaussianBlur:
+    """Taken from  https://github.com/PyTorchLightning/lightning-bolts/blob/2415b49a2b405693cd499e09162c89f807abbdc4/pl_bolts/models/self_supervised/simclr/transforms.py#L17"""
+
+    # Implements Gaussian blur as described in the SimCLR paper
+    def __init__(self, kernel_size, p=0.5, min=0.1, max=2.0):
+
+        self.min = min
+        self.max = max
+
+        # kernel size is set to be 10% of the image height/width
+        self.kernel_size = kernel_size
+        self.p = p
+
+    def __call__(self, sample):
+        sample = np.array(sample)
+
+        # blur the image with a 50% chance
+        prob = np.random.random_sample()
+
+        if prob < self.p:
+            sigma = (self.max - self.min) * np.random.random_sample() + self.min
+            sample = cv2.GaussianBlur(
+                sample, (self.kernel_size, self.kernel_size), sigma
+            )
+
+        return sample

@@ -7,14 +7,7 @@ config = load_config()
 
 
 def conv_block(
-    C_in,
-    C_out,
-    K=3,
-    S=1,
-    P=1,
-    activation="lrelu",
-    batchnorm=True,
-    bias=False,
+    C_in, C_out, K=3, S=1, P=1, activation="lrelu", batchnorm=True, bias=False,
 ):
 
     activations = nn.ModuleDict(
@@ -45,14 +38,7 @@ def conv_block(
 
 
 def convT_block(
-    C_in,
-    C_out,
-    K=3,
-    S=1,
-    P=1,
-    activation="lrelu",
-    batchnorm=True,
-    bias=False,
+    C_in, C_out, K=3, S=1, P=1, activation="lrelu", batchnorm=True, bias=False,
 ):
     activations = nn.ModuleDict(
         [

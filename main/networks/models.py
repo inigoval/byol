@@ -8,71 +8,6 @@ import torchvision.models as models
 from networks.layers import conv_block, convT_block, linear_block, UPSoftmax
 
 
-class Tang(nn.Module):
-    def __init__(self):
-        super(Tang, self).__init__()
-        # Conv2D(in_channels, out_channels, kernel size, stride, padding)
-
-        self.conv1 = nn.Sequential(
-            nn.Conv2d(1, 6, 11, 1, 1),
-            nn.ReLU(),
-            nn.MaxPool2d(2, stride=2),
-        )
-
-        self.conv2 = nn.Sequential(
-            nn.Conv2d(6, 16, 5, 2, 1),
-            nn.BatchNorm2d(16),
-            nn.ReLU(),
-            nn.MaxPool2d(3, stride=2),
-        )
-
-        self.conv3 = nn.Sequential(
-            nn.Conv2d(16, 24, 3, 1, 1),
-            nn.BatchNorm2d(24),
-            nn.ReLU(),
-        )
-
-        self.conv4 = nn.Sequential(
-            nn.Conv2d(24, 24, 3, 1, 1),
-            nn.BatchNorm2d(24),
-            nn.ReLU(),
-        )
-
-        self.conv5 = nn.Sequential(
-            nn.Conv2d(24, 16, 3, 1, 1),
-            nn.BatchNorm2d(16),
-            nn.ReLU(),
-            nn.MaxPool2d(5, stride=4),
-        )
-
-        # 8192 -> 2048
-        # 2048 -> 512
-        # 512  -> 512
-        # 512  -> 3
-        self.linear1 = nn.Sequential(
-            nn.Linear(256, 256),
-            nn.ReLU(),
-            nn.Dropout(),
-            nn.Linear(256, 256),
-            nn.ReLU(),
-            nn.Dropout(),
-            nn.Linear(256, 256),
-            nn.ReLU(),
-            nn.Dropout(),
-        )
-
-        self.linear2 = nn.Linear(256, 2)
-
-    def forward(self, x):
-        x = self.conv1(x)
-        x = self.conv2(x)
-        x = self.conv3(x)
-        x = self.conv4(x)
-        x = self.conv5(x)
-        x = x.view(-1, 256)
-        x = self.linear1(x)
-
-
 class MLPHead(nn.Module):
     """Fully connected head wtih a single hidden layer"""
 
@@ -99,16 +34,17 @@ class ResNet18(torch.nn.Module):
 
         # Change first layer for color channels B/W images
         n_c = kwargs["data"]["color_channels"]
-        self.encoder[0] = nn.Conv2d(n_c, 64, 7, 2, 3)
+        if n_c != 3:
+            self.encoder[0] = nn.Conv2d(n_c, 64, 7, 2, 3)
 
-        c_out = list(resnet.children())[-1].in_features
         features = kwargs["model"]["features"]
-
-        self.encoder = nn.Sequential(
-            self.encoder,
-            #            nn.Conv2d(c_out, features, 1),
-            #            nn.AdaptiveAvgPool2d(1),
-        )
+        if features:
+            c_out = list(resnet.children())[-1].in_features
+            self.encoder = nn.Sequential(
+                self.encoder,
+                nn.Conv2d(c_out, features, 1),
+                nn.AdaptiveAvgPool2d(1),
+            )
 
         # Add projection layer
         self.projection = MLPHead(
@@ -119,6 +55,11 @@ class ResNet18(torch.nn.Module):
         h = self.encoder(x)
         h = h.view(h.shape[0], h.shape[1])
         return self.projection(h)
+
+    def encode(self, x):
+        h = self.encoder(x)
+        h = h.view(h.shape[0], h.shape[1])
+        return h
 
 
 class ResNet50(torch.nn.Module):

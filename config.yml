@@ -1,51 +1,41 @@
 type: 'byol'
 project_name: 'byol'
-dataset: 'rgz'
-compute: 'gpu'
+dataset: 'imagenette'
+compute: 'slurm'
+seed: 69
+debug: False
 
 model:
     arch: 'resnet18' 
-    features: 512
+    features: 512     # Number of encoded features (None just uses original resnet output)
+    n_epochs: 300
 
 projection_head:
-    mlp_hidden_size: 256
-    projection_size: 100 
-
-train:
-    n_epochs: 150
-    opt: 'sgd'
+    mlp_hidden_size: 512
+    projection_size: 128
 
 data:
-    color_channels: None
-    classes: None
+    color_channels: null
+    classes: null
     mu: 0
     sig: 1
+    input_height: null
+    num_workers: 8
+    rotate: False
 
 linear:
-    n_epochs: 150
-    lr: 0.0005
-    batch_size: 50
-    momentum: 0.9
+    n_epochs: 100
+    opt: 'adam'
+    lr: 0.0004
+    batch_size: 128
+    momentum: 0
     weight_decay: 0
 
-eval:
-    mu: 0
-    sig: 1
-
-pca:
-    n_dim: 100
-    n_epochs: 5
-    batch_size: 10000
-
-###############################
-### optimisable hyperparams ###
-###############################
-
 ## DATA ## 
-cut_threshold: 20
+cut_threshold: 19 
 
 ## AUGMENTATIONS ##
-center_crop_size: 85
+center_crop_size: 128 
 random_crop: !!python/tuple [0.3, 1]
 blur_kernel: 23 # Odd non-integer number
 blur_sig: !!python/tuple [0.1, 2.0]
@@ -55,12 +45,13 @@ s: 1
 
 ## Optimiser ## 
 # Base settings
-lr: 0.03
+lr: 0.06
 batch_size: 256 
-momentum: 0
-weight_decay: 0.00000
+momentum: 0.9
+weight_decay: 0.0005
+opt: 'sgd'
 # Scheduler
-scheduler: None # [None, 'cosine', 'warmupcosine']
+scheduler: 'cosine' # [none, 'cosine', 'warmupcosine']
 warmup_epochs: 10  # Only used in linear warmup cosine annealing
 
 # LARS
@@ -68,5 +59,5 @@ lars: False
 trust_coef: 0.003
 
 ## BYOL ## 
-m: 0.996
+m: 0.99
 m_decay: False

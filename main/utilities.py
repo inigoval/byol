@@ -44,7 +44,6 @@ def entropy(p, eps=0.0000001, loss=False):
     return H
 
 
-
 def fig2img(fig):
     """Convert a Matplotlib figure to a PIL Image and return it"""
     import io

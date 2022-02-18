@@ -14,9 +14,7 @@ class Tang(nn.Module):
         # Conv2D(in_channels, out_channels, kernel size, stride, padding)
 
         self.conv1 = nn.Sequential(
-            nn.Conv2d(1, 6, 11, 1, 1),
-            nn.ReLU(),
-            nn.MaxPool2d(2, stride=2),
+            nn.Conv2d(1, 6, 11, 1, 1), nn.ReLU(), nn.MaxPool2d(2, stride=2),
         )
 
         self.conv2 = nn.Sequential(
@@ -27,15 +25,11 @@ class Tang(nn.Module):
         )
 
         self.conv3 = nn.Sequential(
-            nn.Conv2d(16, 24, 3, 1, 1),
-            nn.BatchNorm2d(24),
-            nn.ReLU(),
+            nn.Conv2d(16, 24, 3, 1, 1), nn.BatchNorm2d(24), nn.ReLU(),
         )
 
         self.conv4 = nn.Sequential(
-            nn.Conv2d(24, 24, 3, 1, 1),
-            nn.BatchNorm2d(24),
-            nn.ReLU(),
+            nn.Conv2d(24, 24, 3, 1, 1), nn.BatchNorm2d(24), nn.ReLU(),
         )
 
         self.conv5 = nn.Sequential(
