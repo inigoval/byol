@@ -139,11 +139,13 @@ class byol(pl.LightningModule):
 
         last_conv_channels = list(resnet.children())[-1].in_features
         features = self.config["model"]["features"]
-        self.backbone = nn.Sequential(
+        backbone = nn.Sequential(
             *list(resnet.children())[:-1],
             nn.Conv2d(last_conv_channels, features, 1),
             nn.AdaptiveAvgPool2d(1),
         )
+
+        return backbone
 
 
 class Update_M(Callback):
