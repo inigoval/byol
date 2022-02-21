@@ -3,12 +3,12 @@ project_name: 'byol'
 dataset: 'imagenette'
 compute: 'slurm'
 seed: 69
-debug: False
+debug: True
 
 model:
     arch: 'resnet18' 
     features: 512     # Number of encoded features (None just uses original resnet output)
-    n_epochs: 300
+    n_epochs: 250 
 
 projection_head:
     mlp_hidden_size: 512
@@ -24,7 +24,7 @@ data:
     rotate: False
 
 linear:
-    n_epochs: 100
+    n_epochs: 150
     opt: 'adam'
     lr: 0.0004
     batch_size: 128
@@ -41,14 +41,14 @@ blur_kernel: 23 # Odd non-integer number
 blur_sig: !!python/tuple [0.1, 2.0]
 #blur_sig: !!python/tuple [!!python/tuple [0.1, 2.0]]
 p_blur: 0.5
-s: 1
+s: 0.5
 
 ## Optimiser ## 
 # Base settings
 lr: 0.06
 batch_size: 256 
 momentum: 0.9
-weight_decay: 0.0005
+weight_decay: 0.0005 
 opt: 'sgd'
 # Scheduler
 scheduler: 'cosine' # [none, 'cosine', 'warmupcosine']

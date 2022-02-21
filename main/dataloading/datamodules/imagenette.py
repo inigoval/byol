@@ -11,7 +11,6 @@ class Imagenette_DataModule(Base_DataModule):
     def setup(self):
         self.data["train"] = ImageFolder(self.path / "train", transform=self.T_train)
         self.data["l"] = ImageFolder(self.path / "train", transform=self.T_test)
-
         self.data["val"] = ImageFolder(self.path / "val", transform=self.T_test)
         self.data["test"] = ImageFolder(self.path / "val", transform=self.T_test)
 
@@ -27,3 +26,4 @@ class Imagenette_DataModule_Eval(Base_DataModule_Eval):
         self.update_transforms(D_train)
         self.data["train"] = ImageFolder(self.path / "train", transform=self.T_train)
         self.data["val"] = ImageFolder(self.path / "val", transform=self.T_test)
+        self.data["test"] = ImageFolder(self.path / "val", transform=self.T_test)

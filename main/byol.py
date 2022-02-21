@@ -1,81 +1,77 @@
+import pytorch_lightning as pl
+import torchvision
 import torch
 import torch.nn as nn
+import lightly
+import copy
 import torch.nn.functional as F
-import pytorch_lightning as pl
 
-from pl_bolts.optimizers.lr_scheduler import LinearWarmupCosineAnnealingLR
 from math import cos, pi
-from copy import deepcopy
-from lightly.loss import SymNegCosineSimilarityLoss
+from lightly.models.modules.heads import BYOLProjectionHead
+from lightly.models.utils import deactivate_requires_grad
+from lightly.models.utils import update_momentum
+from pytorch_lightning.callbacks import Callback
 
-from utilities import LARSWrapper
-from networks.models import MLPHead
-from networks.models import ResNet18, ResNet50, WideResNet50_2
-from utilities import freeze_model
 from evaluation import knn_predict
-
-
-def byol_loss(x, y):
-    x = F.normalize(x, dim=1)
-    y = F.normalize(y, dim=1)
-    return 2 - 2 * (x * y.detach()).sum(dim=-1)
 
 
 class byol(pl.LightningModule):
     def __init__(self, config):
+        # create a ResNet backbone and remove the classification head
         super().__init__()
         self.save_hyperparameters()  # save hyperparameters for easy inference
         self.config = config
 
-        model_dict = {
-            "resnet18": ResNet18,
-            "resnet50": ResNet50,
-            "wideresnet50_2": WideResNet50_2,
-        }
-
-        self.m_online = model_dict[config["model"]["arch"]](**config)
-        self.predictor = MLPHead(
-            in_channels=self.m_online.projection.net[-1].out_features,
-            **config["projection_head"],
+        resnet = torchvision.models.resnet18()
+        last_conv_channels = list(resnet.children())[-1].in_features
+        features = self.config["model"]["features"]
+        self.backbone = nn.Sequential(
+            *list(resnet.children())[:-1],
+            nn.Conv2d(last_conv_channels, features, 1),
+            nn.AdaptiveAvgPool2d(1),
         )
 
-        self.m_target = deepcopy(self.m_online)
-        freeze_model(self.m_target)
+        # create a byol model based on ResNet
+        self.projection_head = BYOLProjectionHead(features, 1024, 256)
+        self.prediction_head = BYOLProjectionHead(256, 1024, 256)
 
+        self.backbone_momentum = copy.deepcopy(self.backbone)
+        self.projection_head_momentum = copy.deepcopy(self.projection_head)
+
+        deactivate_requires_grad(self.backbone_momentum)
+        deactivate_requires_grad(self.projection_head_momentum)
+
+        self.criterion = lightly.loss.SymNegCosineSimilarityLoss()
         self.m = self.config["m"]
 
+        self.dummy_param = nn.Parameter(torch.empty(0))
         self.best_acc = 0
 
-        # Dummy parameter to move tensors to correct device
-        self.dummy_param = nn.Parameter(torch.empty(0))
-
-        self.criterion = SymNegCosineSimilarityLoss()
-
     def forward(self, x):
-        """Return representation"""
-        return self.m_online.encoder(x)
+        x = self.backbone(x).flatten(start_dim=1)
+        return self.projection_head(x)
 
     def training_step(self, batch, batch_idx):
-        # Load both views of x (y is a dummy label)
-        x, _ = batch
-        x1, x2 = x
+        (x0, x1), _ = batch
 
-        # Get targets for each view
-        with torch.no_grad():
-            y1, y2 = self.m_target(x1), self.m_target(x2)
+        # update momentum
+        update_momentum(self.backbone, self.backbone_momentum, self.m)
+        update_momentum(self.projection_head, self.projection_head_momentum, self.m)
 
-        # Get predictions for each view
-        f1, f2 = self.predictor(self.m_online(x1)), self.predictor(self.m_online(x2))
+        def step(x0_, x1_):
+            x0_ = self.backbone(x0_).flatten(start_dim=1)
+            x0_ = self.projection_head(x0_)
+            x0_ = self.prediction_head(x0_)
 
-        # Calculate and log loss
-        # loss = byol_loss(f1, y1) + byol_loss(f2, y2)
-        # loss = torch.mean(loss)
-        loss = self.criterion((y1, f1), (y2, f2))
+            x1_ = self.backbone_momentum(x1_).flatten(start_dim=1)
+            x1_ = self.projection_head_momentum(x1_)
+            return x0_, x1_
+
+        p0, z1 = step(x0, x1)
+        p1, z0 = step(x1, x0)
+
+        loss = self.criterion((z0, p0), (z1, p1))
         self.log("train/loss", loss)
-
-        # Update target network using EMA (no gradients)
-        self.update_m_target()
-
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -83,7 +79,7 @@ class byol(pl.LightningModule):
         x, y = batch
 
         # Extract + normalize features
-        feature = self.m_online.encoder(x).squeeze()
+        feature = self.backbone(x).squeeze()
         feature = F.normalize(feature, dim=1)
 
         # Load feature bank and labels
@@ -118,57 +114,27 @@ class byol(pl.LightningModule):
         lr = self.config["lr"]
         mom = self.config["momentum"]
         w_decay = self.config["weight_decay"]
+        params = (
+            list(self.backbone.parameters())
+            + list(self.projection_head.parameters())
+            + list(self.prediction_head.parameters())
+        )
+        optim = torch.optim.SGD(params, lr=lr, momentum=mom, weight_decay=w_decay)
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+            optim, self.config["model"]["n_epochs"]
+        )
+        return [optim], [scheduler]
 
-        opts = {
-            "adam": torch.optim.Adam(
-                list(self.m_online.parameters()) + list(self.predictor.parameters()),
-                lr=lr,
-                weight_decay=w_decay,
-            ),
-            "sgd": torch.optim.SGD(
-                list(self.m_online.parameters()) + list(self.predictor.parameters()),
-                lr=lr,
-                momentum=mom,
-                weight_decay=w_decay,
-            ),
-        }
 
-        opt = opts[self.config["opt"]]
+class Update_M(Callback):
+    """Updates EMA momentum"""
 
-        # Apply LARS wrapper if option is chosen
-        if self.config["lars"]:
-            opt = LARSWrapper(opt, eta=self.config["trust_coef"])
+    def __init__(self):
+        super().__init__()
 
-        max_epochs = self.config["model"]["n_epochs"]
-        if self.config["scheduler"] == "none":
-            return opt
-
-        elif self.config["scheduler"] == "cosine":
-            max_epochs = max_epochs
-            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(opt, max_epochs)
-
-            return [opt], [scheduler]
-
-        elif self.config["scheduler"] == "warmupcosine":
-            scheduler = LinearWarmupCosineAnnealingLR(
-                opt,
-                self.config["warmup_epochs"],
-                max_epochs=max_epochs,
-            )
-
-            return [opt], [scheduler]
-
-    @torch.no_grad()
-    def update_m_target(self):
-        """Update target network without gradients"""
-        m = self.config["m"]
-
-        if self.config["m_decay"]:
-            epoch = self.current_epoch
-            n_epochs = self.config["model"]["n_epochs"]
-            m = 1 - (1 - m) * (cos(pi * epoch / n_epochs) + 1) / 2
-
-        for p_online, p_target in zip(
-            self.m_online.parameters(), self.m_target.parameters()
-        ):
-            p_target.data = p_target.data * m + p_online.data * (1.0 - m)
+    def on_training_epoch_end(self, trainer, pl_module):
+        with torch.no_grad():
+            config = pl_module.config
+            epoch = pl_module.current_epoch
+            n_epochs = config["model"]["n_epochs"]
+            pl_module.m = 1 - (1 - pl_module.m) * (cos(pi * epoch / n_epochs) + 1) / 2

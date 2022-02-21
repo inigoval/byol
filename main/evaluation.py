@@ -14,7 +14,6 @@ from torch.utils.data import DataLoader
 from dataloading.utils import dset2tens
 from paths import Path_Handler
 from networks.models import MLPHead, LogisticRegression
-from dataloading.datamodules import mb_DataModule_eval
 
 
 def umap(x, y):

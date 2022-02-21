@@ -1,0 +1,2 @@
+from .imagenette import Imagenette_DataModule_Eval, Imagenette_DataModule
+from .gzmnist import GalaxyMNIST_DataModule, GalaxyMNIST_DataModule_Eval

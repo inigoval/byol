@@ -3,7 +3,7 @@ from torch.utils.data import DataLoader
 
 from paths import Path_Handler
 from dataloading.utils import compute_mu_sig_features, compute_mu_sig_images
-from transforms import ReduceView, MultiView, SimpleView
+from dataloading.transforms import ReduceView, MultiView, SimpleView
 
 
 class Base_DataModule(pl.LightningDataModule):

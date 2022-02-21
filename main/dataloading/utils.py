@@ -130,26 +130,26 @@ def compute_mu_sig(dset, batch_size=0):
         n, c, h, w = x.shape
 
         # Calculate mean
-        mean = 0
+        mu = 0
         print("Computing mean")
         for x, _ in tqdm(loader):
             x = x
             weight = x.shape[0] / n_dset
-            mean += weight * torch.mean(x)
+            mu += weight * torch.mu(x)
 
         # Calculate std
         D_sq = 0
         print("Computing std")
         for x, _ in tqdm(loader):
-            D_sq += torch.sum((x - mean) ** 2)
+            D_sq += torch.sum((x - mu) ** 2)
         std = (D_sq / (n_dset * h * w)) ** 0.5
 
-        print(f"mean: {mean}, std: {std}")
-        return mean, std.item()
+        print(f"mean: {mu}, std: {std}")
+        return mu, std.item()
 
     else:
         x, _ = dset2tens(dset)
-        return torch.mean(x).item(), torch.std(x).item()
+        return torch.mu(x).item(), torch.std(x).item()
 
 
 def compute_mu_sig_images(dset, batch_size=0):
@@ -161,34 +161,34 @@ def compute_mu_sig_images(dset, batch_size=0):
         n_channels = next(iter(loader))[0].shape[1]
 
         # Calculate mean
-        mean = torch.zeros(n_channels)
+        mu = torch.zeros(n_channels)
         for x, _ in loader:
             for c in np.arange(n_channels):
                 x_c = x[:, c, :, :]
                 weight = x.shape[0] / n_dset
-                mean[c] += weight * torch.mean(x_c).item()
+                mu[c] += weight * torch.mu(x_c).item()
 
         # Calculate std
         D_sq = torch.zeros(n_channels)
         for x, _ in loader:
             for c in np.arange(n_channels):
                 x_c = x[:, c, :, :]
-                D_sq += torch.sum((x_c - mean[c]) ** 2)
+                D_sq += torch.sum((x_c - mu[c]) ** 2)
         sig = (D_sq / (n_dset * x.shape[-1] * x.shape[-2])) ** 0.5
 
-        mean, sig = tuple(mean.tolist()), tuple(sig.tolist())
-        print(f"mean: {mean}, std: {sig}")
-        return mean, sig
+        mu, sig = tuple(mu.tolist()), tuple(sig.tolist())
+        print(f"mu: {mu}, std: {sig}")
+        return mu, sig
 
     else:
         x, _ = dset2tens(dset)
         n_channels = x.shape[1]
-        mean, sig = [], []
+        mu, sig = [], []
         for c in n_channels:
             x_c = x[:, c, :, :]
-            mean.append(torch.mean(x).item())
+            mu.append(torch.mu(x).item())
             sig.append(torch.std(x).item())
-        return tuple(mean), tuple(sig)
+        return tuple(mu), tuple(sig)
 
 
 def compute_mu_sig_features(dset, batch_size=0):
@@ -202,27 +202,27 @@ def compute_mu_sig_features(dset, batch_size=0):
         n, c, h, w = x.shape
 
         # Calculate mean
-        mean = 0
+        mu = 0
         print("Computing mean")
         for x, _ in tqdm(loader):
             x = x
             weight = x.shape[0] / n_dset
-            mean += weight * torch.mean(x)
+            mu += weight * torch.mu(x)
 
         # Calculate std
         D_sq = 0
         print("Computing std")
         for x, _ in tqdm(loader):
-            D_sq += torch.sum((x - mean) ** 2)
+            D_sq += torch.sum((x - mu) ** 2)
         std = (D_sq / (n_dset * h * w)) ** 0.5
 
-        print(f"mean: {mean}, std: {std}")
-        return mean, std.item()
+        print(f"mean: {mu}, std: {std}")
+        return mu, std.item()
 
     else:
         x, _ = dset2tens(dset)
-        return torch.mean(x).item(), torch.std(x).item()
+        return torch.mu(x).item(), torch.std(x).item()
 
 
 def _get_imagenet_norms():
-    return {"mean": (0.485, 0.456, 0.406), "sig": (0.229, 0.224, 0.225)}
+    return {"mu": (0.485, 0.456, 0.406), "sig": (0.229, 0.224, 0.225)}
