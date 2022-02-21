@@ -31,6 +31,8 @@ class byol(pl.LightningModule):
             nn.AdaptiveAvgPool2d(1),
         )
 
+        self.backbone = self._get_backbone()
+
         # create a byol model based on ResNet
         proj = self.config["projection_head"]
         self.projection_head = BYOLProjectionHead(features, proj["hidden"], proj["out"])
@@ -126,6 +128,22 @@ class byol(pl.LightningModule):
             optim, self.config["model"]["n_epochs"]
         )
         return [optim], [scheduler]
+
+    def _get_backbone(self):
+        resnet = torchvision.models.resnet18()
+
+        # Change first layer for color channels B/W images
+        n_c = self.config["data"]["color_channels"]
+        if n_c != 3:
+            self.backbone[0] = nn.Conv2d(n_c, 64, 7, 2, 3)
+
+        last_conv_channels = list(resnet.children())[-1].in_features
+        features = self.config["model"]["features"]
+        self.backbone = nn.Sequential(
+            *list(resnet.children())[:-1],
+            nn.Conv2d(last_conv_channels, features, 1),
+            nn.AdaptiveAvgPool2d(1),
+        )
 
 
 class Update_M(Callback):
