@@ -4,6 +4,11 @@ import logging
 
 from paths import Path_Handler
 from dataloading.datamodules import Imagenette_DataModule, Imagenette_DataModule_Eval
+from dataloading.datamodules import GalaxyMNIST_DataModule, GalaxyMNIST_DataModule_Eval
+from dataloading.datamodules import RGZ_DataModule, RGZ_DataModule_Eval
+
+# from dataloading.datamodules import STL10_DataModule, STL10_DataModule_Eval
+# from dataloading.datamodules import CIFAR10_DataModule, CIFAR10_DataModule_Eval
 
 from byol import byol, Update_M
 from evaluation import linear_net, Feature_Bank
@@ -52,13 +57,17 @@ if __name__ == "__main__":
             "pretrain": Imagenette_DataModule,
             "linear": Imagenette_DataModule_Eval,
         },
-        # "rgz": {
-        #     "pretrain": mb_DataModule,
-        #     "linear": mb_DataModule_eval,
-        # },
+        "gzmnist": {
+            "pretrain": GalaxyMNIST_DataModule,
+            "linear": GalaxyMNIST_DataModule_Eval,
+        },
+        "rgz": {
+            "pretrain": RGZ_DataModule,
+            "linear": RGZ_DataModule_Eval,
+        },
         # "stl10": {
-        #     "pretrain": stl10_DataModule,
-        #     "linear": stl10_DataModule_eval,
+        #     "pretrain": STL10_DataModule,
+        #     "linear": STL10_DataModule_Eval,
         # },
         # "cifar10": {
         #     "pretrain": cifar10_DataModule,

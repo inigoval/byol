@@ -29,28 +29,18 @@ class Base_DataModule(pl.LightningDataModule):
     def train_dataloader(self):
         # Batch all data together
         batch_size = self.config["batch_size"]
-        loader = DataLoader(
-            self.data["train"],
-            batch_size,
-            shuffle=True,
-            num_workers=self.config["data"]["num_workers"],
-        )
+        n_workers = self.config["data"]["num_workers"]
+        loader = DataLoader(self.data["train"], batch_size, shuffle=True, num_workers=n_workers)
         return loader
 
     def val_dataloader(self):
-        loader = DataLoader(
-            self.data["val"],
-            1000,
-            num_workers=self.config["data"]["num_workers"],
-        )
+        n_workers = self.config["data"]["num_workers"]
+        loader = DataLoader(self.data["val"], 1000, num_workers=n_workers)
         return loader
 
     def test_dataloader(self):
-        loader = DataLoader(
-            self.data["test"],
-            1000,
-            num_workers=self.config["data"]["num_workers"],
-        )
+        n_workers = self.config["data"]["num_workers"]
+        loader = DataLoader(self.data["test"], 1000, num_workers=n_workers)
         return loader
 
     def update_transforms(self, D_train):
@@ -61,6 +51,8 @@ class Base_DataModule(pl.LightningDataModule):
             # Define transforms with calculated values
             self.T_train.update_normalization(mu, sig)
             self.T_test.update_normalization(mu, sig)
+
+        self.T_train.n_views = 2
 
 
 class Base_DataModule_Eval(pl.LightningDataModule):
@@ -83,16 +75,19 @@ class Base_DataModule_Eval(pl.LightningDataModule):
 
     def train_dataloader(self):
         # Batch only labelled data
+        n_workers = self.config["data"]["num_workers"]
         batch_size = self.config["linear"]["batch_size"]
-        loader = DataLoader(self.data["train"], batch_size, shuffle=True)
+        loader = DataLoader(self.data["train"], batch_size, shuffle=True, num_workers=n_workers)
         return loader
 
     def val_dataloader(self):
-        loader = DataLoader(self.data["val"], 1000)
+        n_workers = self.config["data"]["num_workers"]
+        loader = DataLoader(self.data["val"], 1000, num_workers=n_workers)
         return loader
 
     def test_dataloader(self):
-        loader = DataLoader(self.data["test"], 1000)
+        n_workers = self.config["data"]["num_workers"]
+        loader = DataLoader(self.data["test"], 1000, num_workers=n_workers)
         return loader
 
     def update_transforms(self, D_train):

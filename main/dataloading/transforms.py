@@ -97,6 +97,9 @@ class MultiView(nn.Module):
         elif self.config["dataset"] == "cifar10":
             return _simclr_view(self.config)
 
+        elif self.config["data"] == "gzmnist":
+            return _simclr_view(self.config)
+
     def update_normalization(self, mu, sig):
         self.normalize = T.Normalize(mu, sig)
 
@@ -221,8 +224,6 @@ class SIMCLR_GaussianBlur:
 
         if prob < self.p:
             sigma = (self.max - self.min) * np.random.random_sample() + self.min
-            sample = cv2.GaussianBlur(
-                sample, (self.kernel_size, self.kernel_size), sigma
-            )
+            sample = cv2.GaussianBlur(sample, (self.kernel_size, self.kernel_size), sigma)
 
         return sample

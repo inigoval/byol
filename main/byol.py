@@ -32,8 +32,10 @@ class byol(pl.LightningModule):
         )
 
         # create a byol model based on ResNet
-        self.projection_head = BYOLProjectionHead(features, 1024, 256)
-        self.prediction_head = BYOLProjectionHead(256, 1024, 256)
+        proj = self.config["projection_head"]
+        self.projection_head = BYOLProjectionHead(features, proj["hidden"], proj["out"])
+        pred = self.config["prediction_head"]
+        self.prediction_head = BYOLProjectionHead(proj["out"], pred["hidden"], pred["out"])
 
         self.backbone_momentum = copy.deepcopy(self.backbone)
         self.projection_head_momentum = copy.deepcopy(self.projection_head)

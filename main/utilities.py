@@ -192,11 +192,7 @@ class LARSWrapper(object):
             group["weight_decay"] = 0
 
             # update the parameters
-            [
-                self.update_p(p, group, weight_decay)
-                for p in group["params"]
-                if p.grad is not None
-            ]
+            [self.update_p(p, group, weight_decay) for p in group["params"] if p.grad is not None]
 
         # update the optimizer
         self.optim.step(closure=closure)
