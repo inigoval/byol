@@ -71,9 +71,7 @@ def knn_predict(
     sim_weight, sim_idx = sim_matrix.topk(k=knn_k, dim=-1)
 
     # [B, K]
-    sim_labels = torch.gather(
-        target_bank.expand(feature.size(0), -1), dim=-1, index=sim_idx
-    )
+    sim_labels = torch.gather(target_bank.expand(feature.size(0), -1), dim=-1, index=sim_idx)
     # we do a reweighting of the similarities
     sim_weight = (sim_weight / knn_t).exp()
 
@@ -152,11 +150,11 @@ class linear_net(pl.LightningModule):
         logits = self.forward(x)
         y_pred = logits.softmax(dim=-1)
         loss = self.ce_loss(logits, y)
-        self.log("linear_eval/train_loss", loss)
+        self.log("linear_eval/train_loss", loss, on_step=False, on_epoch=True)
 
         # predictions = torch.argmax(logits, dim=1).int()
         acc = tmF.accuracy(y_pred, y)
-        self.log("linear_eval/train_acc", acc)
+        self.log("linear_eval/train_acc", acc, on_step=False, on_epoch=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -177,21 +175,25 @@ class linear_net(pl.LightningModule):
         mom = self.config["linear"]["momentum"]
         w_decay = self.config["linear"]["weight_decay"]
 
+        params = self.logreg.parameters()
+
         opts = {
-            "adam": torch.optim.Adam(
-                self.logreg.parameters(),
+            "adam": lambda p: torch.optim.Adam(
+                p,
                 lr=lr,
                 weight_decay=w_decay,
             ),
-            "sgd": torch.optim.SGD(
-                self.logreg.parameters(),
+            "sgd": lambda p: torch.optim.SGD(
+                p,
                 lr=lr,
                 momentum=mom,
                 weight_decay=w_decay,
             ),
         }
 
-        opt = opts[self.config["linear"]["opt"]]
+        opts = {"adam": torch.optim.Adam, "sgd": torch.optim.SGD}
+
+        opt = opts[self.config["linear"]["opt"]](self.logreg.parameters())
 
         return opt
 

@@ -15,6 +15,7 @@ class Path_Handler:
 
         path_dict["data"] = root / "data"
         path_dict["files"] = root / "files"
+        path_dict["main"] = root / "main"
 
         path_dict["rgz"] = root / "data" / "rgz"
         path_dict["mb"] = root / "data" / "mb"

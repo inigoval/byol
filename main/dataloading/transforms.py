@@ -2,7 +2,10 @@ import torch
 import torchvision.transforms as T
 import torchvision
 import numpy as np
+import astroaugmentations as AA
 from torch import nn
+
+from paths import Path_Handler
 import cv2
 
 
@@ -59,34 +62,8 @@ class MultiView(nn.Module):
 
     def _view(self):
         if self.config["dataset"] == "rgz":
-
-            # Gaussian blurring
-            blur_kernel = self.config["blur_kernel"]
-            blur_sig = self.config["blur_sig"]
-            blur = T.GaussianBlur(blur_kernel, sigma=blur_sig)
-
-            # Cropping
-            center_crop = self.config["center_crop_size"]
-            random_crop = self.config["random_crop"]
-
-            # Color jitter
-            s = self.config["s"]
-            color_jitter = T.ColorJitter(0.8 * s, 0.8 * s, 0.8 * s, 0)
-
-            # Define a view
-            view = T.Compose(
-                [
-                    T.RandomRotation(180),
-                    T.RandomApply([color_jitter], p=0.8),
-                    T.RandomApply([blur], p=self.config["p_blur"]),
-                    T.CenterCrop(center_crop),
-                    T.RandomResizedCrop(center_crop, scale=random_crop),
-                    T.RandomHorizontalFlip(),
-                    T.ToTensor(),
-                ]
-            )
-
-            return view
+            # return _rgz_view(self.config)
+            return _rgz_view2()
 
         elif self.config["dataset"] == "imagenette":
             return _simclr_view(self.config)
@@ -97,8 +74,8 @@ class MultiView(nn.Module):
         elif self.config["dataset"] == "cifar10":
             return _simclr_view(self.config)
 
-        elif self.config["data"] == "gzmnist":
-            return _simclr_view(self.config)
+        elif self.config["dataset"] == "gzmnist":
+            return _gz_view(self.config)
 
     def update_normalization(self, mu, sig):
         self.normalize = T.Normalize(mu, sig)
@@ -114,16 +91,13 @@ class SimpleView(nn.Module):
         if config["data"]["rotate"]:
             augs.append(T.RandomRotation(180))
             augs.append(T.RandomHorizontalFlip())
-
         augs.append(T.Resize(config["data"]["input_height"]))
-        augs.append(T.CenterCrop(config["center_crop_size"]))
+        if config["center_crop_size"]:
+            augs.append(T.CenterCrop(config["center_crop_size"]))
         augs.append(T.ToTensor())
-
         self.view = T.Compose(augs)
 
         self.normalize = T.Normalize(mu, sig)
-
-        self.T_rotate = T.RandomRotation(180)
 
     def __call__(self, x):
         # Use rotation if training
@@ -136,12 +110,12 @@ class SimpleView(nn.Module):
 
 
 class ReduceView(nn.Module):
-    def __init__(self, encoder, config, mu=(0,), sig=(1,)):
+    def __init__(self, encoder, config, train=True):
         super().__init__()
 
         augs = []
 
-        if config["data"]["rotate"]:
+        if config["data"]["rotate"] and train:
             augs.append(T.RandomRotation(180))
             augs.append(T.RandomHorizontalFlip())
 
@@ -151,16 +125,16 @@ class ReduceView(nn.Module):
 
         self.view = T.Compose(augs)
 
-        self.pre_normalize = T.Normalize(mu, sig)
-        self.reduce = lambda x: encoder(x)
+        self.pre_normalize = T.Normalize(config["data"]["mu"], config["data"]["sig"])
+        self.encoder = encoder
+        self.reduce = lambda x: self.encoder(x)
         self.normalize = T.Normalize(0, 1)
 
     def __call__(self, x):
         x = self.view(x)
         x = self.pre_normalize(x)
-        x = x.view(1, x.shape[-3], x.shape[-2], x.shape[-1])
+        x = torch.unsqueeze(x, 0)
         x = self.reduce(x).view(-1, 1, 1)
-        # x = self.normalize(x.view(1, -1)
         x = self.normalize(x)
         return x
 
@@ -173,12 +147,11 @@ def _simclr_view(config):
 
     s = config["s"]
     input_height = config["data"]["input_height"]
-    # p_blur = config["p_blur"]
-    blur_kernel = _blur_kernel(input_height)
 
     color_jitter = T.ColorJitter(0.8 * s, 0.8 * s, 0.8 * s, 0.2 * s)
 
     # Gaussian blurring, kernel 10% of image size (SimCLR paper)
+    blur_kernel = _blur_kernel(input_height)
     blur = SIMCLR_GaussianBlur(blur_kernel, p=0.5, min=0.1, max=2.0)
 
     # Define a view
@@ -193,6 +166,78 @@ def _simclr_view(config):
         ]
     )
 
+    return view
+
+
+def _gz_view(config):
+    s = config["s"]
+    input_height = config["data"]["input_height"]
+
+    # Gaussian blurring, kernel 10% of image size (SimCLR paper)
+    p_blur = config["p_blur"]
+    blur_kernel = _blur_kernel(input_height)
+    blur_sig = config["blur_sig"]
+    blur = SIMCLR_GaussianBlur(blur_kernel, p=p_blur, min=blur_sig[0], max=blur_sig[1])
+
+    # Color augs
+    color_jitter = T.ColorJitter(0.8 * s, 0.8 * s, 0.8 * s, 0.2 * s)
+    p_grayscale = config["p_grayscale"]
+
+    # Cropping
+    random_crop = config["random_crop"]
+
+    # Define a view
+    view = T.Compose(
+        [
+            T.RandomRotation(180),
+            T.RandomResizedCrop(input_height, scale=random_crop),
+            T.RandomHorizontalFlip(),
+            T.RandomApply([color_jitter], p=0.8),
+            T.RandomGrayscale(p=p_grayscale),
+            blur,
+            T.ToTensor(),
+        ]
+    )
+
+    return view
+
+
+def _rgz_view(config):
+    # Gaussian blurring
+    blur_kernel = config["blur_kernel"]
+    blur_sig = config["blur_sig"]
+    blur = T.GaussianBlur(blur_kernel, sigma=blur_sig)
+
+    # Cropping
+    center_crop = config["center_crop_size"]
+    random_crop = config["random_crop"]
+
+    # Color jitter
+    s = config["s"]
+    color_jitter = T.ColorJitter(0.8 * s, 0.8 * s, 0.8 * s, 0)
+
+    # Define a view
+    view = T.Compose(
+        [
+            T.RandomRotation(180),
+            T.CenterCrop(center_crop),
+            T.RandomResizedCrop(center_crop, scale=random_crop),
+            T.RandomHorizontalFlip(),
+            T.RandomApply([color_jitter], p=0.8),
+            T.RandomApply([blur], p=config["p_blur"]),
+            T.ToTensor(),
+        ]
+    )
+
+    return view
+
+
+def _rgz_view2():
+    paths = Path_Handler()
+    path_dict = paths._dict()
+    kernel_path = path_dict["main"] / "dataloading" / "FIRST_kernel.npy"
+
+    view = AA.AstroAugmentations(domain="radio", kernel=np.load(kernel_path), p=0.5)()
     return view
 
 

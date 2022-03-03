@@ -25,7 +25,7 @@ def update_config(config):
         config["data"]["color_channels"] = 3
         config["data"]["classes"] = 10
         config["data"]["input_height"] = 128
-        config["data"]["center_crop_size"] = 128
+        config["center_crop_size"] = 128
 
     if config["dataset"] == "rgz":
         config["data"]["color_channels"] = 1
@@ -50,3 +50,4 @@ def update_config(config):
         config["data"]["color_channels"] = 3
         config["data"]["classes"] = 4
         config["data"]["input_height"] = 64
+        config["data"]["rotate"] = True

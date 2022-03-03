@@ -1,6 +1,6 @@
 type: 'byol'
 project_name: 'byol'
-dataset: 'rgz' # ['imagenette', 'rgz', 'gzmnist', 'stl10', 'cifar10']
+dataset: 'imagenette' # ['imagenette', 'rgz', 'gzmnist', 'stl10', 'cifar10']
 compute: 'slurm'
 seed: 69
 debug: False
@@ -8,30 +8,27 @@ debug: False
 model:
     arch: 'resnet18' 
     features: 512     # Number of encoded features (None just uses original resnet output)
-    n_epochs: 250 
+    n_epochs: 250
 
 projection_head:
-    hidden: 1024 
-    out: 256
-
-prediction_head:
     hidden: 1024
     out: 256
 
 data:
     color_channels: null
     classes: null
-    mu: 0
-    sig: 1
+    mu: null
+    sig: null
     input_height: null
-    num_workers: 8
+    num_workers: 8 
+    prefetch_factor: 20
     rotate: False
 
 linear:
     n_epochs: 150
     opt: 'adam'
-    lr: 0.0004
-    batch_size: 128
+    lr: 0.0005
+    batch_size: 512
     momentum: 0
     weight_decay: 0
 
@@ -39,23 +36,24 @@ linear:
 cut_threshold: 19 
 
 ## AUGMENTATIONS ##
-center_crop_size: 128 
+center_crop_size: null
 random_crop: !!python/tuple [0.3, 1]
 blur_kernel: 23 # Odd non-integer number
 blur_sig: !!python/tuple [0.1, 2.0]
 #blur_sig: !!python/tuple [!!python/tuple [0.1, 2.0]]
 p_blur: 0.5
 s: 0.5
+p_grayscale: 1
 
 ## Optimiser ## 
 # Base settings
 lr: 0.06
 momentum: 0.9
-weight_decay: 0.0005
+weight_decay: 0.0005 # 0.0005
 batch_size: 256 
 opt: 'sgd'
 # Scheduler
-scheduler: 'cosine' # [none, 'cosine', 'warmupcosine']
+scheduler: 'cosine' # ['none', 'cosine', 'warmupcosine']
 warmup_epochs: 10  # Only used in linear warmup cosine annealing
 
 # LARS
@@ -63,5 +61,5 @@ lars: False
 trust_coef: 0.003
 
 ## BYOL ## 
-m: 0.99
+m: 0.996
 m_decay: False

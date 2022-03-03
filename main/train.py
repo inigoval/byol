@@ -2,14 +2,12 @@ import wandb
 import pytorch_lightning as pl
 import logging
 
+from pytorch_lightning.callbacks import LearningRateMonitor
+
 from paths import Path_Handler
 from dataloading.datamodules import Imagenette_DataModule, Imagenette_DataModule_Eval
 from dataloading.datamodules import GalaxyMNIST_DataModule, GalaxyMNIST_DataModule_Eval
 from dataloading.datamodules import RGZ_DataModule, RGZ_DataModule_Eval
-
-# from dataloading.datamodules import STL10_DataModule, STL10_DataModule_Eval
-# from dataloading.datamodules import CIFAR10_DataModule, CIFAR10_DataModule_Eval
-
 from byol import byol, Update_M
 from evaluation import linear_net, Feature_Bank
 from config import load_config, update_config
@@ -87,7 +85,7 @@ if __name__ == "__main__":
     log_examples(wandb_logger, pretrain_data.data["train"])
 
     # List of callbacks
-    callbacks = [pretrain_checkpoint, Feature_Bank()]
+    callbacks = [pretrain_checkpoint, Feature_Bank(), LearningRateMonitor()]
 
     if config["m_decay"]:
         callbacks.append(Update_M())
@@ -143,9 +141,9 @@ if __name__ == "__main__":
     eval_data.prepare_data()
     eval_data.setup()
 
-    if not config["debug"]:
-        config["linear"]["mu"] = eval_data.mu
-        config["linear"]["sig"] = eval_data.sig
+    # if not config["debug"]:
+    #     config["linear"]["mu"] = eval_data.mu
+    #     config["linear"]["sig"] = eval_data.sig
 
     linear_checkpoint = pl.callbacks.ModelCheckpoint(
         monitor="linear_eval/val_acc",

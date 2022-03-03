@@ -30,17 +30,23 @@ class Base_DataModule(pl.LightningDataModule):
         # Batch all data together
         batch_size = self.config["batch_size"]
         n_workers = self.config["data"]["num_workers"]
-        loader = DataLoader(self.data["train"], batch_size, shuffle=True, num_workers=n_workers)
+        loader = DataLoader(
+            self.data["train"],
+            batch_size,
+            shuffle=True,
+            num_workers=n_workers,
+            prefetch_factor=20,
+        )
         return loader
 
     def val_dataloader(self):
         n_workers = self.config["data"]["num_workers"]
-        loader = DataLoader(self.data["val"], 1000, num_workers=n_workers)
+        loader = DataLoader(self.data["val"], 1000, num_workers=n_workers, prefetch_factor=20)
         return loader
 
     def test_dataloader(self):
         n_workers = self.config["data"]["num_workers"]
-        loader = DataLoader(self.data["test"], 1000, num_workers=n_workers)
+        loader = DataLoader(self.data["test"], 1000, num_workers=n_workers, prefetch_factor=20)
         return loader
 
     def update_transforms(self, D_train):
@@ -58,15 +64,15 @@ class Base_DataModule(pl.LightningDataModule):
 class Base_DataModule_Eval(pl.LightningDataModule):
     """mu sig initially passed are for pre-normalization in pixel space, update_normalization updates normalizatio in representation space"""
 
-    def __init__(self, encoder, config, mu, sig):
+    def __init__(self, encoder, config):
         super().__init__()
         self.config = config
         paths = Path_Handler()
         path_dict = paths._dict()
         self.path = path_dict[config["dataset"]]
 
-        self.T_train = ReduceView(encoder, config, mu=mu, sig=sig)
-        self.T_test = ReduceView(encoder, config, mu=mu, sig=sig)
+        self.T_train = ReduceView(encoder, config, train=True)
+        self.T_test = ReduceView(encoder, config, train=False)
 
         self.data = {}
 
@@ -77,17 +83,28 @@ class Base_DataModule_Eval(pl.LightningDataModule):
         # Batch only labelled data
         n_workers = self.config["data"]["num_workers"]
         batch_size = self.config["linear"]["batch_size"]
-        loader = DataLoader(self.data["train"], batch_size, shuffle=True, num_workers=n_workers)
+        loader = DataLoader(
+            self.data["train"],
+            batch_size,
+            shuffle=True,
+            num_workers=n_workers,
+            prefetch_factor=20,
+        )
         return loader
 
     def val_dataloader(self):
         n_workers = self.config["data"]["num_workers"]
-        loader = DataLoader(self.data["val"], 1000, num_workers=n_workers)
+        loader = DataLoader(
+            self.data["val"],
+            1000,
+            num_workers=n_workers,
+            prefetch_factor=20,
+        )
         return loader
 
     def test_dataloader(self):
         n_workers = self.config["data"]["num_workers"]
-        loader = DataLoader(self.data["test"], 1000, num_workers=n_workers)
+        loader = DataLoader(self.data["test"], 1000, num_workers=n_workers, prefetch_factor=20)
         return loader
 
     def update_transforms(self, D_train):
