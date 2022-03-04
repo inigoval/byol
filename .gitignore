@@ -1,4 +1,6 @@
 data
 sweep-cfg.txt
 notebooks
+astroaugmentations
+*.npy
 __pycache__

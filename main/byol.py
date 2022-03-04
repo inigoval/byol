@@ -6,8 +6,10 @@ import lightly
 import copy
 import torch.nn.functional as F
 import torchvision.models as M
+from pl_bolts.optimizers.lr_scheduler import LinearWarmupCosineAnnealingLR
 
 from math import cos, pi
+from utilities import LARSWrapper
 from lightly.models.modules.heads import BYOLProjectionHead
 from lightly.models.utils import deactivate_requires_grad
 from lightly.models.utils import update_momentum
@@ -115,11 +117,40 @@ class byol(pl.LightningModule):
             + list(self.projection_head.parameters())
             + list(self.prediction_head.parameters())
         )
-        optim = torch.optim.SGD(params, lr=lr, momentum=mom, weight_decay=w_decay)
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-            optim, self.config["model"]["n_epochs"]
-        )
-        return [optim], [scheduler]
+
+        opts = {
+            "adam": lambda p: torch.optim.Adam(p, lr=lr),
+            "sgd": lambda p: torch.optim.SGD(
+                p,
+                lr=lr,
+                momentum=mom,
+                weight_decay=w_decay,
+            ),
+        }
+
+        opt = opts[self.config["train"]["opt"]]
+
+        # Apply LARS wrapper if option is chosen
+        if self.config["lars"]:
+            opt = LARSWrapper(opt, eta=self.config["trust_coef"])
+
+        if self.config["scheduler"] == "cosine":
+            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+                opt, self.config["model"]["n_epochs"]
+            )
+            return [opt], [scheduler]
+
+        # Currently produces weird results
+        elif self.config["scheduler"] == "warmupcosine":
+            scheduler = LinearWarmupCosineAnnealingLR(
+                opt,
+                self.config["warmup_epochs"],
+                max_epochs=self.config["train"]["n_epochs"],
+            )
+            return [opt], [scheduler]
+
+        elif self.config["scheduler"] == "None":
+            return opt
 
     def _get_backbone(self):
         net = self._get_net()
