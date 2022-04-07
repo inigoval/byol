@@ -91,6 +91,72 @@ def knn_predict(
     return pred_labels
 
 
+class Lightning_Eval(pl.LightningModule):
+    def __init__(self, config):
+        super().__init__()
+        self.config = config
+
+    def training_epoch_end(self, outputs):
+        with torch.no_grad():
+            data_bank = self.trainer.datamodule.data["l"]
+            data_bank_loader = DataLoader(data_bank, 2000)
+            feature_bank = []
+            target_bank = []
+            for data in data_bank_loader:
+                # Load data and move to correct device
+                x, y = data
+                x = x.type_as(self.dummy_param)
+                y = y.type_as(self.dummy_param).long()
+
+                # Encode data and normalize features (for kNN)
+                feature = self.forward(x).squeeze()
+                feature = F.normalize(feature, dim=1)
+                feature_bank.append(feature)
+                target_bank.append(y)
+
+            # Save full feature bank for validation epoch
+            self.feature_bank = torch.cat(feature_bank, dim=0).t().contiguous()
+            self.target_bank = torch.cat(target_bank, dim=0).t().contiguous()
+
+    def validation_step(self, batch, batch_idx):
+        if hasattr(self, "feature_bank") and hasattr(self, "target_bank"):
+            # Load batch
+            x, y = batch
+
+            # Extract + normalize features
+            feature = self.forward(x).squeeze()
+            feature = F.normalize(feature, dim=1)
+
+            # Load feature bank and labels
+            feature_bank = self.feature_bank.type_as(x)
+            target_bank = self.target_bank.type_as(y)
+
+            pred_labels = knn_predict(
+                feature,
+                feature_bank,
+                target_bank,
+                self.config["data"]["classes"],
+            )
+
+            num = len(y)
+            top1 = (pred_labels[:, 0] == y).float().sum()
+            return (num, top1.item())
+
+    def validation_epoch_end(self, outputs):
+        if hasattr(self, "feature_bank") and hasattr(self, "target_bank"):
+            total_num = 0
+            total_top1 = 0
+            for (num, top1) in outputs:
+                total_num += num
+                total_top1 += top1
+
+            acc = float(total_top1 / total_num) * 100
+            if acc > self.best_acc:
+                self.best_acc = acc
+            self.log("val/kNN_acc", acc)
+            self.log("val/max_kNN_acc", self.best_acc)
+
+
 class Feature_Bank(Callback):
     """Code adapted from https://github.com/lightly-ai/lightly/blob/master/lightly/utils/benchmarking.py
 

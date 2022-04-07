@@ -8,6 +8,8 @@ import matplotlib.pyplot as plt
 import pytorch_lightning as pl
 import wandb
 
+
+from pl_bolts.optimizers.lr_scheduler import LinearWarmupCosineAnnealingLR
 from torch.optim import Optimizer
 from PIL import Image
 from mpl_toolkits.axes_grid1 import ImageGrid
@@ -82,6 +84,27 @@ def batch_eval(fn_dict, dset, batch_size=200):
 def freeze_model(model):
     for param in model.parameters():
         param.requires_grad = False
+
+
+def _optimizer(opt, config):
+    # Apply LARS wrapper if option is chosen
+    if config["lars"]:
+        opt = LARSWrapper(opt, eta=config["trust_coef"])
+
+    if config["scheduler"] == "cosine":
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(opt, config["model"]["n_epochs"])
+        return [opt], [scheduler]
+
+    elif config["scheduler"] == "warmupcosine":
+        scheduler = LinearWarmupCosineAnnealingLR(
+            opt,
+            config["warmup_epochs"],
+            max_epochs=config["train"]["n_epochs"],
+        )
+        return [opt], [scheduler]
+
+    elif config["scheduler"] == "None":
+        return opt
 
 
 def log_examples(wandb_logger, dset, n=18):
