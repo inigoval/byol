@@ -4,6 +4,7 @@ import torchvision
 import numpy as np
 import astroaugmentations as AA
 from torch import nn
+from PIL import ImageFilter
 
 from paths import Path_Handler
 import cv2
@@ -152,13 +153,16 @@ def _simclr_view(config):
 
     # Gaussian blurring, kernel 10% of image size (SimCLR paper)
     blur_kernel = _blur_kernel(input_height)
-    blur = SIMCLR_GaussianBlur(blur_kernel, p=0.5, min=0.1, max=2.0)
+    blur = LightlyGaussianBlur(blur_kernel, prob=0.5)
 
     # Define a view
     view = T.Compose(
         [
+            # T.Resize(input_height),
+            # T.CenterCrop(input_height),
             T.RandomResizedCrop(input_height, scale=(0.08, 1)),
             T.RandomHorizontalFlip(),
+            T.RandomVerticalFlip(),
             T.RandomApply([color_jitter], p=0.8),
             T.RandomGrayscale(p=0.2),
             blur,
@@ -271,4 +275,53 @@ class SIMCLR_GaussianBlur:
             sigma = (self.max - self.min) * np.random.random_sample() + self.min
             sample = cv2.GaussianBlur(sample, (self.kernel_size, self.kernel_size), sigma)
 
+        return sample
+
+
+class LightlyGaussianBlur(object):
+    """
+    COPIED DIRECTLY FROM LIGHTLY https://github.com/lightly-ai/lightly/blob/master/lightly/transforms/gaussian_blur.py
+
+    Implementation of random Gaussian blur.
+    Utilizes the built-in ImageFilter method from PIL to apply a Gaussian
+    blur to the input image with a certain probability. The blur is further
+    randomized as the kernel size is chosen randomly around a mean specified
+    by the user.
+    Attributes:
+        kernel_size:
+            Mean kernel size for the Gaussian blur.
+        prob:
+            Probability with which the blur is applied.
+        scale:
+            Fraction of the kernel size which is used for upper and lower
+            limits of the randomized kernel size.
+    """
+
+    def __init__(self, kernel_size: float, prob: float = 0.5, scale: float = 0.2):
+        self.prob = prob
+        self.scale = scale
+        # limits for random kernel sizes
+        self.min_size = (1 - scale) * kernel_size
+        self.max_size = (1 + scale) * kernel_size
+        self.kernel_size = kernel_size
+
+    def __call__(self, sample):
+        """Blurs the image with a given probability.
+        Args:
+            sample:
+                PIL image to which blur will be applied.
+
+        Returns:
+            Blurred image or original image.
+        """
+        prob = np.random.random_sample()
+        if prob < self.prob:
+            # choose randomized kernel size
+            kernel_size = np.random.normal(self.kernel_size, self.scale * self.kernel_size)
+            kernel_size = max(self.min_size, kernel_size)
+            kernel_size = min(self.max_size, kernel_size)
+            radius = int(kernel_size / 2)
+            # return blurred image
+            return sample.filter(ImageFilter.GaussianBlur(radius=radius))
+        # return original image
         return sample

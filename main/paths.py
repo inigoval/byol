@@ -9,20 +9,22 @@ class Path_Handler:
 
     def fill_dict(self):
         """Create dictionary of required paths"""
-        root = Path(__file__).resolve().parent.parent
         path_dict = {}
-        path_dict["root"] = root
+        path_dict["root"] = Path(__file__).resolve().parent.parent.parent
+        path_dict["project"] = Path(__file__).resolve().parent.parent
 
-        path_dict["data"] = root / "data"
-        path_dict["files"] = root / "files"
-        path_dict["main"] = root / "main"
+        path_dict["data"] = path_dict["root"] / "_data"
 
-        path_dict["rgz"] = root / "data" / "rgz"
-        path_dict["mb"] = root / "data" / "mb"
-        path_dict["imagenette"] = root / "data" / "imagenette2"
-        path_dict["stl10"] = root / "data" / "stl10"
-        path_dict["cifar10"] = root / "data" / "cifar10"
-        path_dict["gzmnist"] = root / "data" / "gzmnist"
+        path_dict["files"] = path_dict["project"] / "files"
+        path_dict["main"] = path_dict["project"] / "main"
+        path_dict["config"] = path_dict["project"] / "config"
+
+        path_dict["rgz"] = path_dict["data"] / "rgz"
+        path_dict["mb"] = path_dict["data"] / "mb"
+        path_dict["imagenette"] = path_dict["data"] / "imagenette-160"
+        path_dict["stl10"] = path_dict["data"] / "stl10"
+        path_dict["cifar10"] = path_dict["data"] / "cifar10"
+        path_dict["gzmnist"] = path_dict["data"] / "gzmnist"
 
         self.dict = path_dict
 

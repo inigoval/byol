@@ -8,7 +8,7 @@ debug: False
 model:
     arch: 'resnet18' 
     features: 512     # Number of encoded features (None just uses original resnet output)
-    n_epochs: 250
+    n_epochs: 800
 
 projection_head:
     hidden: 1024
@@ -61,5 +61,5 @@ lars: False
 trust_coef: 0.003
 
 ## BYOL ## 
-m: 0.996
+m: 0.99
 m_decay: False

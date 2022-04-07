@@ -8,7 +8,7 @@ from paths import Path_Handler
 from dataloading.datamodules import Imagenette_DataModule, Imagenette_DataModule_Eval
 from dataloading.datamodules import GalaxyMNIST_DataModule, GalaxyMNIST_DataModule_Eval
 from dataloading.datamodules import RGZ_DataModule, RGZ_DataModule_Eval
-from byol import byol, Update_M
+from byol import BYOL, Update_M
 from evaluation import linear_net, Feature_Bank
 from config import load_config, update_config
 from utilities import freeze_model, log_examples
@@ -108,7 +108,7 @@ if __name__ == "__main__":
     )
 
     # Initialise model #
-    model = byol(config)
+    model = BYOL(config)
     config["model"]["output_dim"] = config["model"]["features"]
 
     # Train model #
@@ -130,7 +130,7 @@ if __name__ == "__main__":
         encoder = model.backbone
     else:
         best_model_path = pretrain_checkpoint.best_model_path
-        pretrained_model = byol.load_from_checkpoint(best_model_path)
+        pretrained_model = BYOL.load_from_checkpoint(best_model_path)
         encoder = model.backbone
 
     # Freeze encoder weights
