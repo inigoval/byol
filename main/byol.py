@@ -16,6 +16,7 @@ from lightly.models.utils import update_momentum
 from pytorch_lightning.callbacks import Callback
 
 from evaluation import knn_predict
+from networks.models import _get_backbone
 
 
 class byol_old_lightly(pl.LightningModule):
@@ -25,7 +26,7 @@ class byol_old_lightly(pl.LightningModule):
         self.save_hyperparameters()  # save hyperparameters for easy inference
         self.config = config
 
-        self.backbone = self._get_backbone()
+        self.backbone = _get_backbone(config)
 
         # create a byol model based on ResNet
         features = self.config["model"]["features"]
@@ -153,7 +154,7 @@ class byol_old_lightly(pl.LightningModule):
             return opt
 
     def _get_backbone(self):
-        net = self._get_net()
+        net = _get_net()
         c_out = list(net.children())[-1].in_features
 
         net = torch.nn.Sequential(*list(net.children())[:-1])
@@ -193,7 +194,7 @@ class BYOL(pl.LightningModule):
         self.save_hyperparameters()  # save hyperparameters for easy inference
         self.config = config
 
-        self.backbone = self._get_backbone()
+        self.backbone = _get_backbone(config)
 
         # create a byol model based on ResNet
         features = self.config["model"]["features"]
@@ -291,40 +292,6 @@ class BYOL(pl.LightningModule):
             self.best_acc = acc
         self.log("val/kNN_acc", acc)
         self.log("val/max_kNN_acc", self.best_acc)
-
-    def _get_backbone(self):
-        net = self._get_net()
-        c_out = list(net.children())[-1].in_features
-
-        net = torch.nn.Sequential(*list(net.children())[:-1])
-
-        # Change first layer for color channels B/W images
-        n_c = self.config["data"]["color_channels"]
-        if n_c != 3:
-            net[0] = nn.Conv2d(n_c, 64, 7, 2, 3)
-
-        features = self.config["model"]["features"]
-        backbone = nn.Sequential(
-            *list(net.children())[:-1],
-            nn.Conv2d(c_out, features, 1),
-            nn.AdaptiveAvgPool2d(1),
-        )
-
-        return backbone
-
-    def _get_net(self):
-        networks = {
-            "resnet18": M.resnet18,
-            "resnet34": M.resnet34,
-            "resnet50": M.resnet50,
-            "resnet101": M.resnet101,
-            "resnet152": M.resnet152,
-            "wide_resnet50_2": M.wide_resnet50_2,
-            "wide_resnet101_2": M.wide_resnet101_2,
-            "efficientnetb7": M.efficientnet_b7,
-        }
-
-        return networks[self.config["model"]["arch"]]()
 
 
 class Update_M(Callback):
