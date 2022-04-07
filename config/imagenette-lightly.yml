@@ -1,0 +1,49 @@
+# Reproduces ~84% kNN accuracy on imagenette benchmark
+
+model:
+    architecture: 'resnet18' 
+    features: 512     # Number of encoded features (null just uses original resnet output)
+    n_epochs: 250
+    first_kernel_size: 7
+
+projection_head:
+    hidden: 1024
+    out: 256
+
+data:
+    color_channels: 3
+    classes: 10
+    input_height: 128
+    rotate: False
+
+linear:
+    n_epochs: 150
+    opt: 'adam'
+    lr: 0.0005
+    batch_size: 512
+    momentum: 0
+    weight_decay: 0
+    scheduler: 'none' # ['none', 'cosine'] ####
+
+## AUGMENTATIONS ##
+center_crop_size: 128
+s: 0.5
+
+## Optimiser ## 
+# Base settings
+lr: 0.06
+momentum: 0.9
+weight_decay: 0.0005
+batch_size: 256
+opt: 'sgd'
+# Scheduler
+scheduler: 'cosine' # ['none', 'cosine', 'warmupcosine']
+warmup_epochs: 10  # Only used in linear warmup cosine annealing
+
+# LARS
+lars: False
+trust_coef: 0.003
+
+## BYOL ## 
+m: 0.99
+m_decay: False

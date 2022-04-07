@@ -1,0 +1,47 @@
+model:
+    architecture: 'resnet18' 
+    features: 512     # Number of encoded features (None just uses original resnet output)
+    n_epochs: 1000
+    first_kernel_size: 7
+
+projection_head:
+    hidden: 4096
+    out: 256
+
+data:
+    color_channels: 3
+    classes: 10
+    input_height: 128
+    rotate: False
+
+linear:
+    n_epochs: 100
+    opt: 'sgd'
+    lr: 0.2
+    batch_size: 25
+    momentum: 0.9
+    weight_decay: 0
+    scheduler: 'cosine' # ['none', 'cosine'] ####
+
+## AUGMENTATIONS ##
+center_crop_size: 128
+s: 1
+
+## Optimiser ## 
+# Base settings
+lr: 0.2
+momentum: 0.9
+weight_decay: 0.000001
+batch_size: 256
+opt: 'sgd'
+# Scheduler
+scheduler: 'warmupcosine' # ['none', 'cosine', 'warmupcosine']
+warmup_epochs: 10  # Only used in linear warmup cosine annealing
+
+# LARS
+lars: False
+trust_coef: 0.003
+
+## BYOL ## 
+m: 0.996
+m_decay: True

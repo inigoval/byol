@@ -1,0 +1,9 @@
+type: 'byol'
+project_name: 'byol'
+dataset: 'imagenette' # ['imagenette', 'rgz', 'gzmnist', 'stl10', 'cifar10']
+compute: 'slurm'
+seed: 69
+debug: False
+num_workers: 8 
+prefetch_factor: 30
+checkpoint_mode: 'last'

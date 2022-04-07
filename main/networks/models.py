@@ -68,4 +68,4 @@ def _get_net(config):
         "efficientnetb7": M.efficientnet_b7,
     }
 
-    return networks[config["model"]["arch"]]()
+    return networks[config["model"]["architecture"]]()

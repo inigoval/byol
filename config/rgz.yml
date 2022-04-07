@@ -1,0 +1,57 @@
+model:
+    arch: 'resnet18' 
+    features: 512     # Number of encoded features (None just uses original resnet output)
+    n_epochs: 100
+
+projection_head:
+    hidden: 256
+    out: 100
+
+data:
+    color_channels: 1
+    classes: 2
+    input_height: 85
+    rotate: True
+
+linear:
+    n_epochs: 100
+    opt: 'adam'
+    lr: 0.0005
+    batch_size: 50
+    momentum: 0
+    weight_decay: 0
+    scheduler: 'none'
+
+## DATA ## 
+cut_threshold: 19 
+
+## AUGMENTATIONS ##
+aug_type: 'simclr' # ['simclr', 'astroaug']
+center_crop_size: 85
+random_crop: !!python/tuple [0.3, 1]
+blur_kernel: 9 # Odd non-integer number
+blur_sig: !!python/tuple [0.1, 2.0]
+#blur_sig: !!python/tuple [!!python/tuple [0.1, 2.0]]
+p_blur: 0.5
+s: 0.5
+p_grayscale: 1
+p_aug: 0.5
+
+## Optimiser ## 
+# Base settings
+lr: 0.03
+momentum: 0.9
+weight_decay: 0.0000005
+batch_size: 256
+opt: 'sgd'
+# Scheduler
+scheduler: 'none' # ['none', 'cosine', 'warmupcosine']
+warmup_epochs: 10  # Only used in linear warmup cosine annealing
+
+# LARS
+lars: False
+trust_coef: 0.003
+
+## BYOL ## 
+m: 0.996
+m_decay: False

@@ -21,7 +21,7 @@ if __name__ == "__main__":
     )
 
     config = load_config()
-    update_config(config)
+    # update_config(config)
 
     pl.seed_everything(config["seed"])
 

@@ -29,7 +29,7 @@ class Base_DataModule(pl.LightningDataModule):
     def train_dataloader(self):
         # Batch all data together
         batch_size = self.config["batch_size"]
-        n_workers = self.config["data"]["num_workers"]
+        n_workers = self.config["num_workers"]
         loader = DataLoader(
             self.data["train"],
             batch_size,
@@ -40,12 +40,12 @@ class Base_DataModule(pl.LightningDataModule):
         return loader
 
     def val_dataloader(self):
-        n_workers = self.config["data"]["num_workers"]
+        n_workers = self.config["num_workers"]
         loader = DataLoader(self.data["val"], 1000, num_workers=n_workers, prefetch_factor=20)
         return loader
 
     def test_dataloader(self):
-        n_workers = self.config["data"]["num_workers"]
+        n_workers = self.config["num_workers"]
         loader = DataLoader(self.data["test"], 1000, num_workers=n_workers, prefetch_factor=20)
         return loader
 
@@ -81,7 +81,7 @@ class Base_DataModule_Eval(pl.LightningDataModule):
 
     def train_dataloader(self):
         # Batch only labelled data
-        n_workers = self.config["data"]["num_workers"]
+        n_workers = self.config["num_workers"]
         batch_size = self.config["linear"]["batch_size"]
         loader = DataLoader(
             self.data["train"],
@@ -93,7 +93,7 @@ class Base_DataModule_Eval(pl.LightningDataModule):
         return loader
 
     def val_dataloader(self):
-        n_workers = self.config["data"]["num_workers"]
+        n_workers = self.config["num_workers"]
         loader = DataLoader(
             self.data["val"],
             1000,
@@ -103,7 +103,7 @@ class Base_DataModule_Eval(pl.LightningDataModule):
         return loader
 
     def test_dataloader(self):
-        n_workers = self.config["data"]["num_workers"]
+        n_workers = self.config["num_workers"]
         loader = DataLoader(self.data["test"], 1000, num_workers=n_workers, prefetch_factor=20)
         return loader
 
