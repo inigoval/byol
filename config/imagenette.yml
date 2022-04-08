@@ -24,6 +24,11 @@ linear:
     weight_decay: 0
     scheduler: 'cosine' # ['none', 'cosine'] ####
 
+knn:
+  neighbors: 200
+  temperature: 0.1
+
+
 ## AUGMENTATIONS ##
 center_crop_size: 128
 s: 0.5

@@ -136,6 +136,8 @@ class Lightning_Eval(pl.LightningModule):
                 feature_bank,
                 target_bank,
                 self.config["data"]["classes"],
+                knn_k=self.config["knn"]["neighbors"],
+                knn_t=self.config["knn"]["temperature"],
             )
 
             num = len(y)

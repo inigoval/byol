@@ -31,11 +31,10 @@ def load_config():
 
     # if loading a benchmark, use load the specific config
     preset = config["preset"]
-    if preset is not "none":
+    if preset:
         path = path_dict["config"] / f"{dataset}-{preset}.yml"
-
-    with open(path, "r") as ymlconfig:
-        config = yaml.load(ymlconfig, Loader=yaml.FullLoader)
+        with open(path, "r") as ymlconfig:
+            config = yaml.load(ymlconfig, Loader=yaml.FullLoader)
 
     # combine global with data-set specific config
     config.update(global_config)

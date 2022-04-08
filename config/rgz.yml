@@ -1,11 +1,12 @@
+preset: null
 model:
-    arch: 'resnet18' 
+    architecture: 'resnet18' 
     features: 512     # Number of encoded features (None just uses original resnet output)
-    n_epochs: 100
+    n_epochs: 300
 
 projection_head:
-    hidden: 256
-    out: 100
+    hidden: 1024
+    out: 256
 
 data:
     color_channels: 1
@@ -22,6 +23,11 @@ linear:
     weight_decay: 0
     scheduler: 'none'
 
+
+knn:
+  neighbors: 20
+  temperature: 0.1
+
 ## DATA ## 
 cut_threshold: 19 
 
@@ -31,7 +37,6 @@ center_crop_size: 85
 random_crop: !!python/tuple [0.3, 1]
 blur_kernel: 9 # Odd non-integer number
 blur_sig: !!python/tuple [0.1, 2.0]
-#blur_sig: !!python/tuple [!!python/tuple [0.1, 2.0]]
 p_blur: 0.5
 s: 0.5
 p_grayscale: 1
@@ -39,9 +44,9 @@ p_aug: 0.5
 
 ## Optimiser ## 
 # Base settings
-lr: 0.03
+lr: 0.06
 momentum: 0.9
-weight_decay: 0.0000005
+weight_decay: 0.0005
 batch_size: 256
 opt: 'sgd'
 # Scheduler

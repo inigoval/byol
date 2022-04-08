@@ -1,5 +1,3 @@
-# Reproduces ~84% kNN accuracy on imagenette benchmark
-
 model:
     architecture: 'resnet18' 
     features: 512     # Number of encoded features (null just uses original resnet output)
@@ -13,25 +11,27 @@ projection_head:
 data:
     color_channels: 3
     classes: 10
-    input_height: 128
+    input_height: 40
     rotate: False
 
 linear:
-    n_epochs: 150
-    opt: 'adam'
-    lr: 0.0005
-    batch_size: 512
-    momentum: 0
+    n_epochs: 100
+    opt: 'sgd'
+    lr: 0.2
+    batch_size: 25
+    momentum: 0.9
     weight_decay: 0
-    scheduler: 'none' # ['none', 'cosine'] ####
+    scheduler: 'cosine' # ['none', 'cosine'] ####
 
 knn:
-  neighbors: 200
+  neighbors: 20
   temperature: 0.1
 
 ## AUGMENTATIONS ##
-center_crop_size: 128
+# center_crop_size: 128
+random_crop: !!python/tuple [0.3, 1]
 s: 0.5
+p_grayscale: 1
 
 ## Optimiser ## 
 # Base settings

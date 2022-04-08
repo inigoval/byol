@@ -2,9 +2,11 @@ import torch
 import torchvision.transforms as T
 import torchvision
 import numpy as np
+import albumentations as A
 import astroaugmentations as AA
 from torch import nn
 from PIL import ImageFilter
+from albumentations.pytorch import ToTensorV2
 
 from paths import Path_Handler
 import cv2
@@ -63,8 +65,7 @@ class MultiView(nn.Module):
 
     def _view(self):
         if self.config["dataset"] == "rgz":
-            # return _rgz_view(self.config)
-            return _rgz_view2()
+            return _rgz_view(self.config)
 
         elif self.config["dataset"] == "imagenette":
             return _simclr_view(self.config)
@@ -180,8 +181,9 @@ def _gz_view(config):
     # Gaussian blurring, kernel 10% of image size (SimCLR paper)
     p_blur = config["p_blur"]
     blur_kernel = _blur_kernel(input_height)
-    blur_sig = config["blur_sig"]
-    blur = SIMCLR_GaussianBlur(blur_kernel, p=p_blur, min=blur_sig[0], max=blur_sig[1])
+    # blur_sig = config["blur_sig"]
+    # blur = SIMCLR_GaussianBlur(blur_kernel, p=p_blur, min=blur_sig[0], max=blur_sig[1])
+    blur = LightlyGaussianBlur(blur_kernel, prob=p_blur)
 
     # Color augs
     color_jitter = T.ColorJitter(0.8 * s, 0.8 * s, 0.8 * s, 0.2 * s)
@@ -196,6 +198,7 @@ def _gz_view(config):
             T.RandomRotation(180),
             T.RandomResizedCrop(input_height, scale=random_crop),
             T.RandomHorizontalFlip(),
+            T.RandomVerticalFlip(),
             T.RandomApply([color_jitter], p=0.8),
             T.RandomGrayscale(p=p_grayscale),
             blur,
@@ -207,42 +210,120 @@ def _gz_view(config):
 
 
 def _rgz_view(config):
-    # Gaussian blurring
-    blur_kernel = config["blur_kernel"]
-    blur_sig = config["blur_sig"]
-    blur = T.GaussianBlur(blur_kernel, sigma=blur_sig)
+    if config["aug_type"] == "simclr":
 
-    # Cropping
-    center_crop = config["center_crop_size"]
-    random_crop = config["random_crop"]
+        # Gaussian blurring
+        blur_kernel = config["blur_kernel"]
+        blur_sig = config["blur_sig"]
+        # blur = LightlyGaussianBlur(blur_kernel, sigma=blur_sig)
+        blur = T.GaussianBlur(blur_kernel, sigma=blur_sig)
 
-    # Color jitter
-    s = config["s"]
-    color_jitter = T.ColorJitter(0.8 * s, 0.8 * s, 0.8 * s, 0)
+        # Cropping
+        center_crop = config["center_crop_size"]
+        random_crop = config["random_crop"]
 
-    # Define a view
-    view = T.Compose(
-        [
-            T.RandomRotation(180),
-            T.CenterCrop(center_crop),
-            T.RandomResizedCrop(center_crop, scale=random_crop),
-            T.RandomHorizontalFlip(),
-            T.RandomApply([color_jitter], p=0.8),
-            T.RandomApply([blur], p=config["p_blur"]),
-            T.ToTensor(),
+        # Color jitter
+        s = config["s"]
+        color_jitter = T.ColorJitter(0.8 * s, 0.8 * s, 0.8 * s, 0)
+
+        # Define a view
+        view = T.Compose(
+            [
+                T.RandomRotation(180),
+                T.CenterCrop(center_crop),
+                T.RandomResizedCrop(center_crop, scale=random_crop),
+                T.RandomHorizontalFlip(),
+                T.RandomApply([color_jitter], p=0.8),
+                T.RandomApply([blur], p=config["p_blur"]),
+                T.ToTensor(),
+            ]
+        )
+
+        return view
+
+    elif config["aug_type"] == "astroaug":
+
+        paths = Path_Handler()
+        path_dict = paths._dict()
+        kernel_path = path_dict["main"] / "dataloading" / "FIRST_kernel.npy"
+        kernel = np.load(kernel_path)
+
+        p = config["p_aug"]
+
+        # Cropping
+        center_crop = config["center_crop_size"]
+        # random_crop = config["random_crop"]
+
+        augs = [
+            # Change source perspective
+            A.Lambda(
+                name="Superpixel spectral index change",
+                image=AA.SpectralIndex(
+                    mean=-0.8, std=0.2, super_pixels=True, n_segments=100, seed=None
+                ),
+                p=p,
+            ),  # With segmentation
+            A.Lambda(
+                name="Brightness perspective distortion",
+                image=AA.BrightnessGradient(limits=(0.0, 1.0)),
+                p=p,
+            ),  # No noise
+            A.ElasticTransform(  # Elastically transform the source
+                sigma=100, alpha_affine=25, interpolation=1, border_mode=1, value=0, p=p
+            ),
+            A.ShiftScaleRotate(
+                shift_limit=0.1,
+                scale_limit=0.1,
+                rotate_limit=90,
+                interpolation=2,
+                border_mode=0,
+                value=0,
+                p=p,
+            ),
+            A.VerticalFlip(p=0.5),
+            # Change properties of noise / imaging artefacts
+            A.Lambda(
+                name="Spectral index change of whole image",
+                image=AA.SpectralIndex(mean=-0.8, std=0.2, seed=None),
+                p=p,
+            ),  # Across the whole image
+            A.Emboss(
+                alpha=(0.2, 0.5), strength=(0.2, 0.5), p=p
+            ),  # Quick emulation of incorrect w-kernels # Doesnt force the maxima to 1
+            A.Lambda(
+                name="Dirty beam convlolution",
+                image=AA.CustomKernelConvolution(
+                    kernel=kernel, rfi_dropout=0.4, psf_radius=1.3, sidelobe_scaling=1, mode="sum"
+                ),
+                p=p,
+            ),  # Add sidelobes
+            A.Lambda(
+                name="Brightness perspective distortion",
+                image=AA.BrightnessGradient(limits=(0.0, 1), primary_beam=True, noise=0.01),
+                p=p,
+            ),  # Gaussian Noise and pb brightness scaling
+            # Modelling based transforms
+            A.ShiftScaleRotate(
+                shift_limit=0.1,
+                scale_limit=0.1,
+                rotate_limit=180,
+                interpolation=2,
+                border_mode=0,
+                value=0,
+                p=p,
+            ),
+            A.CenterCrop(width=center_crop, height=center_crop, p=1),
+            A.Lambda(
+                name="Dirty beam convlolution",
+                image=AA.MinMaxNormalize(mean=0.5, std=0.5),
+                always_apply=True,
+            ),
+            ToTensorV2(),
         ]
-    )
 
-    return view
+        view = A.Compose(augs)
 
-
-def _rgz_view2():
-    paths = Path_Handler()
-    path_dict = paths._dict()
-    kernel_path = path_dict["main"] / "dataloading" / "FIRST_kernel.npy"
-
-    view = AA.AstroAugmentations(domain="radio", kernel=np.load(kernel_path), p=0.5)()
-    return view
+        return lambda img: view(image=np.array(img))["image"]
 
 
 def _blur_kernel(input_height):

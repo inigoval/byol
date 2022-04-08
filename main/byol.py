@@ -62,6 +62,8 @@ class BYOL(Lightning_Eval):
         update_momentum(self.backbone, self.backbone_momentum, m=0.99)
         update_momentum(self.projection_head, self.projection_head_momentum, m=0.99)
         (x0, x1), _ = batch
+        x0 = x0.type_as(self.dummy_param)
+        x1 = x1.type_as(self.dummy_param)
         p0 = self.project(x0)
         z0 = self.project_momentum(x0)
         p1 = self.project(x1)
