@@ -8,6 +8,7 @@ from paths import Path_Handler
 from dataloading.datamodules import Imagenette_DataModule, Imagenette_DataModule_Eval
 from dataloading.datamodules import GalaxyMNIST_DataModule, GalaxyMNIST_DataModule_Eval
 from dataloading.datamodules import RGZ_DataModule, RGZ_DataModule_Eval
+from dataloading.datamodules import CIFAR10_DataModule, CIFAR10_DataModule_Eval
 from byol import BYOL, Update_M
 from evaluation import linear_net, Feature_Bank
 from config import load_config, update_config
@@ -67,10 +68,10 @@ if __name__ == "__main__":
         #     "pretrain": STL10_DataModule,
         #     "linear": STL10_DataModule_Eval,
         # },
-        # "cifar10": {
-        #     "pretrain": cifar10_DataModule,
-        #     "linear": cifar10_DataModule_eval,
-        # },
+        "cifar10": {
+            "pretrain": CIFAR10_DataModule,
+            "linear": CIFAR10_DataModule_Eval,
+        },
     }
 
     pretrain_data = datasets[config["dataset"]]["pretrain"](config)

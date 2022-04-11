@@ -1,5 +1,6 @@
+preset: null
 model:
-    architecture: 'resnet18' 
+    architecture: 'resnet18-cifar' 
     features: 512     # Number of encoded features (null just uses original resnet output)
     n_epochs: 250
     first_kernel_size: 7
@@ -11,27 +12,26 @@ projection_head:
 data:
     color_channels: 3
     classes: 10
-    input_height: 40
+    input_height: 128
     rotate: False
 
 linear:
     n_epochs: 100
-    opt: 'sgd'
+    opt: 'adam'
     lr: 0.2
-    batch_size: 25
-    momentum: 0.9
+    batch_size: 512
+    momentum: 0
     weight_decay: 0
     scheduler: 'cosine' # ['none', 'cosine'] ####
 
 knn:
-  neighbors: 20
+  neighbors: 200
   temperature: 0.1
 
+
 ## AUGMENTATIONS ##
-# center_crop_size: 128
-random_crop: !!python/tuple [0.3, 1]
+center_crop_size: 128
 s: 0.5
-p_grayscale: 1
 
 ## Optimiser ## 
 # Base settings
@@ -49,5 +49,5 @@ lars: False
 trust_coef: 0.003
 
 ## BYOL ## 
-m: 0.99
+m: 0.996
 m_decay: False
