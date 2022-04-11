@@ -8,7 +8,6 @@ import matplotlib.pyplot as plt
 import pytorch_lightning as pl
 import wandb
 
-
 from pl_bolts.optimizers.lr_scheduler import LinearWarmupCosineAnnealingLR
 from torch.optim import Optimizer
 from PIL import Image
@@ -134,12 +133,12 @@ def log_examples(wandb_logger, dset, n=18):
         else:
             img_list = [x_i.view(C, H, W) for x_i in x]
             img = make_grid(img_list)
-            tens2pil = ToPILImage()
-            save_list.append(tens2pil(img))
+            # tens2pil = ToPILImage()
+            save_list.append(img)
 
         count += 1
 
-    wandb_logger.log_image(key=f"image_pairs", images=save_list)
+    wandb_logger.log_image(key="image_pairs", images=save_list)
 
 
 """
