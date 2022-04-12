@@ -96,28 +96,6 @@ class BYOL(Lightning_Eval):
 
         return _optimizer(opt, self.config)
 
-        # # Apply LARS wrapper if option is chosen
-        # if self.config["lars"]:
-        #     opt = LARSWrapper(opt, eta=self.config["trust_coef"])
-
-        # if self.config["scheduler"] == "cosine":
-        #     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-        #         opt, self.config["model"]["n_epochs"]
-        #     )
-        #     return [opt], [scheduler]
-
-        # # Currently produces weird results
-        # elif self.config["scheduler"] == "warmupcosine":
-        #     scheduler = LinearWarmupCosineAnnealingLR(
-        #         opt,
-        #         self.config["warmup_epochs"],
-        #         max_epochs=self.config["train"]["n_epochs"],
-        #     )
-        #     return [opt], [scheduler]
-
-        # elif self.config["scheduler"] == "None":
-        #     return opt
-
 
 class Update_M(Callback):
     """Updates EMA momentum"""

@@ -99,7 +99,7 @@ class Lightning_Eval(pl.LightningModule):
     def training_epoch_end(self, outputs):
         with torch.no_grad():
             data_bank = self.trainer.datamodule.data["l"]
-            data_bank_loader = DataLoader(data_bank, 2000)
+            data_bank_loader = DataLoader(data_bank, 300)
             feature_bank = []
             target_bank = []
             for data in data_bank_loader:
@@ -168,30 +168,30 @@ class Feature_Bank(Callback):
         super().__init__()
 
     def on_validation_epoch_start(self, trainer, pl_module):
-        encoder = pl_module.backbone
-        # encoder = pl_module.m_online.encoder
+        with torch.no_grad():
+            encoder = pl_module.backbone
 
-        data_bank = pl_module.trainer.datamodule.data["l"]
-        data_bank_loader = DataLoader(data_bank, 2000)
-        feature_bank = []
-        target_bank = []
-        for data in data_bank_loader:
-            # Load data and move to correct device
-            x, y = data
-            x = x.type_as(pl_module.dummy_param)
-            y = y.type_as(pl_module.dummy_param).long()
-            # y = y.to(torch.long)
-            # y = y.to(pl_module.dummy_param.device)
+            data_bank = pl_module.trainer.datamodule.data["l"]
+            data_bank_loader = DataLoader(data_bank, 500)
+            feature_bank = []
+            target_bank = []
+            for data in data_bank_loader:
+                # Load data and move to correct device
+                x, y = data
+                x = x.type_as(pl_module.dummy_param)
+                y = y.type_as(pl_module.dummy_param).long()
+                # y = y.to(torch.long)
+                # y = y.to(pl_module.dummy_param.device)
 
-            # Encode data and normalize features (for kNN)
-            feature = encoder(x).squeeze()
-            feature = F.normalize(feature, dim=1)
-            feature_bank.append(feature)
-            target_bank.append(y)
+                # Encode data and normalize features (for kNN)
+                feature = encoder(x).squeeze()
+                feature = F.normalize(feature, dim=1)
+                feature_bank.append(feature)
+                target_bank.append(y)
 
-        # Save full feature bank for validation epoch
-        pl_module.feature_bank = torch.cat(feature_bank, dim=0).t().contiguous()
-        pl_module.target_bank = torch.cat(target_bank, dim=0).t().contiguous()
+            # Save full feature bank for validation epoch
+            pl_module.feature_bank = torch.cat(feature_bank, dim=0).t().contiguous()
+            pl_module.target_bank = torch.cat(target_bank, dim=0).t().contiguous()
 
 
 class linear_net(pl.LightningModule):
@@ -259,9 +259,7 @@ class linear_net(pl.LightningModule):
             ),
         }
 
-        opts = {"adam": torch.optim.Adam, "sgd": torch.optim.SGD}
-
-        opt = opts[self.config["linear"]["opt"]](self.logreg.parameters())
+        opt = opts[self.config["linear"]["opt"]](params)
 
         return opt
 

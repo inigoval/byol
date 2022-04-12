@@ -226,3 +226,7 @@ def compute_mu_sig_features(dset, batch_size=0):
 
 def _get_imagenet_norms():
     return {"mu": (0.485, 0.456, 0.406), "sig": (0.229, 0.224, 0.225)}
+
+
+def _get_cifar10_norms():
+    return {"mu": (0.4914, 0.4822, 0.4465), "sig": (0.2023, 0.1994, 0.2010)}

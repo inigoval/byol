@@ -41,17 +41,17 @@ class Base_DataModule(pl.LightningDataModule):
 
     def val_dataloader(self):
         n_workers = self.config["num_workers"]
-        loader = DataLoader(self.data["val"], 1000, num_workers=n_workers, prefetch_factor=20)
+        loader = DataLoader(self.data["val"], 300, num_workers=n_workers, prefetch_factor=20)
         return loader
 
     def test_dataloader(self):
         n_workers = self.config["num_workers"]
-        loader = DataLoader(self.data["test"], 1000, num_workers=n_workers, prefetch_factor=20)
+        loader = DataLoader(self.data["test"], 300, num_workers=n_workers, prefetch_factor=20)
         return loader
 
     def update_transforms(self, D_train):
         if not self.config["debug"]:
-            mu, sig = compute_mu_sig_images(D_train)
+            mu, sig = compute_mu_sig_images(D_train, batch_size=1000)
             self.mu, self.sig = mu, sig
 
             # Define transforms with calculated values
@@ -96,7 +96,7 @@ class Base_DataModule_Eval(pl.LightningDataModule):
         n_workers = self.config["num_workers"]
         loader = DataLoader(
             self.data["val"],
-            1000,
+            300,
             num_workers=n_workers,
             prefetch_factor=20,
         )
@@ -104,7 +104,7 @@ class Base_DataModule_Eval(pl.LightningDataModule):
 
     def test_dataloader(self):
         n_workers = self.config["num_workers"]
-        loader = DataLoader(self.data["test"], 1000, num_workers=n_workers, prefetch_factor=20)
+        loader = DataLoader(self.data["test"], 300, num_workers=n_workers, prefetch_factor=20)
         return loader
 
     def update_transforms(self, D_train):

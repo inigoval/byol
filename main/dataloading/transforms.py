@@ -122,7 +122,8 @@ class ReduceView(nn.Module):
             augs.append(T.RandomHorizontalFlip())
 
         augs.append(T.Resize(config["data"]["input_height"]))
-        augs.append(T.CenterCrop(config["center_crop_size"]))
+        if config["center_crop_size"]:
+            augs.append(T.CenterCrop(config["center_crop_size"]))
         augs.append(T.ToTensor())
 
         self.view = T.Compose(augs)

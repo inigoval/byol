@@ -42,9 +42,13 @@ def _get_backbone(config):
     net = torch.nn.Sequential(*list(net.children())[:-1])
 
     # Change first layer for color channels B/W images
+
+    # if config["model"]["downscale"]:
+    #     net[0] = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
+
     n_c = config["data"]["color_channels"]
     if n_c != 3:
-        net[0] = nn.Conv2d(n_c, 64, 7, 2, 3)
+        net[0].in_channels = n_c
 
     features = config["model"]["features"]
     backbone = nn.Sequential(
