@@ -86,7 +86,10 @@ if __name__ == "__main__":
     log_examples(wandb_logger, pretrain_data.data["train"])
 
     # List of callbacks
-    callbacks = [pretrain_checkpoint, Feature_Bank(), LearningRateMonitor()]
+    callbacks = [
+        pretrain_checkpoint,
+        LearningRateMonitor(),
+    ]
 
     if config["m_decay"]:
         callbacks.append(Update_M())

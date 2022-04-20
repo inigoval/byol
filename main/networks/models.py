@@ -6,8 +6,6 @@ import pytorch_lightning as pl
 import torchvision.models as models
 import torchvision.models as M
 
-from networks.layers import conv_block, convT_block, linear_block, UPSoftmax
-
 
 class MLPHead(nn.Module):
     """Fully connected head wtih a single hidden layer"""
@@ -43,12 +41,14 @@ def _get_backbone(config):
 
     # Change first layer for color channels B/W images
 
-    # if config["model"]["downscale"]:
-    #     net[0] = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
-
     n_c = config["data"]["color_channels"]
     if n_c != 3:
-        net[0].in_channels = n_c
+        # c_out, k, s, p = net[0].out_channels, net[0].kernel_size, net[0].stride, net[0].padding
+        # net[0] = nn.Conv2d(n_c, c_out, kernel_size=k, stride=s, padding=p, bias=False)
+        net[0] = nn.Conv2d(n_c, 64, kernel_size=7, stride=2, padding=2, bias=False)
+
+    if config["model"]["downscale"]:
+        net[0] = nn.Conv2d(n_c, 64, kernel_size=3, stride=1, padding=1, bias=False)
 
     features = config["model"]["features"]
     backbone = nn.Sequential(

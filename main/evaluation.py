@@ -141,23 +141,15 @@ class Lightning_Eval(pl.LightningModule):
                 knn_t=self.config["knn"]["temperature"],
             )
 
-            num = len(y)
-            top1 = (pred_labels[:, 0] == y).float().sum()
-            return (num, top1.item())
+            top1 = pred_labels[:, 0]
+
+            # Compute accuracy
+            self.knn_acc.update(top1, y)
 
     def validation_epoch_end(self, outputs):
         if hasattr(self, "feature_bank") and hasattr(self, "target_bank"):
-            total_num = 0
-            total_top1 = 0
-            for (num, top1) in outputs:
-                total_num += num
-                total_top1 += top1
-
-            acc = float(total_top1 / total_num) * 100
-            if acc > self.best_acc:
-                self.best_acc = acc
-            self.log("val/kNN_acc", acc)
-            self.log("val/max_kNN_acc", self.best_acc)
+            self.log("val/kNN_acc", self.knn_acc.compute())
+            self.knn_acc.reset()
 
 
 class Feature_Bank(Callback):
@@ -173,7 +165,7 @@ class Feature_Bank(Callback):
             encoder = pl_module.backbone
 
             data_bank = pl_module.trainer.datamodule.data["l"]
-            data_bank_loader = DataLoader(data_bank, 500)
+            data_bank_loader = DataLoader(data_bank, 200)
             feature_bank = []
             target_bank = []
             for data in data_bank_loader:
@@ -205,6 +197,11 @@ class linear_net(pl.LightningModule):
         self.logreg = LogisticRegression(output_dim, n_classes)
         self.ce_loss = torch.nn.CrossEntropyLoss()
 
+        self.train_acc = tm.Accuracy(average="micro", top_k=1, threshold=0)
+        self.val_acc = tm.Accuracy(average="micro", top_k=1, threshold=0)
+
+        self.dummy_param = nn.Parameter(torch.empty(0))
+
         paths = Path_Handler()
         self.paths = paths.dict
 
@@ -222,22 +219,28 @@ class linear_net(pl.LightningModule):
         self.log("linear_eval/train_loss", loss, on_step=False, on_epoch=True)
 
         # predictions = torch.argmax(logits, dim=1).int()
-        acc = tmF.accuracy(y_pred, y)
-        self.log("linear_eval/train_acc", acc, on_step=False, on_epoch=True)
+        # acc = tmF.accuracy(y_pred, y)
+        # self.log("linear_eval/train_acc", acc, on_step=False, on_epoch=True)
+
+        self.train_acc(y_pred, y)
+        self.log("linear_eval/train_acc", self.train_acc, on_step=False, on_epoch=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
         x, y = batch
+        x = x.type_as(self.dummy_param)
+
         x = x.view(x.shape[0], -1)
         logits = self.forward(x)
-        y_pred = logits.softmax(dim=-1)
+        # y_pred = logits.softmax(dim=-1)
 
         loss = self.ce_loss(logits, y)
         self.log("linear_eval/val_loss", loss)
 
         # predictions = torch.argmax(logits, dim=1).int()
-        acc = tmF.accuracy(y_pred, y)
-        self.log("linear_eval/val_acc", acc)
+        # acc = tmF.accuracy(y_pred, y)
+        self.val_acc(logits, y)
+        self.log("linear_eval/val_acc", self.val_acc, on_step=False, on_epoch=True)
 
     def configure_optimizers(self):
         lr = self.config["linear"]["lr"]
