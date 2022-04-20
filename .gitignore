@@ -4,3 +4,5 @@ notebooks
 astroaugmentations
 *.npy
 __pycache__
+*ipynb*
+.ipynb*
