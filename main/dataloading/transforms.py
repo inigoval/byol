@@ -215,9 +215,10 @@ def _rgz_view(config):
 
         # Gaussian blurring
         blur_kernel = config["blur_kernel"]
-        blur_sig = config["blur_sig"]
-        # blur = LightlyGaussianBlur(blur_kernel, sigma=blur_sig)
-        blur = T.GaussianBlur(blur_kernel, sigma=blur_sig)
+        # blur_sig = config["blur_sig"]
+        p_blur = config["p_blur"]
+        blur = LightlyGaussianBlur(blur_kernel, prob=p_blur)
+        # blur = T.GaussianBlur(blur_kernel, sigma=blur_sig)
 
         # Cropping
         center_crop = config["center_crop_size"]
@@ -234,8 +235,9 @@ def _rgz_view(config):
                 T.CenterCrop(center_crop),
                 T.RandomResizedCrop(center_crop, scale=random_crop),
                 T.RandomHorizontalFlip(),
+                T.RandomVerticalFlip(),
                 T.RandomApply([color_jitter], p=0.8),
-                T.RandomApply([blur], p=config["p_blur"]),
+                blur,
                 T.ToTensor(),
             ]
         )

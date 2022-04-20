@@ -137,17 +137,15 @@ if __name__ == "__main__":
         pretrained_model = BYOL.load_from_checkpoint(best_model_path)
         encoder = model.backbone
 
+    encoder = model.backbone
     # Freeze encoder weights
     freeze_model(encoder)
+    encoder.eval()
 
     # Switch data-loader to linear evaluation mode
     eval_data = datasets[config["dataset"]]["linear"](encoder, config)
     eval_data.prepare_data()
     eval_data.setup()
-
-    # if not config["debug"]:
-    #     config["linear"]["mu"] = eval_data.mu
-    #     config["linear"]["sig"] = eval_data.sig
 
     linear_checkpoint = pl.callbacks.ModelCheckpoint(
         monitor="linear_eval/val_acc",

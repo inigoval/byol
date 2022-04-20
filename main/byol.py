@@ -44,7 +44,7 @@ class BYOL(Lightning_Eval):
         self.best_acc = 0
 
     def forward(self, x):
-        return self.backbone(x).flatten(start_dim=1)
+        return self.backbone(x)
 
     def project(self, x):
         y = self.backbone(x).flatten(start_dim=1)
