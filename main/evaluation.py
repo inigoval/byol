@@ -95,11 +95,12 @@ class Lightning_Eval(pl.LightningModule):
     def __init__(self, config):
         super().__init__()
         self.config = config
+        self.knn_acc = tm.Accuracy(average="micro", threshold=0)
 
-    def training_epoch_end(self, outputs):
+    def on_validation_start(self):
         with torch.no_grad():
             data_bank = self.trainer.datamodule.data["l"]
-            data_bank_loader = DataLoader(data_bank, 300)
+            data_bank_loader = DataLoader(data_bank, 200)
             feature_bank = []
             target_bank = []
             for data in data_bank_loader:

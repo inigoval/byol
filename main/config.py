@@ -6,14 +6,6 @@ paths = Path_Handler()
 path_dict = paths._dict()
 
 
-# def load_config():
-#     """Helper function to load yaml config file, convert to python dictionary and return."""
-#     path = path_dict["project"] / "config.yml"
-#     with open(path, "r") as ymlconfig:
-#         config = yaml.load(ymlconfig, Loader=yaml.FullLoader)
-#     return config
-
-
 def load_config():
     """Helper function to load yaml config file, convert to python dictionary and return."""
 
@@ -23,7 +15,8 @@ def load_config():
         global_config = yaml.load(ymlconfig, Loader=yaml.FullLoader)
 
     dataset = global_config["dataset"]
-    path = path_dict["config"] / f"{dataset}.yml"
+    type = global_config["type"]
+    path = path_dict["config"] / type / f"{dataset}.yml"
 
     # load data-set specific config
     with open(path, "r") as ymlconfig:
@@ -32,7 +25,7 @@ def load_config():
     # if loading a benchmark, use load the specific config
     preset = config["preset"]
     if preset:
-        path = path_dict["config"] / f"{dataset}-{preset}.yml"
+        path = path_dict["config"] / type / f"{dataset}-{preset}.yml"
         with open(path, "r") as ymlconfig:
             config = yaml.load(ymlconfig, Loader=yaml.FullLoader)
 
