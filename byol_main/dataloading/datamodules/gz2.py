@@ -26,7 +26,7 @@ class GZ2_DataModule(Base_DataModule):  # not the same as in pytorch-galaxy-data
     def prepare_data(self):
         GZ2Dataset(self.path, label_cols=['label'], download=True)
 
-    def setup(self):
+    def setup(self, stage=None):  # stage by ptl convention
         self.T_train.n_views = 1
 
         full_catalog = GZ2Dataset(self.path, download=True).catalog
