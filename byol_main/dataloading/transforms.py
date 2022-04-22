@@ -96,7 +96,8 @@ class SimpleView(nn.Module):
         self.config = config
 
         augs = []
-
+        if config['dataset'] == 'gz2':  # is a tensor, needs to be a PIL to later call T.ToTensor
+            augs.append(T.ToPILImage())
         if config["data"]["rotate"]:
             augs.append(T.RandomRotation(180))
             augs.append(T.RandomHorizontalFlip())
@@ -110,8 +111,8 @@ class SimpleView(nn.Module):
 
     def __call__(self, x):
         # Use rotation if training
-
-        x = self.normalize(self.view(x))
+        x = self.view(x)
+        x = self.normalize(x)
         return x
 
     def update_normalization(self, mu, sig):
@@ -240,7 +241,7 @@ def _gz2_view(config):
     view = T.Compose(
         [   
             # the GZ2 dataset yields tensors (may change this)
-            T.ToPILImage(),  # the blur transform requires a PIL image
+            # T.ToPILImage(),  # the blur transform requires a PIL image
             T.RandomRotation(180),
             T.RandomResizedCrop(input_height, scale=random_crop),
             T.RandomHorizontalFlip(),
