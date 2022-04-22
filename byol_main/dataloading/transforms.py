@@ -96,8 +96,8 @@ class SimpleView(nn.Module):
         self.config = config
 
         augs = []
-        if config['dataset'] == 'gz2':  # is a tensor, needs to be a PIL to later call T.ToTensor
-            augs.append(T.ToPILImage())
+        # if config['dataset'] == 'gz2':  # is a tensor, needs to be a PIL to later call T.ToTensor
+        #     augs.append(T.ToPILImage())
         if config["data"]["rotate"]:
             augs.append(T.RandomRotation(180))
             augs.append(T.RandomHorizontalFlip())
