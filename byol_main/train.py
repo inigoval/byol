@@ -5,15 +5,16 @@ import logging
 from pytorch_lightning.callbacks import LearningRateMonitor
 
 from paths import Path_Handler
-from dataloading.datamodules import Imagenette_DataModule, Imagenette_DataModule_Eval
-from dataloading.datamodules import GalaxyMNIST_DataModule, GalaxyMNIST_DataModule_Eval
-from dataloading.datamodules import RGZ_DataModule, RGZ_DataModule_Eval
-from dataloading.datamodules import CIFAR10_DataModule, CIFAR10_DataModule_Eval
-from byol import BYOL, Update_M
-from nnclr import NNCLR
-from evaluation import linear_net, Feature_Bank
-from config import load_config, update_config
-from utilities import freeze_model, log_examples
+from byol_main.dataloading.datamodules import Imagenette_DataModule, Imagenette_DataModule_Eval
+from byol_main.dataloading.datamodules import GalaxyMNIST_DataModule, GalaxyMNIST_DataModule_Eval
+from byol_main.dataloading.datamodules import GZ2_DataModule, GZ2_DataModule_Eval
+from byol_main.dataloading.datamodules import RGZ_DataModule, RGZ_DataModule_Eval
+from byol_main.dataloading.datamodules import CIFAR10_DataModule, CIFAR10_DataModule_Eval
+from byol_main.byol import BYOL, Update_M
+from byol_main.nnclr import NNCLR
+from byol_main.evaluation import linear_net, Feature_Bank
+from byol_main.config import load_config, update_config
+from byol_main.utilities import freeze_model, log_examples
 
 if __name__ == "__main__":
 
@@ -60,6 +61,10 @@ if __name__ == "__main__":
         "gzmnist": {
             "pretrain": GalaxyMNIST_DataModule,
             "linear": GalaxyMNIST_DataModule_Eval,
+        },
+        "gz2": {
+            "pretrain": GZ2_DataModule,
+            "linear": GZ2_DataModule_Eval,
         },
         "rgz": {
             "pretrain": RGZ_DataModule,

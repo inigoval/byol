@@ -11,8 +11,8 @@ from torchvision.datasets import MNIST
 from torch.utils.data import DataLoader, random_split
 from pytorch_lightning.trainer.supporters import CombinedLoader
 
-from paths import Path_Handler
-from utilities import batch_eval
+from byol_main.paths import Path_Handler
+from byol_main.utilities import batch_eval
 
 
 def data_splitter_strat(dset, seed=None, split=1, val_frac=0.2, u_cut=False):

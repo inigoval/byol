@@ -1,9 +1,9 @@
 import pytorch_lightning as pl
 from torch.utils.data import DataLoader
 
-from paths import Path_Handler
-from dataloading.utils import compute_mu_sig_features, compute_mu_sig_images
-from dataloading.transforms import ReduceView, MultiView, SimpleView
+from byol_main.paths import Path_Handler
+from byol_main.dataloading.utils import compute_mu_sig_features, compute_mu_sig_images
+from byol_main.dataloading.transforms import ReduceView, MultiView, SimpleView
 
 
 class Base_DataModule(pl.LightningDataModule):

@@ -8,7 +8,7 @@ from torch import nn
 from PIL import ImageFilter
 from albumentations.pytorch import ToTensorV2
 
-from paths import Path_Handler
+from byol_main.paths import Path_Handler
 import cv2
 
 
@@ -48,7 +48,7 @@ class MultiView(nn.Module):
         self.config = config
 
         # Define a view
-        self.view = self._view()
+        self.view = self._view()  # creates a callable transform
         self.normalize = T.Normalize(mu, sig)
         self.n_views = n_views
 
@@ -56,7 +56,8 @@ class MultiView(nn.Module):
         if self.n_views > 1:
             views = []
             for i in np.arange(self.n_views):
-                view = self.normalize(self.view(x))
+                view = self.view(x)
+                view = self.normalize(view)
                 views.append(view)
             return views
         else:
@@ -77,7 +78,13 @@ class MultiView(nn.Module):
             return _simclr_view(self.config)
 
         elif self.config["dataset"] == "gzmnist":
-            return _gz_view(self.config)
+            return _gzmnist_view(self.config)
+
+        elif self.config["dataset"] == "gz2":
+            return _gz2_view(self.config)
+
+        else:
+            raise ValueError(self.config["dataset"])
 
     def update_normalization(self, mu, sig):
         self.normalize = T.Normalize(mu, sig)
@@ -175,7 +182,7 @@ def _simclr_view(config):
     return view
 
 
-def _gz_view(config):
+def _gzmnist_view(config):
     s = config["s"]
     input_height = config["data"]["input_height"]
 
@@ -204,6 +211,44 @@ def _gz_view(config):
             T.RandomGrayscale(p=p_grayscale),
             blur,
             T.ToTensor(),
+        ]
+    )
+
+    return view
+
+
+def _gz2_view(config):
+    # currently the same as gzmnist except for the ToPIL transform
+    s = config["s"]
+    input_height = config["data"]["input_height"]
+
+    # Gaussian blurring, kernel 10% of image size (SimCLR paper)
+    p_blur = config["p_blur"]
+    blur_kernel = _blur_kernel(input_height)
+    # blur_sig = config["blur_sig"]
+    # blur = SIMCLR_GaussianBlur(blur_kernel, p=p_blur, min=blur_sig[0], max=blur_sig[1])
+    blur = LightlyGaussianBlur(blur_kernel, prob=p_blur)
+
+    # Color augs
+    color_jitter = T.ColorJitter(0.8 * s, 0.8 * s, 0.8 * s, 0.2 * s)
+    p_grayscale = config["p_grayscale"]
+
+    # Cropping
+    random_crop = config["random_crop"]
+
+    # Define a view
+    view = T.Compose(
+        [   
+            # the GZ2 dataset yields tensors (may change this)
+            T.ToPILImage(),  # the blur transform requires a PIL image
+            T.RandomRotation(180),
+            T.RandomResizedCrop(input_height, scale=random_crop),
+            T.RandomHorizontalFlip(),
+            T.RandomVerticalFlip(),
+            T.RandomApply([color_jitter], p=0.8),
+            T.RandomGrayscale(p=p_grayscale),
+            blur,
+            T.ToTensor()  # the model requires a tensor
         ]
     )
 

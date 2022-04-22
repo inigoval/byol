@@ -6,7 +6,7 @@ import numpy as np
 from pytorch_galaxy_datasets.galaxy_zoo_2 import GZ2Dataset
 from sklearn.model_selection import train_test_split
 
-from dataloading.base_dm import Base_DataModule_Eval, Base_DataModule
+from byol_main.dataloading.base_dm import Base_DataModule_Eval, Base_DataModule
 
 
 def split_catalog(catalog, train_fraction=.7, val_fraction=.1, test_fraction=.2):
@@ -29,7 +29,7 @@ class GZ2_DataModule(Base_DataModule):  # not the same as in pytorch-galaxy-data
     def setup(self):
         self.T_train.n_views = 1
 
-        full_catalog = GZ2Dataset(self.path).catalog
+        full_catalog = GZ2Dataset(self.path, download=True).catalog
         train_catalog, val_catalog, test_catalog = split_catalog(full_catalog)
 
         D_train = GZ2Dataset(self.path, catalog=train_catalog, transform=self.T_train)
@@ -70,6 +70,26 @@ class GZ2_DataModule_Eval(Base_DataModule_Eval):
 
 if __name__ == '__main__':
 
-    GZ2_DataModule(config=None)[0]
+    import yaml
 
-    GZ2_DataModule_Eval(config=None)
+    with open('config/byol/gz2.yml', 'r') as f:
+        config = yaml.load(f, Loader=yaml.FullLoader)
+
+    config['dataset'] = 'gz2'
+    config['debug'] = True
+    config['num_workers'] = 1
+    # config = {
+    #     'batch_size': 32,
+    #     'num_workers': 1,
+    #     'debug': True,
+    #     'dataset': 'gz2'
+    # }
+    print(config)
+
+    datamodule = GZ2_DataModule(config=config)
+    # GZ2_DataModule_Eval(config=config)
+    datamodule.setup()
+
+    for (images, labels) in datamodule.train_dataloader():
+        print(images, labels)
+        break
