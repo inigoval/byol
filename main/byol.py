@@ -41,7 +41,8 @@ class BYOL(Lightning_Eval):
         self.criterion = lightly.loss.NegativeCosineSimilarity()
 
         self.dummy_param = nn.Parameter(torch.empty(0))
-        self.best_acc = 0
+
+        self.m = config["m"]
 
     def forward(self, x):
         return self.backbone(x)
@@ -59,8 +60,11 @@ class BYOL(Lightning_Eval):
         return z
 
     def training_step(self, batch, batch_idx):
-        update_momentum(self.backbone, self.backbone_momentum, m=0.99)
-        update_momentum(self.projection_head, self.projection_head_momentum, m=0.99)
+        # Update momentum value
+        update_momentum(self.backbone, self.backbone_momentum, m=self.m)
+        update_momentum(self.projection_head, self.projection_head_momentum, m=self.m)
+
+        # Load in data
         (x0, x1), _ = batch
         x0 = x0.type_as(self.dummy_param)
         x1 = x1.type_as(self.dummy_param)
@@ -69,32 +73,27 @@ class BYOL(Lightning_Eval):
         p1 = self.project(x1)
         z1 = self.project_momentum(x1)
         loss = 0.5 * (self.criterion(p0, z1) + self.criterion(p1, z0))
-        self.log("train/loss", loss)
+        self.log("train/loss", loss, on_step=False, on_epoch=True)
         return loss
 
+    def on_train_epoch_end(self):
+        if self.config["m_decay"]:
+            self.update_m()
+
     def configure_optimizers(self):
-        lr = self.config["lr"]
-        mom = self.config["momentum"]
-        w_decay = self.config["weight_decay"]
         params = (
             list(self.backbone.parameters())
             + list(self.projection_head.parameters())
             + list(self.prediction_head.parameters())
         )
 
-        opts = {
-            "adam": lambda p: torch.optim.Adam(p, lr=lr),
-            "sgd": lambda p: torch.optim.SGD(
-                p,
-                lr=lr,
-                momentum=mom,
-                weight_decay=w_decay,
-            ),
-        }
+        return _optimizer(params, self.config)
 
-        opt = opts[self.config["opt"]](params)
-
-        return _optimizer(opt, self.config)
+    def update_m(self):
+        with torch.no_grad():
+            epoch = self.current_epoch
+            n_epochs = self.config["model"]["n_epochs"]
+            self.m = 1 - (1 - self.m) * (cos(pi * epoch / n_epochs) + 1) / 2
 
 
 class Update_M(Callback):

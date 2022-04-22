@@ -148,7 +148,7 @@ class Lightning_Eval(pl.LightningModule):
 
     def validation_epoch_end(self, outputs):
         if hasattr(self, "feature_bank") and hasattr(self, "target_bank"):
-            self.log("val/kNN_acc", self.knn_acc.compute())
+            self.log("val/kNN_acc", self.knn_acc.compute() * 100)
             self.knn_acc.reset()
 
 

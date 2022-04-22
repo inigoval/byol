@@ -85,7 +85,23 @@ def freeze_model(model):
         param.requires_grad = False
 
 
-def _optimizer(opt, config):
+def _optimizer(params, config):
+    lr = config["lr"]
+    mom = config["momentum"]
+    w_decay = config["weight_decay"]
+
+    opts = {
+        "adam": lambda p: torch.optim.Adam(p, lr=lr),
+        "sgd": lambda p: torch.optim.SGD(
+            p,
+            lr=lr,
+            momentum=mom,
+            weight_decay=w_decay,
+        ),
+    }
+
+    opt = opts[config["opt"]](params)
+
     # Apply LARS wrapper if option is chosen
     if config["lars"]:
         opt = LARSWrapper(opt, eta=config["trust_coef"])

@@ -214,7 +214,9 @@ def _rgz_view(config):
     if config["aug_type"] == "simclr":
 
         # Gaussian blurring
-        blur_kernel = config["blur_kernel"]
+        # blur_kernel = config["blur_kernel"]
+        input_height = config["center_crop_size"]
+        blur_kernel = _blur_kernel(input_height)
         # blur_sig = config["blur_sig"]
         p_blur = config["p_blur"]
         blur = LightlyGaussianBlur(blur_kernel, prob=p_blur)

@@ -1,8 +1,10 @@
+preset: 'deepmind'
+
 model:
     architecture: 'resnet18' 
     features: 512     # Number of encoded features (None just uses original resnet output)
     n_epochs: 1000
-    first_kernel_size: 7
+    downscale: False
 
 projection_head:
     hidden: 4096
@@ -39,7 +41,7 @@ scheduler: 'warmupcosine' # ['none', 'cosine', 'warmupcosine']
 warmup_epochs: 10  # Only used in linear warmup cosine annealing
 
 # LARS
-lars: False
+lars: True
 trust_coef: 0.003
 
 ## BYOL ## 

@@ -10,6 +10,7 @@ from dataloading.datamodules import GalaxyMNIST_DataModule, GalaxyMNIST_DataModu
 from dataloading.datamodules import RGZ_DataModule, RGZ_DataModule_Eval
 from dataloading.datamodules import CIFAR10_DataModule, CIFAR10_DataModule_Eval
 from byol import BYOL, Update_M
+from nnclr import NNCLR
 from evaluation import linear_net, Feature_Bank
 from config import load_config, update_config
 from utilities import freeze_model, log_examples
@@ -90,9 +91,6 @@ if __name__ == "__main__":
         pretrain_checkpoint,
         LearningRateMonitor(),
     ]
-
-    if config["m_decay"]:
-        callbacks.append(Update_M())
 
     trainer_settings = {
         "slurm": {"gpus": 1, "num_nodes": 1},
