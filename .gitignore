@@ -6,3 +6,5 @@ astroaugmentations
 __pycache__
 *ipynb*
 .ipynb*
+
+.vscode
