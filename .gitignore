@@ -8,3 +8,6 @@ __pycache__
 .ipynb*
 
 .vscode
+files/wandb
+
+*.egg-info
