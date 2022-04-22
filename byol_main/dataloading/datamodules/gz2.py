@@ -91,5 +91,5 @@ if __name__ == '__main__':
     datamodule.setup()
 
     for (images, labels) in datamodule.train_dataloader():
-        print(images, labels)
+        print(images.shape, labels.shape)
         break

@@ -248,7 +248,7 @@ def _gz2_view(config):
             T.RandomVerticalFlip(),
             T.RandomApply([color_jitter], p=0.8),
             T.RandomGrayscale(p=p_grayscale),
-            blur,
+            # blur,  no, need all the resolution we can get
             T.ToTensor()  # the model requires a tensor
         ]
     )
