@@ -33,6 +33,9 @@ class GZ2_DataModule(Base_DataModule):  # not the same as in pytorch-galaxy-data
         full_catalog = full_catalog.query('label >= 0').sample(10000)  # -1 indicates cannot be assigned a label
         assert full_catalog['label'].min() >= 0
         train_catalog, val_catalog, test_catalog = split_catalog(full_catalog)
+        assert train_catalog['label'].min() >= 0
+        assert val_catalog['label'].min() >= 0
+        assert test_catalog['label'].min() >= 0
 
         D_train = GZ2Dataset(self.path, label_cols=['label'], catalog=train_catalog, transform=self.T_train)
         self.update_transforms(D_train)
@@ -61,24 +64,23 @@ class GZ2_DataModule_Eval(Base_DataModule_Eval):
         assert full_catalog['label'].min() >= 0
         train_catalog, val_catalog, test_catalog = split_catalog(full_catalog)
 
-
-
         # Initialise individual datasets with identity transform (for evaluation)
-        D_train = GZ2Dataset(self.path, catalog=train_catalog, download=True, transform=self.T_train)
+        D_train = GZ2Dataset(self.path, catalog=train_catalog, label_cols=['label'], download=True, transform=self.T_train)
 
         self.update_transforms(D_train)
 
         self.data["train"] = GZ2Dataset(
-            self.path, catalog=train_catalog, download=True, transform=self.T_train
+            self.path, catalog=train_catalog, label_cols=['label'], download=True, transform=self.T_train
         )
-        self.data["val"] = GZ2Dataset(self.path, catalog=val_catalog, transform=self.T_test)
-        self.data["test"] = GZ2Dataset(self.path, catalog=test_catalog, transform=self.T_test)
-        self.data["l"] = GZ2Dataset(self.path,catalog=val_catalog,  transform=self.T_test)
+        self.data["val"] = GZ2Dataset(self.path, catalog=val_catalog, label_cols=['label'], transform=self.T_test)
+        self.data["test"] = GZ2Dataset(self.path, catalog=test_catalog, label_cols=['label'], transform=self.T_test)
+        self.data["l"] = GZ2Dataset(self.path,catalog=val_catalog, label_cols=['label'], transform=self.T_test)
 
 
 if __name__ == '__main__':
 
     import yaml
+    import torch
 
     with open('config/byol/gz2.yml', 'r') as f:
         config = yaml.load(f, Loader=yaml.FullLoader)
@@ -86,18 +88,18 @@ if __name__ == '__main__':
     config['dataset'] = 'gz2'
     config['debug'] = True
     config['num_workers'] = 1
-    # config = {
-    #     'batch_size': 32,
-    #     'num_workers': 1,
-    #     'debug': True,
-    #     'dataset': 'gz2'
-    # }
-    print(config)
+    config['data'] = {'mu': 0, 'sig': 1, 'rotate': True, 'input_height': 64} # needed for _Eval
+    # print(config)
 
-    datamodule = GZ2_DataModule(config=config)
-    # GZ2_DataModule_Eval(config=config)
-    datamodule.setup()
+    for datamodule in [GZ2_DataModule(config=config), GZ2_DataModule_Eval(config=config, encoder=lambda x: torch.from_numpy(np.random.rand(len(x), 512)))]:
 
-    for (images, labels) in datamodule.train_dataloader():
-        print(images[0].shape, labels.shape)  # [0] as list of views
-        break
+        datamodule.setup()
+
+        for (images, labels) in datamodule.train_dataloader():
+            print(images[0].shape, labels.shape)  # [0] as list of views
+            assert labels.min() >= 0
+
+        for (images, labels) in datamodule.val_dataloader():
+            print(images[0].shape, labels.shape)  # [0] as list of views
+            assert labels.min() >= 0
+    
