@@ -149,6 +149,8 @@ class Lightning_Eval(pl.LightningModule):
             top1 = pred_labels[:, 0]
 
             # Compute accuracy
+            assert y.min() >= 0
+            assert top1.min() >= 0
             self.knn_acc.update(top1, y)
 
     def validation_epoch_end(self, outputs):
