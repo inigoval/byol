@@ -40,9 +40,9 @@ def knn_predict(
         feature:
             Tensor of shape [N, D] for which you want predictions
         feature_bank:
-            Tensor of a database of features used for kNN
+            Tensor of a database of features used for kNN, of shape [D, N] where N is len(l datamodule)
         target_bank:
-            Labels for the features in our feature_bank
+            Labels for the features in our feature_bank, of shape ()
         num_classes:
             Number of classes (e.g. `10` for CIFAR-10)
         knn_k:
@@ -65,12 +65,16 @@ def knn_predict(
     """
 
     # compute cos similarity between each feature vector and feature bank ---> [B, N]
-    sim_matrix = torch.mm(feature, feature_bank)
+    sim_matrix = torch.mm(feature, feature_bank)  # (B, D) matrix. mult (D, N) gives (B, N) (as feature dim got summed over to got cos sim)
 
     # [B, K]
-    sim_weight, sim_idx = sim_matrix.topk(k=knn_k, dim=-1)
+    sim_weight, sim_idx = sim_matrix.topk(k=knn_k, dim=-1)  # this will be slow if feature_bank is large (e.g. 100k datapoints)
 
     # [B, K]
+    # target_bank is (1, N) (due to .t() in init)
+    # feature.size(0) is the validation batch size
+    # expand copies target_bank to (val_batch, N)
+    # gather than indexes the N dimension to place the right labels (of the top k features), making sim_labels (val_batch) with values of the correct labels
     sim_labels = torch.gather(target_bank.expand(feature.size(0), -1), dim=-1, index=sim_idx)
     # we do a reweighting of the similarities
     sim_weight = (sim_weight / knn_t).exp()
@@ -99,24 +103,24 @@ class Lightning_Eval(pl.LightningModule):
 
     def on_validation_start(self):
         with torch.no_grad():
-            data_bank = self.trainer.datamodule.data["l"]
-            data_bank_loader = DataLoader(data_bank, 200)
+            data_bank = self.trainer.datamodule.data["l"]  # will get split into feature_bank and target_bank
+            data_bank_loader = DataLoader(data_bank, 200)  # 200 is the batch size used for the unpacking below
             feature_bank = []
             target_bank = []
             for data in data_bank_loader:
                 # Load data and move to correct device
-                x, y = data
+                x, y = data  # supervised-style batch of (images, labels), with batch size from above
                 x = x.type_as(self.dummy_param)
                 y = y.type_as(self.dummy_param).long()
 
                 # Encode data and normalize features (for kNN)
-                feature = self.forward(x).squeeze()
+                feature = self.forward(x).squeeze()  # (batch, features)  e.g. (200, 512)
                 feature = F.normalize(feature, dim=1)
-                feature_bank.append(feature)
-                target_bank.append(y)
+                feature_bank.append(feature) # tensor of all features, within which to find nearest-neighbours. Each is (B, N_features), N_features being the output dim of self.forward e.g. BYOL
+                target_bank.append(y)  # tensor with labels of those features
 
             # Save full feature bank for validation epoch
-            self.feature_bank = torch.cat(feature_bank, dim=0).t().contiguous()
+            self.feature_bank = torch.cat(feature_bank, dim=0).t().contiguous()  # (features, len(l datamodule)) due to the .t() transpose
             self.target_bank = torch.cat(target_bank, dim=0).t().contiguous()
 
     def validation_step(self, batch, batch_idx):
@@ -133,9 +137,9 @@ class Lightning_Eval(pl.LightningModule):
             target_bank = self.target_bank.type_as(y)
 
             pred_labels = knn_predict(
-                feature,
-                feature_bank,
-                target_bank,
+                feature,  # feature to search for
+                feature_bank,  # feature bank to identify NN within
+                target_bank,  # labels of those features in feature_bank, same index
                 self.config["data"]["classes"],
                 knn_k=self.config["knn"]["neighbors"],
                 knn_t=self.config["knn"]["temperature"],

@@ -24,7 +24,7 @@ class GZ2_DataModule(Base_DataModule):  # not the same as in pytorch-galaxy-data
         super().__init__(config, mu=(0,), sig=(1,))
 
     def prepare_data(self):
-        GZ2Dataset(self.path, label_cols=['label'], download=True)
+        GZ2Dataset(self.path, download=True)
 
     def setup(self, stage=None):  # stage by ptl convention
         self.T_train.n_views = 1
@@ -32,17 +32,18 @@ class GZ2_DataModule(Base_DataModule):  # not the same as in pytorch-galaxy-data
         full_catalog = GZ2Dataset(self.path, download=True).catalog
         train_catalog, val_catalog, test_catalog = split_catalog(full_catalog)
 
-        D_train = GZ2Dataset(self.path, catalog=train_catalog, transform=self.T_train)
+        D_train = GZ2Dataset(self.path, label_cols=['label'], catalog=train_catalog, transform=self.T_train)
         self.update_transforms(D_train)
 
         # Re-initialise dataset with new mu and sig values
         self.data["train"] = GZ2Dataset(
-            self.path, catalog=train_catalog, download=True, transform=self.T_train
+            self.path, catalog=train_catalog, label_cols=['label'], download=True, transform=self.T_train
         )
         # Initialise individual datasets with test transform (for evaluation)
-        self.data["val"] = GZ2Dataset(self.path, catalog=val_catalog, transform=self.T_test)
-        self.data["test"] = GZ2Dataset(self.path, catalog=test_catalog, transform=self.T_test)
-        self.data["l"] = GZ2Dataset(self.path, catalog=train_catalog,  transform=self.T_test)
+        self.data["val"] = GZ2Dataset(self.path, label_cols=['label'], catalog=val_catalog, transform=self.T_test)
+        self.data["test"] = GZ2Dataset(self.path, label_cols=['label'], catalog=test_catalog, transform=self.T_test)
+        self.data["l"] = GZ2Dataset(self.path, label_cols=['label'], catalog=val_catalog,  transform=self.T_test)  # will be unpacked into feature_bank, target_bank, for knn eval
+        # TODO temporarily switched to val catalog as it's smaller and so easier to run KNN on
 
 
 # config arg not used
@@ -91,5 +92,5 @@ if __name__ == '__main__':
     datamodule.setup()
 
     for (images, labels) in datamodule.train_dataloader():
-        print(images.shape, labels.shape)
+        print(images[0].shape, labels.shape)  # [0] as list of views
         break

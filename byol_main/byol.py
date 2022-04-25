@@ -18,7 +18,7 @@ from evaluation import knn_predict, Lightning_Eval
 from networks.models import _get_backbone
 
 
-class BYOL(Lightning_Eval):
+class BYOL(Lightning_Eval):  # Lightning_Eval superclass adds validation step options for kNN and linear evaluation
     def __init__(self, config):
         super().__init__(config)
         self.save_hyperparameters()  # save hyperparameters for easy inference
@@ -45,7 +45,7 @@ class BYOL(Lightning_Eval):
         self.m = config["m"]
 
     def forward(self, x):
-        return self.backbone(x)
+        return self.backbone(x)  # dimension (batch, features), features from config e.g. 512
 
     def project(self, x):
         y = self.backbone(x).flatten(start_dim=1)
