@@ -77,6 +77,7 @@ def knn_predict(
     # feature.size(0) is the validation batch size
     # expand copies target_bank to (val_batch, N)
     # gather than indexes the N dimension to place the right labels (of the top k features), making sim_labels (val_batch) with values of the correct labels
+    logging.warning((target_bank.shape, feature.shape, sim_idx.shape))
     sim_labels = torch.gather(target_bank.expand(feature.size(0), -1), dim=-1, index=sim_idx)
     # we do a reweighting of the similarities
     sim_weight = (sim_weight / knn_t).exp()
@@ -123,7 +124,7 @@ class Lightning_Eval(pl.LightningModule):
 
             # Save full feature bank for validation epoch
             self.feature_bank = torch.cat(feature_bank, dim=0).t().contiguous()  # (features, len(l datamodule)) due to the .t() transpose
-            self.target_bank = torch.cat(target_bank, dim=0).t().contiguous()
+            self.target_bank = torch.cat(target_bank, dim=0).t().contiguous()  # either (label_dim, len) or just (len) depending on if labels should have singleton label_dim dimension
             assert all(self.target_bank >= 0)
 
     def validation_step(self, batch, batch_idx):
