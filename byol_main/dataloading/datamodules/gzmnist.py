@@ -10,7 +10,7 @@ class GalaxyMNIST_DataModule(Base_DataModule):
         GalaxyMNIST(self.path, train=False, download=True)
         GalaxyMNIST(self.path, train=True, download=True)
 
-    def setup(self):
+    def setup(self, stage=None):
         self.T_train.n_views = 1
         D_train = GalaxyMNIST(self.path, train=True, download=True, transform=self.T_train)
 
