@@ -1,3 +1,5 @@
+import logging
+
 import pytorch_lightning as pl
 import umap
 import torch
@@ -128,31 +130,32 @@ class Lightning_Eval(pl.LightningModule):
         if hasattr(self, "feature_bank") and hasattr(self, "target_bank"):
             # Load batch
             x, y = batch
-
-            # Extract + normalize features
-            feature = self.forward(x).squeeze()
-            feature = F.normalize(feature, dim=1)
-
-            # Load feature bank and labels
-            feature_bank = self.feature_bank.type_as(x)
-            target_bank = self.target_bank.type_as(y)
-
-            pred_labels = knn_predict(
-                feature,  # feature to search for
-                feature_bank,  # feature bank to identify NN within
-                target_bank,  # labels of those features in feature_bank, same index
-                self.config["data"]["classes"],
-                knn_k=self.config["knn"]["neighbors"],
-                knn_t=self.config["knn"]["temperature"],
-            )
-
-            top1 = pred_labels[:, 0]
-
-            # Compute accuracy
+            logging.warning(y)
             print(y)
-            assert y.min() >= 0
-            assert top1.min() >= 0
-            self.knn_acc.update(top1, y)
+
+            # # Extract + normalize features
+            # feature = self.forward(x).squeeze()
+            # feature = F.normalize(feature, dim=1)
+
+            # # Load feature bank and labels
+            # feature_bank = self.feature_bank.type_as(x)
+            # target_bank = self.target_bank.type_as(y)
+
+            # pred_labels = knn_predict(
+            #     feature,  # feature to search for
+            #     feature_bank,  # feature bank to identify NN within
+            #     target_bank,  # labels of those features in feature_bank, same index
+            #     self.config["data"]["classes"],
+            #     knn_k=self.config["knn"]["neighbors"],
+            #     knn_t=self.config["knn"]["temperature"],
+            # )
+
+            # top1 = pred_labels[:, 0]
+
+            # # Compute accuracy
+            # assert y.min() >= 0
+            # assert top1.min() >= 0
+            # self.knn_acc.update(top1, y)
 
     def validation_epoch_end(self, outputs):
         if hasattr(self, "feature_bank") and hasattr(self, "target_bank"):
