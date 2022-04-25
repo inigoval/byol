@@ -66,6 +66,8 @@ def knn_predict(
         >>> )
     """
 
+    assert target_bank.min() >= 0
+
     # compute cos similarity between each feature vector and feature bank ---> [B, N]
     sim_matrix = torch.mm(feature, feature_bank)  # (B, D) matrix. mult (D, N) gives (B, N) (as feature dim got summed over to got cos sim)
 
@@ -77,6 +79,7 @@ def knn_predict(
     # feature.size(0) is the validation batch size
     # expand copies target_bank to (val_batch, N)
     # gather than indexes the N dimension to place the right labels (of the top k features), making sim_labels (val_batch) with values of the correct labels
+    #  (torch.Size([8000]), torch.Size([300, 512]), torch.Size([300, 20]))  for GZMNIST
     logging.warning((target_bank.shape, feature.shape, sim_idx.shape))
     sim_labels = torch.gather(target_bank.expand(feature.size(0), -1), dim=-1, index=sim_idx)
     # we do a reweighting of the similarities
