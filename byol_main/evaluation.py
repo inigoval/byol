@@ -122,6 +122,7 @@ class Lightning_Eval(pl.LightningModule):
             # Save full feature bank for validation epoch
             self.feature_bank = torch.cat(feature_bank, dim=0).t().contiguous()  # (features, len(l datamodule)) due to the .t() transpose
             self.target_bank = torch.cat(target_bank, dim=0).t().contiguous()
+            assert all(self.target_bank >= 0)
 
     def validation_step(self, batch, batch_idx):
         if hasattr(self, "feature_bank") and hasattr(self, "target_bank"):

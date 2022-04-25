@@ -48,6 +48,7 @@ class GZ2_DataModule(Base_DataModule):  # not the same as in pytorch-galaxy-data
 
 
 # config arg not used
+# TODO nasty duplication with the above - unsure why there's two of these
 class GZ2_DataModule_Eval(Base_DataModule_Eval):
     def __init__(self, encoder, config):
         super().__init__(encoder, config)
@@ -55,6 +56,8 @@ class GZ2_DataModule_Eval(Base_DataModule_Eval):
     def setup(self):
 
         full_catalog = GZ2Dataset(self.path).catalog
+        full_catalog = full_catalog.query('label >= 0').sample(10000)  # -1 indicates cannot be assigned a label
+        train_catalog, val_catalog, test_catalog = split_catalog(full_catalog)
         train_catalog, val_catalog, test_catalog = split_catalog(full_catalog)
 
         # Initialise individual datasets with identity transform (for evaluation)
@@ -67,7 +70,7 @@ class GZ2_DataModule_Eval(Base_DataModule_Eval):
         )
         self.data["val"] = GZ2Dataset(self.path, catalog=val_catalog, transform=self.T_test)
         self.data["test"] = GZ2Dataset(self.path, catalog=test_catalog, transform=self.T_test)
-        self.data["l"] = GZ2Dataset(self.path,catalog=train_catalog,  transform=self.T_test)
+        self.data["l"] = GZ2Dataset(self.path,catalog=val_catalog,  transform=self.T_test)
 
 
 if __name__ == '__main__':
