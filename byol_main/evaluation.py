@@ -80,8 +80,15 @@ def knn_predict(
     # expand copies target_bank to (val_batch, N)
     # gather than indexes the N dimension to place the right labels (of the top k features), making sim_labels (val_batch) with values of the correct labels
     #  (torch.Size([8000]), torch.Size([300, 512]), torch.Size([300, 20]))  for GZMNIST
+    # (torch.Size([1000]), torch.Size([300, 512]), torch.Size([300, 20])) for GZ2
+    logging.warning(sim_idx)
+    # if these aren't true, will get index error when trying to index target_bank
+    assert sim_idx.min() >= 0
+    assert sim_idx.max() < target_bank.size(0)
     logging.warning((target_bank.shape, feature.shape, sim_idx.shape))
-    sim_labels = torch.gather(target_bank.expand(feature.size(0), -1), dim=-1, index=sim_idx)
+    expanded_target_bank = target_bank.expand(feature.size(0), -1)  # will be e.g. (300, 1000)
+    logging.warning(expanded_target_bank.shape)
+    sim_labels = torch.gather(expanded_target_bank, dim=-1, index=sim_idx)
     # we do a reweighting of the similarities
     sim_weight = (sim_weight / knn_t).exp()
 

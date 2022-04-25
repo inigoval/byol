@@ -12,7 +12,7 @@ projection_head:
 
 data:
     color_channels: 3
-    classes: 4
+    classes: 7
     input_height: 64  # TODO very low
     rotate: True
 
