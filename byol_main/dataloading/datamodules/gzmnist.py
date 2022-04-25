@@ -30,7 +30,7 @@ class GalaxyMNIST_DataModule_Eval(Base_DataModule_Eval):
     def __init__(self, encoder, config):
         super().__init__(encoder, config)
 
-    def setup(self):
+    def setup(self, stage=None):
         # Initialise individual datasets with identity transform (for evaluation)
         D_train = GalaxyMNIST(self.path, train=True, download=True, transform=self.T_train)
 
