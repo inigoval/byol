@@ -30,6 +30,7 @@ class GZ2_DataModule(Base_DataModule):  # not the same as in pytorch-galaxy-data
         self.T_train.n_views = 1
 
         full_catalog = GZ2Dataset(self.path, download=True).catalog
+        catalog = catalog.query('label >= 0').sample(10000)  # -1 indicates cannot be assigned a label
         train_catalog, val_catalog, test_catalog = split_catalog(full_catalog)
 
         D_train = GZ2Dataset(self.path, label_cols=['label'], catalog=train_catalog, transform=self.T_train)
