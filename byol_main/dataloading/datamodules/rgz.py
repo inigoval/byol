@@ -26,7 +26,7 @@ class RGZ_DataModule(Base_DataModule):
         # Initialise individual datasets with test transform (for evaluation)
         self.data["val"] = MBFRFull(self.path, train=False, transform=self.T_test)
         self.data["test"] = MBFRFull(self.path, train=False, transform=self.T_test)
-        self.data["l"] = MBFRFull(self.path, train=True, transform=self.T_test)
+        self.data["labelled"] = MBFRFull(self.path, train=True, transform=self.T_test)
         self.data["u"] = RGZ20k(self.path, train=True, transform=self.T_test)
 
     def _train_set(self, transform):

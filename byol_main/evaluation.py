@@ -110,7 +110,7 @@ class Lightning_Eval(pl.LightningModule):
 
     def on_validation_start(self):
         with torch.no_grad():
-            data_bank = self.trainer.datamodule.data["l"]  # will get split into feature_bank and target_bank
+            data_bank = self.trainer.datamodule.data["labelled"]  # will get split into feature_bank and target_bank
             data_bank_loader = DataLoader(data_bank, 200)  # 200 is the batch size used for the unpacking below
             feature_bank = []
             target_bank = []
@@ -177,7 +177,7 @@ class Feature_Bank(Callback):
         with torch.no_grad():
             encoder = pl_module.backbone
 
-            data_bank = pl_module.trainer.datamodule.data["l"]
+            data_bank = pl_module.trainer.datamodule.data["labelled"]
             data_bank_loader = DataLoader(data_bank, 200)
             feature_bank = []
             target_bank = []

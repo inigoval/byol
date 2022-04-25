@@ -45,7 +45,7 @@ class GZ2_DataModule(Base_DataModule):  # not the same as in pytorch-galaxy-data
         # Initialise individual datasets with test transform (for evaluation)
         self.data["val"] = GZ2Dataset(self.path, label_cols=['label'], catalog=val_catalog, transform=self.T_test)
         self.data["test"] = GZ2Dataset(self.path, label_cols=['label'], catalog=test_catalog, transform=self.T_test)
-        self.data["l"] = GZ2Dataset(self.path, label_cols=['label'], catalog=val_catalog,  transform=self.T_test)  # will be unpacked into feature_bank, target_bank, for knn eval
+        self.data["labelled"] = GZ2Dataset(self.path, label_cols=['label'], catalog=val_catalog,  transform=self.T_test)  # will be unpacked into feature_bank, target_bank, for knn eval
         # TODO temporarily switched to val catalog as it's smaller and so easier to run KNN on
 
 
@@ -73,7 +73,7 @@ class GZ2_DataModule_Eval(Base_DataModule_Eval):
         )
         self.data["val"] = GZ2Dataset(self.path, catalog=val_catalog, label_cols=['label'], transform=self.T_test)
         self.data["test"] = GZ2Dataset(self.path, catalog=test_catalog, label_cols=['label'], transform=self.T_test)
-        self.data["l"] = GZ2Dataset(self.path,catalog=val_catalog, label_cols=['label'], transform=self.T_test)
+        self.data["labelled"] = GZ2Dataset(self.path,catalog=train_catalog.sample(10000), label_cols=['label'], transform=self.T_test)
 
 
 if __name__ == '__main__':

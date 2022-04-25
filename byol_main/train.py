@@ -40,7 +40,7 @@ if __name__ == "__main__":
         auto_insert_metric_name=False,
         verbose=True,
         dirpath="wandb/",
-        filename="tweaked_augs",
+        filename="full_dataset",
         save_weights_only=True,
     )
 

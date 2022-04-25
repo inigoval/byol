@@ -11,7 +11,7 @@ class Imagenette_DataModule(Base_DataModule):
 
     def setup(self):
         self.data["train"] = ImageFolder(self.path / "train", transform=self.T_train)
-        self.data["l"] = ImageFolder(self.path / "train", transform=self.T_test)
+        self.data["labelled"] = ImageFolder(self.path / "train", transform=self.T_test)
         self.data["val"] = ImageFolder(self.path / "val", transform=self.T_test)
         self.data["test"] = ImageFolder(self.path / "val", transform=self.T_test)
 

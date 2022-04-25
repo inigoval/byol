@@ -23,7 +23,7 @@ class GalaxyMNIST_DataModule(Base_DataModule):
         # Initialise individual datasets with test transform (for evaluation)
         self.data["val"] = GalaxyMNIST(self.path, train=False, transform=self.T_test)
         self.data["test"] = GalaxyMNIST(self.path, train=False, transform=self.T_test)
-        self.data["l"] = GalaxyMNIST(self.path, train=True, transform=self.T_test)
+        self.data["labelled"] = GalaxyMNIST(self.path, train=True, transform=self.T_test)
 
 
 class GalaxyMNIST_DataModule_Eval(Base_DataModule_Eval):
@@ -41,7 +41,7 @@ class GalaxyMNIST_DataModule_Eval(Base_DataModule_Eval):
         )
         self.data["val"] = GalaxyMNIST(self.path, train=False, transform=self.T_test)
         self.data["test"] = GalaxyMNIST(self.path, train=False, transform=self.T_test)
-        self.data["l"] = GalaxyMNIST(self.path, train=True, transform=self.T_test)
+        self.data["labelled"] = GalaxyMNIST(self.path, train=True, transform=self.T_test)
 
 
 
