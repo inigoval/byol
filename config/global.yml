@@ -1,6 +1,6 @@
 type: 'byol'
 project_name: 'byol'
-dataset: 'gz' # ['imagenette', 'rgz', 'gzmnist', 'stl10', 'cifar10']
+dataset: 'gz2' # ['imagenette', 'rgz', 'gzmnist', 'gz2', 'stl10', 'cifar10']
 compute: 'slurm'
 seed: 69
 debug: False

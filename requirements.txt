@@ -1,0 +1,6 @@
+lightning-bolts  # aka pl_bolts
+lightly
+umap-learn
+git+https://github.com/mb010/AstroAugmentations
+git+https://github.com/mwalmsley/pytorch-galaxy-datasets  # for gz2
+git+https://github.com/mwalmsley/galaxy_mnist  # for gz mnist

@@ -16,7 +16,7 @@ from torch.utils.data import DataLoader
 from torchvision.utils import make_grid
 from torchvision.transforms import ToPILImage
 
-from paths import Path_Handler
+from byol_main.paths import Path_Handler
 
 
 # Define paths

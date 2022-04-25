@@ -25,6 +25,7 @@ class Path_Handler:
         path_dict["stl10"] = path_dict["data"] / "stl10"
         path_dict["cifar10"] = path_dict["data"] / "cifar10"
         path_dict["gzmnist"] = path_dict["data"] / "gzmnist"
+        path_dict["gz2"] = path_dict["data"] / "gz2"
 
         self.dict = path_dict
 
