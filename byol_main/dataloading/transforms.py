@@ -225,7 +225,7 @@ def _gz2_view(config):
 
     # Gaussian blurring, kernel 10% of image size (SimCLR paper)
     # updated - no blurring
-    
+
     # Color augs
     color_jitter = T.ColorJitter(0.8 * s, 0.8 * s, 0.8 * s, 0.2 * s)
     p_grayscale = config["p_grayscale"]
@@ -235,7 +235,7 @@ def _gz2_view(config):
         [   
             # the GZ2 dataset yields tensors (may change this)
             # T.ToPILImage(),  # the blur transform requires a PIL image
-            T.Resize(input_height * 1.33),
+            T.Resize(int(input_height * 1.33)),  # assumed square
             T.RandomRotation(180),
             T.RandomResizedCrop(
                 input_height,
