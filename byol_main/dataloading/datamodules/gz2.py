@@ -30,7 +30,9 @@ class GZ2_DataModule(Base_DataModule):  # not the same as in pytorch-galaxy-data
         self.T_train.n_views = 1
 
         full_catalog = GZ2Dataset(self.path, download=True).catalog
-        full_catalog = full_catalog.query('label >= 0').sample(10000)  # -1 indicates cannot be assigned a label
+        full_catalog = full_catalog.query('label >= 0') # -1 indicates cannot be assigned a label
+        if self.config['debug']:
+            full_catalog = full_catalog.sample(10000)  
         train_catalog, val_catalog, test_catalog = split_catalog(full_catalog)
 
         D_train = GZ2Dataset(self.path, label_cols=['label'], catalog=train_catalog, transform=self.T_train)
@@ -56,7 +58,9 @@ class GZ2_DataModule_Eval(Base_DataModule_Eval):
     def setup(self, stage=None):
 
         full_catalog = GZ2Dataset(self.path).catalog
-        full_catalog = full_catalog.query('label >= 0').sample(10000)  # -1 indicates cannot be assigned a label
+        full_catalog = full_catalog.query('label >= 0')
+        if self.config['debug']:
+            full_catalog = full_catalog.sample(10000)  
         train_catalog, val_catalog, test_catalog = split_catalog(full_catalog)
 
         # Initialise individual datasets with identity transform (for evaluation)
