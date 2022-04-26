@@ -118,11 +118,17 @@ if __name__ == "__main__":
     )
 
     # Initialise model #
-    model = BYOL(config)
+    models = {"byol": BYOL, "nnclr": NNCLR}
+    model = models[config["type"]](config)
+
     config["model"]["output_dim"] = config["model"]["features"]
 
     # Train model #
     pre_trainer.fit(model, pretrain_data)
+
+    log_examples(wandb_logger, pretrain_data.data["train"])
+
+    print(model.config["data"]["mu"])
 
     # Run test loop #
     # pre_trainer.test(ckpt_path="best")
