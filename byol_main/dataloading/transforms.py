@@ -138,7 +138,7 @@ class ReduceView(nn.Module):
 
         self.pre_normalize = T.Normalize(config["data"]["mu"], config["data"]["sig"])
         self.encoder = encoder
-        self.reduce = lambda x: self.encoder(x)
+        self.reduce = self.encoder
         self.normalize = T.Normalize(0, 1)
 
     def __call__(self, x):
@@ -185,14 +185,14 @@ def _simclr_view(config):
 
 def _gzmnist_view(config):
     s = config["s"]
-    input_height = config["data"]["input_height"]
+    input_height = config["data"]["input_height"]  # TODO adjust for 128pix
 
     # Gaussian blurring, kernel 10% of image size (SimCLR paper)
-    p_blur = config["p_blur"]
-    blur_kernel = _blur_kernel(input_height)
+    # p_blur = config["p_blur"]
+    # blur_kernel = _blur_kernel(input_height)
     # blur_sig = config["blur_sig"]
     # blur = SIMCLR_GaussianBlur(blur_kernel, p=p_blur, min=blur_sig[0], max=blur_sig[1])
-    blur = LightlyGaussianBlur(blur_kernel, prob=p_blur)
+    # blur = LightlyGaussianBlur(blur_kernel, prob=p_blur)
 
     # Color augs
     color_jitter = T.ColorJitter(0.8 * s, 0.8 * s, 0.8 * s, 0.2 * s)
@@ -210,7 +210,7 @@ def _gzmnist_view(config):
             T.RandomVerticalFlip(),
             T.RandomApply([color_jitter], p=0.8),
             T.RandomGrayscale(p=p_grayscale),
-            blur,
+            # blur,  do not blur
             T.ToTensor(),
         ]
     )

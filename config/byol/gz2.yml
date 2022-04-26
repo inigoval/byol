@@ -1,9 +1,13 @@
 preset: null
 
+# overriding global
+num_workers: 16
+prefetch_factor: 5 
+
 model:
     architecture: 'resnet18' 
     features: 512     # Number of encoded features (null just uses original resnet output)
-    n_epochs: 400
+    n_epochs: 300
     downscale: True
 
 projection_head:
@@ -31,7 +35,7 @@ knn:
 
 ## AUGMENTATIONS ##
 center_crop_size: null
-random_crop_scale: !!python/tuple [0.55, 0.85]
+random_crop_scale: !!python/tuple [0.3, 0.85]
 random_crop_ratio: !!python/tuple [0.8, 1.2]
 s: 0.5  # color jitter strength
 p_grayscale: 0.3  # TODO consider

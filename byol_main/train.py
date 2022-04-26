@@ -40,7 +40,7 @@ if __name__ == "__main__":
         auto_insert_metric_name=False,
         verbose=True,
         dirpath="wandb/",
-        filename="full_dataset_128px",
+        filename="full_124px_amp",
         save_weights_only=True,
     )
 
@@ -110,6 +110,7 @@ if __name__ == "__main__":
         logger=wandb_logger,
         deterministic=True,
         callbacks=callbacks,
+        precision=config["precision"]
         #    check_val_every_n_epoch=3,
         #    log_every_n_steps=10,
     )
@@ -145,6 +146,8 @@ if __name__ == "__main__":
     freeze_model(encoder)
     encoder.eval()
 
+    logging.info('Training complete - switching to eval mode')
+
     # Switch data-loader to linear evaluation mode
     eval_data = datasets[config["dataset"]]["linear"](encoder, config)
     eval_data.prepare_data()
@@ -163,6 +166,7 @@ if __name__ == "__main__":
         max_epochs=config["linear"]["n_epochs"],
         logger=wandb_logger,
         deterministic=True,
+        # always full precision, never distributed. May need a batch size adjustment.
     )
 
     linear_model = linear_net(config)

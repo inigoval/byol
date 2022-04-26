@@ -1,5 +1,6 @@
 # uses dataset from pytorch-galaxy-datasets/galaxy_zoo_2.py
 # does not use the datamodule, as this code has different requirements (e.g. normalisation, augmentation choice, etc)
+import logging
 
 import numpy as np
 # https://github.com/mwalmsley/pytorch-galaxy-datasets
@@ -32,10 +33,11 @@ class GZ2_DataModule(Base_DataModule):  # not the same as in pytorch-galaxy-data
         full_catalog = GZ2Dataset(self.path, download=True).catalog
         full_catalog = full_catalog.query('label >= 0') # -1 indicates cannot be assigned a label
         if self.config['debug']:
-            full_catalog = full_catalog.sample(10000)  
+            full_catalog = full_catalog.sample(20000)  
         train_catalog, val_catalog, test_catalog = split_catalog(full_catalog)
 
-        D_train = GZ2Dataset(self.path, label_cols=['label'], catalog=train_catalog, transform=self.T_train)
+        logging.info('Loading 5k subset of full dataset to adjust mu, sigma')  # subset as kinda slow as single-threaded here, possibly
+        D_train = GZ2Dataset(self.path, label_cols=['label'], catalog=train_catalog.sample(5000), transform=self.T_train)
         self.update_transforms(D_train)
 
         # Re-initialise dataset with new mu and sig values
@@ -45,7 +47,7 @@ class GZ2_DataModule(Base_DataModule):  # not the same as in pytorch-galaxy-data
         # Initialise individual datasets with test transform (for evaluation)
         self.data["val"] = GZ2Dataset(self.path, label_cols=['label'], catalog=val_catalog, transform=self.T_test)
         self.data["test"] = GZ2Dataset(self.path, label_cols=['label'], catalog=test_catalog, transform=self.T_test)
-        self.data["labelled"] = GZ2Dataset(self.path, label_cols=['label'], catalog=val_catalog,  transform=self.T_test)  # will be unpacked into feature_bank, target_bank, for knn eval
+        self.data["labelled"] = GZ2Dataset(self.path, label_cols=['label'], catalog=train_catalog.sample(10000),  transform=self.T_test)  # will be unpacked into feature_bank, target_bank, for knn eval
         # TODO temporarily switched to val catalog as it's smaller and so easier to run KNN on
 
 
@@ -60,20 +62,22 @@ class GZ2_DataModule_Eval(Base_DataModule_Eval):
         full_catalog = GZ2Dataset(self.path).catalog
         full_catalog = full_catalog.query('label >= 0')
         if self.config['debug']:
-            full_catalog = full_catalog.sample(10000)  
+            full_catalog = full_catalog.sample(20000)  
         train_catalog, val_catalog, test_catalog = split_catalog(full_catalog)
 
-        # Initialise individual datasets with identity transform (for evaluation)
-        D_train = GZ2Dataset(self.path, catalog=train_catalog, label_cols=['label'], download=True, transform=self.T_train)
 
+        logging.info('Loading 5k subset of full dataset to adjust mu, sigma')  # subset as kinda slow as single-threaded here, possibly
+        D_train = GZ2Dataset(self.path, label_cols=['label'], catalog=train_catalog.sample(5000), transform=self.T_train)
         self.update_transforms(D_train)
 
+
+        # Initialise individual datasets with identity transform (for evaluation)
         self.data["train"] = GZ2Dataset(
             self.path, catalog=train_catalog, label_cols=['label'], download=True, transform=self.T_train
         )
         self.data["val"] = GZ2Dataset(self.path, catalog=val_catalog, label_cols=['label'], transform=self.T_test)
         self.data["test"] = GZ2Dataset(self.path, catalog=test_catalog, label_cols=['label'], transform=self.T_test)
-        self.data["labelled"] = GZ2Dataset(self.path,catalog=train_catalog.sample(10000), label_cols=['label'], transform=self.T_test)
+        self.data["labelled"] = GZ2Dataset(self.path, catalog=train_catalog.sample(10000), label_cols=['label'], transform=self.T_test)
 
 
 if __name__ == '__main__':

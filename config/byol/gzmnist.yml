@@ -34,7 +34,6 @@ center_crop_size: null
 random_crop: !!python/tuple [0.3, 1]
 s: 0.5
 p_grayscale: 0.3
-p_blur: 0.5
 
 ## Optimiser ## 
 # Base settings
