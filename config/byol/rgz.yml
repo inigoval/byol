@@ -35,7 +35,7 @@ cut_threshold: 19
 ## AUGMENTATIONS ##
 aug_type: 'simclr' # ['simclr', 'astroaug']
 center_crop_size: 85
-random_crop: !!python/tuple [0.3, 1]
+random_crop_scale: !!python/tuple [0.3, 1]
 blur_kernel: 9 # Odd non-integer number
 blur_sig: !!python/tuple [0.1, 2.0]
 p_blur: 0.5

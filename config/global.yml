@@ -6,7 +6,5 @@ seed: 69
 debug: False
 num_workers: 8 # per gpu
 prefetch_factor: 30
-persistent_workers: False
-precision: 16  # [16, 32]-bit. 16 is auto. mixed precision not pure 16.
 checkpoint_mode: 'last'
 pretraining_batch_size: 300  # max for 224 pixel images on 1 gpu
