@@ -21,7 +21,7 @@ from networks.models import _get_backbone
 class BYOL(Lightning_Eval):
     def __init__(self, config):
         super().__init__(config)
-        self.save_hyperparameters()  # save hyperparameters for easy inference
+        # self.save_hyperparameters()  # save hyperparameters for easy inference
         self.config = config
 
         self.backbone = _get_backbone(config)

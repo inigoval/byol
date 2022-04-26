@@ -30,9 +30,9 @@ def load_config():
             config = yaml.load(ymlconfig, Loader=yaml.FullLoader)
 
     # combine global with data-set specific config
-    config.update(global_config)
+    global_config.update(config)
 
-    return config
+    return global_config
 
 
 def update_config(config):
