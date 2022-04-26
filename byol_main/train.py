@@ -31,10 +31,13 @@ if __name__ == "__main__":
     paths = Path_Handler()
     path_dict = paths._dict()
 
-    # Save model with best accuracy for test evaluation, model will be saved in wandb and also #
+    # Save model for test evaluation#
+    checkpoint_mode = {
+        "min_loss": {"mode": "min", "monitor": "train/loss"},
+        "last": {"monitor": None},
+    }
     pretrain_checkpoint = pl.callbacks.ModelCheckpoint(
-        monitor="train/loss",
-        mode="min",
+        **checkpoint_mode[config["checkpoint_mode"]],
         every_n_epochs=1,
         save_on_train_epoch_end=True,
         auto_insert_metric_name=False,
