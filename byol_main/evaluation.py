@@ -7,6 +7,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchmetrics.functional as tmF
 import torchmetrics as tm
+import wandb
 
 from tqdm import tqdm
 from sklearn.decomposition import IncrementalPCA
@@ -69,10 +70,14 @@ def knn_predict(
     assert target_bank.min() >= 0
 
     # compute cos similarity between each feature vector and feature bank ---> [B, N]
-    sim_matrix = torch.mm(feature, feature_bank)  # (B, D) matrix. mult (D, N) gives (B, N) (as feature dim got summed over to got cos sim)
+    sim_matrix = torch.mm(
+        feature, feature_bank
+    )  # (B, D) matrix. mult (D, N) gives (B, N) (as feature dim got summed over to got cos sim)
 
     # [B, K]
-    sim_weight, sim_idx = sim_matrix.topk(k=knn_k, dim=-1)  # this will be slow if feature_bank is large (e.g. 100k datapoints)
+    sim_weight, sim_idx = sim_matrix.topk(
+        k=knn_k, dim=-1
+    )  # this will be slow if feature_bank is large (e.g. 100k datapoints)
 
     # [B, K]
     # target_bank is (1, N) (due to .t() in init)
@@ -108,27 +113,46 @@ class Lightning_Eval(pl.LightningModule):
         self.config = config
         self.knn_acc = tm.Accuracy(average="micro", threshold=0)
 
+    def on_train_start(self):
+        self.config["data"]["mu"] = self.trainer.datamodule.mu
+        self.config["data"]["sig"] = self.trainer.datamodule.sig
+        # self.log("train/mu", self.trainer.datamodule.mu)
+        # self.log("train/sig", self.trainer.datamodule.sig)
+
     def on_validation_start(self):
         with torch.no_grad():
-            data_bank = self.trainer.datamodule.data["labelled"]  # will get split into feature_bank and target_bank
-            data_bank_loader = DataLoader(data_bank, 200)  # 200 is the batch size used for the unpacking below
+            data_bank = self.trainer.datamodule.data[
+                "labelled"
+            ]  # will get split into feature_bank and target_bank
+            data_bank_loader = DataLoader(
+                data_bank, 200
+            )  # 200 is the batch size used for the unpacking below
             feature_bank = []
             target_bank = []
             for data in data_bank_loader:
                 # Load data and move to correct device
-                x, y = data  # supervised-style batch of (images, labels), with batch size from above
+                (
+                    x,
+                    y,
+                ) = data  # supervised-style batch of (images, labels), with batch size from above
                 x = x.type_as(self.dummy_param)
                 y = y.type_as(self.dummy_param).long()
 
                 # Encode data and normalize features (for kNN)
                 feature = self.forward(x).squeeze()  # (batch, features)  e.g. (200, 512)
                 feature = F.normalize(feature, dim=1)
-                feature_bank.append(feature) # tensor of all features, within which to find nearest-neighbours. Each is (B, N_features), N_features being the output dim of self.forward e.g. BYOL
+                feature_bank.append(
+                    feature
+                )  # tensor of all features, within which to find nearest-neighbours. Each is (B, N_features), N_features being the output dim of self.forward e.g. BYOL
                 target_bank.append(y)  # tensor with labels of those features
 
             # Save full feature bank for validation epoch
-            self.feature_bank = torch.cat(feature_bank, dim=0).t().contiguous()  # (features, len(l datamodule)) due to the .t() transpose
-            self.target_bank = torch.cat(target_bank, dim=0).t().contiguous()  # either (label_dim, len) or just (len) depending on if labels should have singleton label_dim dimension
+            self.feature_bank = (
+                torch.cat(feature_bank, dim=0).t().contiguous()
+            )  # (features, len(l datamodule)) due to the .t() transpose
+            self.target_bank = (
+                torch.cat(target_bank, dim=0).t().contiguous()
+            )  # either (label_dim, len) or just (len) depending on if labels should have singleton label_dim dimension
             assert all(self.target_bank >= 0)
 
     def validation_step(self, batch, batch_idx):
