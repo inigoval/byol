@@ -30,7 +30,7 @@ class Base_DataModule(pl.LightningDataModule):
 
     def train_dataloader(self):
         # Batch all data together
-        batch_size = self.config["batch_size"]
+        batch_size = self.config["pretrain_batch_size"]
         n_workers = self.config["num_workers"]
         loader = DataLoader(
             self.data["train"],
@@ -43,12 +43,24 @@ class Base_DataModule(pl.LightningDataModule):
 
     def val_dataloader(self):
         n_workers = self.config["num_workers"]
-        loader = DataLoader(self.data["val"], batch_size=self.config['pretraining_batch_size'], num_workers=n_workers, prefetch_factor=20, persistent_workers=self.config['persistent_workers'])
+        loader = DataLoader(
+            self.data["val"],
+            batch_size=self.config["data"]["val_batch_size"],
+            num_workers=n_workers,
+            prefetch_factor=20,
+            persistent_workers=self.config["persistent_workers"],
+        )
         return loader
 
     def test_dataloader(self):
         n_workers = self.config["num_workers"]
-        loader = DataLoader(self.data["test"], batch_size=self.config['pretraining_batch_size'], num_workers=n_workers, prefetch_factor=20, persistent_workers=self.config['persistent_workers'])
+        loader = DataLoader(
+            self.data["test"],
+            batch_size=self.config["data"]["val_batch_size"],
+            num_workers=n_workers,
+            prefetch_factor=20,
+            persistent_workers=self.config["persistent_workers"],
+        )
         return loader
 
     def update_transforms(self, D_train):
@@ -98,7 +110,7 @@ class Base_DataModule_Eval(pl.LightningDataModule):
         n_workers = self.config["num_workers"]
         loader = DataLoader(
             self.data["val"],
-            batch_size=self.config['pretraining_batch_size'],
+            batch_size=self.config["data"]["val_batch_size"],
             num_workers=n_workers,
             prefetch_factor=20,
         )
@@ -106,14 +118,20 @@ class Base_DataModule_Eval(pl.LightningDataModule):
 
     def test_dataloader(self):
         n_workers = self.config["num_workers"]
-        loader = DataLoader(self.data["test"], batch_size=self.config['pretraining_batch_size'], num_workers=n_workers, prefetch_factor=20, persistent_workers=self.config['persistent_workers'])
+        loader = DataLoader(
+            self.data["test"],
+            batch_size=self.config["data"]["val_batch_size"],
+            num_workers=n_workers,
+            prefetch_factor=20,
+            persistent_workers=self.config["persistent_workers"],
+        )
         return loader
 
     def update_transforms(self, D_train):
         if not self.config["debug"]:
             mu, sig = compute_mu_sig_features(D_train)
             self.mu, self.sig = mu, sig
-            logging.info('Set mu {:3.2f}, sig {:3.2f}'.format(self.mu, self.sig))
+            logging.info("Set mu {:3.2f}, sig {:3.2f}".format(self.mu, self.sig))
 
             # Define transforms with calculated values
             self.T_train.update_normalization(mu, sig)

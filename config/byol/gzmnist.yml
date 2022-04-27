@@ -18,6 +18,7 @@ data:
     classes: 4
     input_height: 64
     rotate: True
+    val_batch_size: 500
 
 linear:
     n_epochs: 100
@@ -44,7 +45,7 @@ p_blur: 0.5
 lr: 0.06
 momentum: 0.9
 weight_decay: 0.0005
-batch_size: 256
+pretrain_batch_size: 256
 opt: 'sgd'
 # Scheduler
 scheduler: 'cosine' # ['none', 'cosine', 'warmupcosine']

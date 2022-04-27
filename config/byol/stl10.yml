@@ -23,6 +23,7 @@ data:
     num_workers: 8 
     prefetch_factor: 20
     rotate: False
+    val_batch_size: 500
 
 linear:
     n_epochs: 30
@@ -51,7 +52,7 @@ p_aug: 0.5
 lr: 0.03
 momentum: 0.9
 weight_decay: 0.0004 # 0.0005
-batch_size: 256
+pretrain_batch_size: 256
 opt: 'sgd'
 # Scheduler
 scheduler: 'cosine' # ['none', 'cosine', 'warmupcosine']
