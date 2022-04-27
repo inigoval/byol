@@ -34,7 +34,7 @@ class RGZ_DataModule(Base_DataModule):
             transform=self.T_test,
             aug_type="torchvision",
         )
-        self.data["l"] = MBFRFull(
+        self.data["labelled"] = MBFRFull(
             self.path,
             train=True,
             transform=self.T_test,
