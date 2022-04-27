@@ -98,10 +98,11 @@ class SimpleView(nn.Module):
         augs = []
         # if config['dataset'] == 'gz2':  # is a tensor, needs to be a PIL to later call T.ToTensor
         #     augs.append(T.ToPILImage())
-        if config["data"]["rotate"]:
-            augs.append(T.RandomRotation(180))
-            augs.append(T.RandomHorizontalFlip())
+        # if config["data"]["rotate"]:
+        # augs.append(T.RandomRotation(180))
+
         augs.append(T.Resize(config["data"]["input_height"]))
+
         if config["center_crop_size"]:
             augs.append(T.CenterCrop(config["center_crop_size"]))
         augs.append(T.ToTensor())
@@ -222,12 +223,12 @@ def _gz2_view(config):
     # currently the same as gzmnist except for the ToPIL transform
     s = config["s"]
     input_height = config["data"]["input_height"]
+    r_downscale = config["data"]["downscale_height"]
+    downscale_height = 424 * r_downscale
 
     # Gaussian blurring, kernel 10% of image size (SimCLR paper)
     p_blur = config["p_blur"]
     blur_kernel = _blur_kernel(input_height)
-    # blur_sig = config["blur_sig"]
-    # blur = SIMCLR_GaussianBlur(blur_kernel, p=p_blur, min=blur_sig[0], max=blur_sig[1])
     blur = LightlyGaussianBlur(blur_kernel, prob=p_blur)
 
     # Color augs
@@ -239,7 +240,7 @@ def _gz2_view(config):
 
     # Define a view
     view = T.Compose(
-        [   
+        [
             # the GZ2 dataset yields tensors (may change this)
             # T.ToPILImage(),  # the blur transform requires a PIL image
             T.Resize(downscale_height),
@@ -249,8 +250,8 @@ def _gz2_view(config):
             T.RandomVerticalFlip(),
             T.RandomApply([color_jitter], p=0.8),
             T.RandomGrayscale(p=p_grayscale),
-            # blur,  no, need all the resolution we can get
-            T.ToTensor()  # the model requires a tensor
+            blur,  # no, need all the resolution we can get
+            T.ToTensor(),  # the model requires a tensor
         ]
     )
 
