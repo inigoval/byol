@@ -12,25 +12,25 @@ def load_config():
     # load global config
     global_path = path_dict["config"] / "global.yml"
     with open(global_path, "r") as ymlconfig:
-        global_config = yaml.load(ymlconfig, Loader=yaml.FullLoader)
+        config = yaml.load(ymlconfig, Loader=yaml.FullLoader)
 
-    dataset = global_config["dataset"]
-    type = global_config["type"]
+    dataset = config["dataset"]
+    type = config["type"]
     path = path_dict["config"] / type / f"{dataset}.yml"
 
     # load data-set specific config
     with open(path, "r") as ymlconfig:
-        config = yaml.load(ymlconfig, Loader=yaml.FullLoader)
+        dataset_config = yaml.load(ymlconfig, Loader=yaml.FullLoader)
 
     # if loading a benchmark, use load the specific config
-    preset = config["preset"]
+    preset = dataset_config["preset"]
     if preset:
         path = path_dict["config"] / type / f"{dataset}-{preset}.yml"
         with open(path, "r") as ymlconfig:
-            config = yaml.load(ymlconfig, Loader=yaml.FullLoader)
+            dataset_config = yaml.load(ymlconfig, Loader=yaml.FullLoader)
 
-    # combine global with data-set specific config
-    global_config.update(config)
+    # combine global with data-set specific config. dataset config has priority
+    config.update(dataset_config)
 
     return global_config
 

@@ -139,7 +139,7 @@ class ReduceView(nn.Module):
 
         self.pre_normalize = T.Normalize(config["data"]["mu"], config["data"]["sig"])
         self.encoder = encoder
-        self.reduce = lambda x: self.encoder(x)
+        self.reduce = self.encoder
         self.normalize = T.Normalize(0, 1)
 
     def __call__(self, x):
@@ -186,7 +186,7 @@ def _simclr_view(config):
 
 def _gzmnist_view(config):
     s = config["s"]
-    input_height = config["data"]["input_height"]
+    input_height = config["data"]["input_height"]  # TODO adjust for 128pix
 
     # Gaussian blurring, kernel 10% of image size (SimCLR paper)
     p_blur = config["p_blur"]
@@ -200,7 +200,7 @@ def _gzmnist_view(config):
     p_grayscale = config["p_grayscale"]
 
     # Cropping
-    random_crop = config["random_crop"]
+    random_crop = config["random_crop_scale"]
 
     # Define a view
     view = T.Compose(
@@ -235,9 +235,6 @@ def _gz2_view(config):
     color_jitter = T.ColorJitter(0.8 * s, 0.8 * s, 0.8 * s, 0.2 * s)
     p_grayscale = config["p_grayscale"]
 
-    # Cropping
-    random_crop = config["random_crop"]
-
     # Define a view
     view = T.Compose(
         [
@@ -245,7 +242,11 @@ def _gz2_view(config):
             # T.ToPILImage(),  # the blur transform requires a PIL image
             T.Resize(downscale_height),
             T.RandomRotation(180),
-            T.RandomResizedCrop(input_height, scale=random_crop),
+            T.RandomResizedCrop(
+                input_height,
+                scale=config["random_crop_scale"],
+                ratio=config["random_crop_ratio"]
+            ),
             T.RandomHorizontalFlip(),
             T.RandomVerticalFlip(),
             T.RandomApply([color_jitter], p=0.8),
@@ -273,7 +274,7 @@ def _rgz_view(config):
 
         # Cropping
         center_crop = config["center_crop_size"]
-        random_crop = config["random_crop"]
+        random_crop = config["random_crop_scale"]
 
         # Color jitter
         s = config["s"]
@@ -306,7 +307,7 @@ def _rgz_view(config):
 
         # Cropping
         center_crop = config["center_crop_size"]
-        # random_crop = config["random_crop"]
+        # random_crop = config["random_crop_scale"]
 
         augs = [
             # Change source perspective

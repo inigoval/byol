@@ -1,5 +1,8 @@
 preset: null
 
+persistent_workers: False
+precision: 16  # [16, 32]-bit. 16 is auto. mixed precision not pure 16.
+
 model:
     architecture: 'resnet18' 
     features: 512     # Number of encoded features (null just uses original resnet output)
@@ -31,10 +34,10 @@ knn:
 
 ## AUGMENTATIONS ##
 center_crop_size: null
-random_crop: !!python/tuple [0.3, 1]
+random_crop_scale: !!python/tuple [0.3, 1]
 s: 0.5
 p_grayscale: 0.3
-p_blur: 0.5
+p_blur: 0.5 
 
 ## Optimiser ## 
 # Base settings
