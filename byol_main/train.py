@@ -84,15 +84,13 @@ if __name__ == "__main__":
     }
 
     pretrain_data = datasets[config["dataset"]]["pretrain"](config)
-    pretrain_data.prepare_data()
-    pretrain_data.setup()
+    # pretrain_data.prepare_data()
+    # pretrain_data.setup()
 
     # Record mean and standard deviation used in normalisation for inference #
-    config["data"]["mu"] = pretrain_data.mu
-    config["data"]["sig"] = pretrain_data.sig
-    config["data"]["n_steps"] = len(pretrain_data.train_dataloader())
-
-    log_examples(wandb_logger, pretrain_data.data["train"])
+    # config["data"]["mu"] = pretrain_data.mu
+    # config["data"]["sig"] = pretrain_data.sig
+    # config["data"]["n_steps"] = len(pretrain_data.train_dataloader())
 
     # List of callbacks
     callbacks = [
@@ -156,8 +154,8 @@ if __name__ == "__main__":
 
     # Switch data-loader to linear evaluation mode
     eval_data = datasets[config["dataset"]]["linear"](encoder, config)
-    eval_data.prepare_data()
-    eval_data.setup()
+    # eval_data.prepare_data()
+    # eval_data.setup()
 
     linear_checkpoint = pl.callbacks.ModelCheckpoint(
         monitor="linear_eval/val_acc",
