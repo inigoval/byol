@@ -4,7 +4,7 @@ model:
     architecture: 'resnet18' 
     features: 512     # Number of encoded features (null just uses original resnet output)
     n_epochs: 400
-    downscale: True
+    downscale: False
 
 projection_head:
     hidden: 1024
@@ -12,8 +12,9 @@ projection_head:
 
 data:
     color_channels: 3
-    classes: 4
-    input_height: 64  # TODO very low
+    r_downscale: 0.72
+    input_height: 128  #TODO very low
+    classes: 7
     rotate: True
 
 linear:
@@ -26,7 +27,7 @@ linear:
     scheduler: 'cosine' # ['none', 'cosine'] ####
 
 knn:
-  neighbors: 20
+  neighbors: 100
   temperature: 0.1
 
 ## AUGMENTATIONS ##

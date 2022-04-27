@@ -242,6 +242,7 @@ def _gz2_view(config):
         [   
             # the GZ2 dataset yields tensors (may change this)
             # T.ToPILImage(),  # the blur transform requires a PIL image
+            T.Resize(downscale_height),
             T.RandomRotation(180),
             T.RandomResizedCrop(input_height, scale=random_crop),
             T.RandomHorizontalFlip(),
@@ -261,8 +262,9 @@ def _rgz_view(config):
 
         # Gaussian blurring
         # blur_kernel = config["blur_kernel"]
-        input_height = config["center_crop_size"]
-        blur_kernel = _blur_kernel(input_height)
+        # input_height = config["center_crop_size"]
+        # blur_kernel = _blur_kernel(input_height)
+        blur_kernel = 3
         # blur_sig = config["blur_sig"]
         p_blur = config["p_blur"]
         blur = LightlyGaussianBlur(blur_kernel, prob=p_blur)
