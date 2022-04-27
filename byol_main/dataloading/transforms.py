@@ -243,9 +243,7 @@ def _gz2_view(config):
             T.Resize(downscale_height),
             T.RandomRotation(180),
             T.RandomResizedCrop(
-                input_height,
-                scale=config["random_crop_scale"],
-                ratio=config["random_crop_ratio"]
+                input_height, scale=config["random_crop_scale"], ratio=config["random_crop_ratio"]
             ),
             T.RandomHorizontalFlip(),
             T.RandomVerticalFlip(),
@@ -313,7 +311,7 @@ def _rgz_view(config):
             # Change source perspective
             A.Lambda(
                 name="Superpixel spectral index change",
-                image=AA.SpectralIndex(
+                image=AA.radio.SpectralIndex(
                     mean=-0.8, std=0.2, super_pixels=True, n_segments=100, seed=None
                 ),
                 p=p,
@@ -339,7 +337,7 @@ def _rgz_view(config):
             # Change properties of noise / imaging artefacts
             A.Lambda(
                 name="Spectral index change of whole image",
-                image=AA.SpectralIndex(mean=-0.8, std=0.2, seed=None),
+                image=AA.radio.SpectralIndex(mean=-0.8, std=0.2, seed=None),
                 p=p,
             ),  # Across the whole image
             A.Emboss(
@@ -347,7 +345,7 @@ def _rgz_view(config):
             ),  # Quick emulation of incorrect w-kernels # Doesnt force the maxima to 1
             A.Lambda(
                 name="Dirty beam convlolution",
-                image=AA.CustomKernelConvolution(
+                image=AA.radio.CustomKernelConvolution(
                     kernel=kernel, rfi_dropout=0.4, psf_radius=1.3, sidelobe_scaling=1, mode="sum"
                 ),
                 p=p,

@@ -32,7 +32,7 @@ def load_config():
     # combine global with data-set specific config. dataset config has priority
     config.update(dataset_config)
 
-    return global_config
+    return config
 
 
 def update_config(config):
