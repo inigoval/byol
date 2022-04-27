@@ -7,3 +7,4 @@ debug: False
 num_workers: 8 
 prefetch_factor: 30
 checkpoint_mode: 'last'
+knn_eval: True

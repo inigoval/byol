@@ -1,9 +1,9 @@
 preset: null
 model:
     architecture: 'resnet18' 
-    features: 512     # Number of encoded features (None just uses original resnet output)
-    n_epochs: 250
-    downscale: False
+    features: 100     # Number of encoded features (null just uses original resnet output)
+    n_epochs: 350
+    downscale: True
 
 projection_head:
     hidden: 1024
@@ -12,8 +12,11 @@ projection_head:
 data:
     color_channels: 1
     classes: 2
-    input_height: 85
     rotate: True
+    conf_test: 0.99
+    unc_test: 0.99
+    rgz: True
+    input_height: 128 # Keep this at 128 and adjust center_crop_size
 
 linear:
     n_epochs: 100
@@ -24,23 +27,27 @@ linear:
     weight_decay: 0
     scheduler: 'cosine'
 
-
 knn:
   neighbors: 20
   temperature: 0.1
 
 ## DATA ## 
-cut_threshold: 19 
+cut_threshold: 23
 
 ## AUGMENTATIONS ##
+<<<<<<< Updated upstream
 aug_type: 'simclr' # ['simclr', 'astroaug']
 center_crop_size: 85
 random_crop: !!python/tuple [0.3, 1]
 blur_kernel: 9 # Odd non-integer number
+=======
+aug_type: 'astroaug' # ['simclr', 'astroaug']
+center_crop_size: 70
+random_crop: !!python/tuple [0.9, 1]
+>>>>>>> Stashed changes
 blur_sig: !!python/tuple [0.1, 2.0]
-p_blur: 0.5
+p_blur: 0.05
 s: 0.5
-p_grayscale: 1
 p_aug: 0.5
 
 ## Optimiser ## 
