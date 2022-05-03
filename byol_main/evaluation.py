@@ -179,7 +179,6 @@ class Lightning_Eval(pl.LightningModule):
             top1 = pred_labels[:, 0]
 
             # Compute accuracy
-
             # assert top1.min() >= 0
             self.knn_acc.update(top1, y)
 
@@ -210,8 +209,6 @@ class Feature_Bank(Callback):
                 x, y = data
                 x = x.type_as(pl_module.dummy_param)
                 y = y.type_as(pl_module.dummy_param).long()
-                # y = y.to(torch.long)
-                # y = y.to(pl_module.dummy_param.device)
 
                 # Encode data and normalize features (for kNN)
                 feature = encoder(x).squeeze()
