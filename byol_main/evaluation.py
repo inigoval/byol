@@ -17,6 +17,7 @@ from torch.utils.data import DataLoader
 from dataloading.utils import dset2tens
 from paths import Path_Handler
 from networks.models import MLPHead, LogisticRegression
+from utilities import log_examples
 
 
 def umap(x, y):
@@ -118,6 +119,10 @@ class Lightning_Eval(pl.LightningModule):
         self.config["data"]["sig"] = self.trainer.datamodule.sig
         # self.log("train/mu", self.trainer.datamodule.mu)
         # self.log("train/sig", self.trainer.datamodule.sig)
+
+        # logger = self.logger.experiment
+
+        log_examples(self.logger, self.trainer.datamodule.data["train"])
 
     def on_validation_start(self):
         with torch.no_grad():
