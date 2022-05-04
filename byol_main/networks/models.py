@@ -34,13 +34,12 @@ class LogisticRegression(torch.nn.Module):
 
 
 def _get_backbone(config):
-    net = _get_net(config)
-    c_out = list(net.children())[-1].in_features
+    net = _get_net(config)  # e.g. resnet
+    c_out = list(net.children())[-1].in_features  # output dim of e.g. resnet, once the classification layer is removed (below)
 
-    net = torch.nn.Sequential(*list(net.children())[:-1])
+    net = torch.nn.Sequential(*list(net.children())[:-1])  # i.e. remove the last layer of resnet (aka the classification layer) as default-defined
 
     # Change first layer for color channels B/W images
-
     n_c = config["data"]["color_channels"]
     if n_c != 3:
         # c_out, k, s, p = net[0].out_channels, net[0].kernel_size, net[0].stride, net[0].padding
@@ -50,11 +49,11 @@ def _get_backbone(config):
     if config["model"]["downscale"]:
         net[0] = nn.Conv2d(n_c, 64, kernel_size=3, stride=1, padding=1, bias=False)
 
-    features = config["model"]["features"]
+    features = config["model"]["features"]  # e.g. 512
     backbone = nn.Sequential(
-        *list(net.children())[:-1],
-        nn.Conv2d(c_out, features, 1),
-        nn.AdaptiveAvgPool2d(1),
+        *list(net.children())[:-1],  # resnet minus classification layer
+        nn.Conv2d(c_out, features, 1),  # another conv layer, to `features` channels
+        nn.AdaptiveAvgPool2d(1),  # remove filter height/width, so now just (batch, features)
     )
 
     return backbone
@@ -70,6 +69,7 @@ def _get_net(config):
         "wide_resnet50_2": M.wide_resnet50_2,
         "wide_resnet101_2": M.wide_resnet101_2,
         "efficientnetb7": M.efficientnet_b7,
+        "efficientnetb0": M.efficientnet_b0  # not tested, could be v useful re zoobot
     }
 
     return networks[config["model"]["architecture"]]()

@@ -34,7 +34,7 @@ def data_splitter_strat(dset, seed=None, split=1, val_frac=0.2, u_cut=False):
     )
 
     # Split into unlabelled/labelled #
-    idx_dict["l"], idx_dict["u"] = train_test_split(
+    idx_dict["labelled"], idx_dict["u"] = train_test_split(
         idx_dict["train"],
         train_size=split,
         stratify=labels[idx_dict["train"]],

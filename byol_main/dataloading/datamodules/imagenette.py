@@ -1,6 +1,7 @@
-from dataloading.base_dm import Base_DataModule_Eval, Base_DataModule
 from torchvision.datasets import ImageFolder
-from dataloading.utils import _get_imagenet_norms
+
+from byol_main.dataloading.base_dm import Base_DataModule_Eval, Base_DataModule
+from byol_main.dataloading.utils import _get_imagenet_norms
 
 
 class Imagenette_DataModule(Base_DataModule):
@@ -10,7 +11,7 @@ class Imagenette_DataModule(Base_DataModule):
 
     def setup(self):
         self.data["train"] = ImageFolder(self.path / "train", transform=self.T_train)
-        self.data["l"] = ImageFolder(self.path / "train", transform=self.T_test)
+        self.data["labelled"] = ImageFolder(self.path / "train", transform=self.T_test)
         self.data["val"] = ImageFolder(self.path / "val", transform=self.T_test)
         self.data["test"] = ImageFolder(self.path / "val", transform=self.T_test)
 

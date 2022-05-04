@@ -19,7 +19,7 @@ class STL10_DataModule(Base_DataModule):
 
         self.data["train"] = STL10(root=path, split="train+unlabeled", transform=T_train)
         self.data["u"] = STL10(root=path, split="unlabeled", transform=T_test)
-        self.data["l"] = STL10(root=path, split="train", transform=T_test)
+        self.data["labelled"] = STL10(root=path, split="train", transform=T_test)
         self.data["val"] = STL10(root=path, split="test", transform=T_test)
         self.data["test"] = STL10(root=path, split="test", transform=T_test)
 

@@ -1,3 +1,5 @@
+import logging
+
 import pytorch_lightning as pl
 import umap
 import torch
@@ -5,6 +7,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchmetrics.functional as tmF
 import torchmetrics as tm
+import wandb
 
 from tqdm import tqdm
 from sklearn.decomposition import IncrementalPCA
@@ -14,6 +17,7 @@ from torch.utils.data import DataLoader
 from dataloading.utils import dset2tens
 from paths import Path_Handler
 from networks.models import MLPHead, LogisticRegression
+from utilities import log_examples
 
 
 def umap(x, y):
@@ -40,9 +44,9 @@ def knn_predict(
         feature:
             Tensor of shape [N, D] for which you want predictions
         feature_bank:
-            Tensor of a database of features used for kNN
+            Tensor of a database of features used for kNN, of shape [D, N] where N is len(l datamodule)
         target_bank:
-            Labels for the features in our feature_bank
+            Labels for the features in our feature_bank, of shape ()
         num_classes:
             Number of classes (e.g. `10` for CIFAR-10)
         knn_k:
@@ -64,13 +68,26 @@ def knn_predict(
         >>> )
     """
 
+    assert target_bank.min() >= 0
+
     # compute cos similarity between each feature vector and feature bank ---> [B, N]
-    sim_matrix = torch.mm(feature, feature_bank)
+    sim_matrix = torch.mm(
+        feature, feature_bank
+    )  # (B, D) matrix. mult (D, N) gives (B, N) (as feature dim got summed over to got cos sim)
 
     # [B, K]
-    sim_weight, sim_idx = sim_matrix.topk(k=knn_k, dim=-1)
+    sim_weight, sim_idx = sim_matrix.topk(
+        k=knn_k, dim=-1
+    )  # this will be slow if feature_bank is large (e.g. 100k datapoints)
 
     # [B, K]
+    # target_bank is (1, N) (due to .t() in init)
+    # feature.size(0) is the validation batch size
+    # expand copies target_bank to (val_batch, N)
+    # gather than indexes the N dimension to place the right labels (of the top k features), making sim_labels (val_batch) with values of the correct labels
+    # if these aren't true, will get index error when trying to index target_bank
+    assert sim_idx.min() >= 0
+    assert sim_idx.max() < target_bank.size(0)
     sim_labels = torch.gather(target_bank.expand(feature.size(0), -1), dim=-1, index=sim_idx)
     # we do a reweighting of the similarities
     sim_weight = (sim_weight / knn_t).exp()
@@ -97,33 +114,56 @@ class Lightning_Eval(pl.LightningModule):
         self.config = config
         self.knn_acc = tm.Accuracy(average="micro", threshold=0)
 
+    def on_train_start(self):
+        self.config["data"]["mu"] = self.trainer.datamodule.mu
+        self.config["data"]["sig"] = self.trainer.datamodule.sig
+        # self.log("train/mu", self.trainer.datamodule.mu)
+        # self.log("train/sig", self.trainer.datamodule.sig)
+
+        # logger = self.logger.experiment
+
+        log_examples(self.logger, self.trainer.datamodule.data["train"])
+
     def on_validation_start(self):
         with torch.no_grad():
-            data_bank = self.trainer.datamodule.data["l"]
-            data_bank_loader = DataLoader(data_bank, 200)
+            data_bank = self.trainer.datamodule.data[
+                "labelled"
+            ]  # will get split into feature_bank and target_bank
+            data_bank_loader = DataLoader(
+                data_bank, 200
+            )  # 200 is the batch size used for the unpacking below
             feature_bank = []
             target_bank = []
             for data in data_bank_loader:
                 # Load data and move to correct device
-                x, y = data
+                (
+                    x,
+                    y,
+                ) = data  # supervised-style batch of (images, labels), with batch size from above
                 x = x.type_as(self.dummy_param)
                 y = y.type_as(self.dummy_param).long()
 
                 # Encode data and normalize features (for kNN)
-                feature = self.forward(x).squeeze()
+                feature = self.forward(x).squeeze()  # (batch, features)  e.g. (200, 512)
                 feature = F.normalize(feature, dim=1)
-                feature_bank.append(feature)
-                target_bank.append(y)
+                feature_bank.append(
+                    feature
+                )  # tensor of all features, within which to find nearest-neighbours. Each is (B, N_features), N_features being the output dim of self.forward e.g. BYOL
+                target_bank.append(y)  # tensor with labels of those features
 
             # Save full feature bank for validation epoch
-            self.feature_bank = torch.cat(feature_bank, dim=0).t().contiguous()
-            self.target_bank = torch.cat(target_bank, dim=0).t().contiguous()
+            self.feature_bank = (
+                torch.cat(feature_bank, dim=0).t().contiguous()
+            )  # (features, len(l datamodule)) due to the .t() transpose
+            self.target_bank = (
+                torch.cat(target_bank, dim=0).t().contiguous()
+            )  # either (label_dim, len) or just (len) depending on if labels should have singleton label_dim dimension
+            assert all(self.target_bank >= 0)
 
     def validation_step(self, batch, batch_idx):
         if hasattr(self, "feature_bank") and hasattr(self, "target_bank"):
             # Load batch
             x, y = batch
-
             # Extract + normalize features
             feature = self.forward(x).squeeze()
             feature = F.normalize(feature, dim=1)
@@ -133,9 +173,9 @@ class Lightning_Eval(pl.LightningModule):
             target_bank = self.target_bank.type_as(y)
 
             pred_labels = knn_predict(
-                feature,
-                feature_bank,
-                target_bank,
+                feature,  # feature to search for
+                feature_bank,  # feature bank to identify NN within
+                target_bank,  # labels of those features in feature_bank, same index
                 self.config["data"]["classes"],
                 knn_k=self.config["knn"]["neighbors"],
                 knn_t=self.config["knn"]["temperature"],
@@ -144,6 +184,7 @@ class Lightning_Eval(pl.LightningModule):
             top1 = pred_labels[:, 0]
 
             # Compute accuracy
+            # assert top1.min() >= 0
             self.knn_acc.update(top1, y)
 
     def validation_epoch_end(self, outputs):
@@ -164,7 +205,7 @@ class Feature_Bank(Callback):
         with torch.no_grad():
             encoder = pl_module.backbone
 
-            data_bank = pl_module.trainer.datamodule.data["l"]
+            data_bank = pl_module.trainer.datamodule.data["labelled"]
             data_bank_loader = DataLoader(data_bank, 200)
             feature_bank = []
             target_bank = []
@@ -173,8 +214,6 @@ class Feature_Bank(Callback):
                 x, y = data
                 x = x.type_as(pl_module.dummy_param)
                 y = y.type_as(pl_module.dummy_param).long()
-                # y = y.to(torch.long)
-                # y = y.to(pl_module.dummy_param.device)
 
                 # Encode data and normalize features (for kNN)
                 feature = encoder(x).squeeze()

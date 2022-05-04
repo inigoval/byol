@@ -98,10 +98,11 @@ class SimpleView(nn.Module):
         augs = []
         # if config['dataset'] == 'gz2':  # is a tensor, needs to be a PIL to later call T.ToTensor
         #     augs.append(T.ToPILImage())
-        if config["data"]["rotate"]:
-            augs.append(T.RandomRotation(180))
-            augs.append(T.RandomHorizontalFlip())
+        # if config["data"]["rotate"]:
+        # augs.append(T.RandomRotation(180))
+
         augs.append(T.Resize(config["data"]["input_height"]))
+
         if config["center_crop_size"]:
             augs.append(T.CenterCrop(config["center_crop_size"]))
         augs.append(T.ToTensor())
@@ -138,7 +139,7 @@ class ReduceView(nn.Module):
 
         self.pre_normalize = T.Normalize(config["data"]["mu"], config["data"]["sig"])
         self.encoder = encoder
-        self.reduce = lambda x: self.encoder(x)
+        self.reduce = self.encoder
         self.normalize = T.Normalize(0, 1)
 
     def __call__(self, x):
@@ -185,7 +186,7 @@ def _simclr_view(config):
 
 def _gzmnist_view(config):
     s = config["s"]
-    input_height = config["data"]["input_height"]
+    input_height = config["data"]["input_height"]  # TODO adjust for 128pix
 
     # Gaussian blurring, kernel 10% of image size (SimCLR paper)
     p_blur = config["p_blur"]
@@ -199,7 +200,7 @@ def _gzmnist_view(config):
     p_grayscale = config["p_grayscale"]
 
     # Cropping
-    random_crop = config["random_crop"]
+    random_crop = config["random_crop_scale"]
 
     # Define a view
     view = T.Compose(
@@ -222,34 +223,34 @@ def _gz2_view(config):
     # currently the same as gzmnist except for the ToPIL transform
     s = config["s"]
     input_height = config["data"]["input_height"]
+    r_downscale = config["data"]["downscale_height"]
+    downscale_height = 424 * r_downscale
 
     # Gaussian blurring, kernel 10% of image size (SimCLR paper)
     p_blur = config["p_blur"]
     blur_kernel = _blur_kernel(input_height)
-    # blur_sig = config["blur_sig"]
-    # blur = SIMCLR_GaussianBlur(blur_kernel, p=p_blur, min=blur_sig[0], max=blur_sig[1])
     blur = LightlyGaussianBlur(blur_kernel, prob=p_blur)
 
     # Color augs
     color_jitter = T.ColorJitter(0.8 * s, 0.8 * s, 0.8 * s, 0.2 * s)
     p_grayscale = config["p_grayscale"]
 
-    # Cropping
-    random_crop = config["random_crop"]
-
     # Define a view
     view = T.Compose(
-        [   
+        [
             # the GZ2 dataset yields tensors (may change this)
             # T.ToPILImage(),  # the blur transform requires a PIL image
+            T.Resize(downscale_height),
             T.RandomRotation(180),
-            T.RandomResizedCrop(input_height, scale=random_crop),
+            T.RandomResizedCrop(
+                input_height, scale=config["random_crop_scale"], ratio=config["random_crop_ratio"]
+            ),
             T.RandomHorizontalFlip(),
             T.RandomVerticalFlip(),
             T.RandomApply([color_jitter], p=0.8),
             T.RandomGrayscale(p=p_grayscale),
-            # blur,  no, need all the resolution we can get
-            T.ToTensor()  # the model requires a tensor
+            blur,  # no, need all the resolution we can get
+            T.ToTensor(),  # the model requires a tensor
         ]
     )
 
@@ -261,8 +262,9 @@ def _rgz_view(config):
 
         # Gaussian blurring
         # blur_kernel = config["blur_kernel"]
-        input_height = config["center_crop_size"]
-        blur_kernel = _blur_kernel(input_height)
+        # input_height = config["center_crop_size"]
+        # blur_kernel = _blur_kernel(input_height)
+        blur_kernel = 3
         # blur_sig = config["blur_sig"]
         p_blur = config["p_blur"]
         blur = LightlyGaussianBlur(blur_kernel, prob=p_blur)
@@ -270,7 +272,7 @@ def _rgz_view(config):
 
         # Cropping
         center_crop = config["center_crop_size"]
-        random_crop = config["random_crop"]
+        random_crop = config["random_crop_scale"]
 
         # Color jitter
         s = config["s"]
@@ -303,13 +305,13 @@ def _rgz_view(config):
 
         # Cropping
         center_crop = config["center_crop_size"]
-        # random_crop = config["random_crop"]
+        # random_crop = config["random_crop_scale"]
 
         augs = [
             # Change source perspective
             A.Lambda(
                 name="Superpixel spectral index change",
-                image=AA.SpectralIndex(
+                image=AA.radio.SpectralIndex(
                     mean=-0.8, std=0.2, super_pixels=True, n_segments=100, seed=None
                 ),
                 p=p,
@@ -335,7 +337,7 @@ def _rgz_view(config):
             # Change properties of noise / imaging artefacts
             A.Lambda(
                 name="Spectral index change of whole image",
-                image=AA.SpectralIndex(mean=-0.8, std=0.2, seed=None),
+                image=AA.radio.SpectralIndex(mean=-0.8, std=0.2, seed=None),
                 p=p,
             ),  # Across the whole image
             A.Emboss(
@@ -343,7 +345,7 @@ def _rgz_view(config):
             ),  # Quick emulation of incorrect w-kernels # Doesnt force the maxima to 1
             A.Lambda(
                 name="Dirty beam convlolution",
-                image=AA.CustomKernelConvolution(
+                image=AA.radio.CustomKernelConvolution(
                     kernel=kernel, rfi_dropout=0.4, psf_radius=1.3, sidelobe_scaling=1, mode="sum"
                 ),
                 p=p,

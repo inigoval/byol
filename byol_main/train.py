@@ -84,15 +84,13 @@ if __name__ == "__main__":
     }
 
     pretrain_data = datasets[config["dataset"]]["pretrain"](config)
-    pretrain_data.prepare_data()
-    pretrain_data.setup()
+    # pretrain_data.prepare_data()
+    # pretrain_data.setup()
 
     # Record mean and standard deviation used in normalisation for inference #
-    config["data"]["mu"] = pretrain_data.mu
-    config["data"]["sig"] = pretrain_data.sig
-    config["data"]["n_steps"] = len(pretrain_data.train_dataloader())
-
-    log_examples(wandb_logger, pretrain_data.data["train"])
+    # config["data"]["mu"] = pretrain_data.mu
+    # config["data"]["sig"] = pretrain_data.sig
+    # config["data"]["n_steps"] = len(pretrain_data.train_dataloader())
 
     # List of callbacks
     callbacks = [
@@ -113,6 +111,7 @@ if __name__ == "__main__":
         logger=wandb_logger,
         deterministic=True,
         callbacks=callbacks,
+        precision=config["precision"]
         #    check_val_every_n_epoch=3,
         #    log_every_n_steps=10,
     )
@@ -154,10 +153,12 @@ if __name__ == "__main__":
     freeze_model(encoder)
     encoder.eval()
 
+    logging.info('Training complete - switching to eval mode')
+
     # Switch data-loader to linear evaluation mode
     eval_data = datasets[config["dataset"]]["linear"](encoder, config)
-    eval_data.prepare_data()
-    eval_data.setup()
+    # eval_data.prepare_data()
+    # eval_data.setup()
 
     linear_checkpoint = pl.callbacks.ModelCheckpoint(
         monitor="linear_eval/val_acc",
@@ -172,6 +173,7 @@ if __name__ == "__main__":
         max_epochs=config["linear"]["n_epochs"],
         logger=wandb_logger,
         deterministic=True,
+        # always full precision, never distributed. May need a batch size adjustment.
     )
 
     linear_model = linear_net(config)

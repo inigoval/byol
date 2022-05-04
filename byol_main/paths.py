@@ -16,7 +16,7 @@ class Path_Handler:
         path_dict["data"] = path_dict["root"] / "_data"
 
         path_dict["files"] = path_dict["project"] / "files"
-        path_dict["main"] = path_dict["project"] / "main"
+        path_dict["main"] = path_dict["project"] / "byol_main"
         path_dict["config"] = path_dict["project"] / "config"
 
         path_dict["rgz"] = path_dict["data"] / "rgz"

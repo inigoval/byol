@@ -1,5 +1,8 @@
 preset: null
 
+persistent_workers: False
+precision: 16  # [16, 32]-bit. 16 is auto. mixed precision not pure 16.
+
 model:
     architecture: 'resnet18' 
     features: 512     # Number of encoded features (null just uses original resnet output)
@@ -15,6 +18,7 @@ data:
     classes: 4
     input_height: 64
     rotate: True
+    val_batch_size: 500
 
 linear:
     n_epochs: 100
@@ -31,17 +35,17 @@ knn:
 
 ## AUGMENTATIONS ##
 center_crop_size: null
-random_crop: !!python/tuple [0.3, 1]
+random_crop_scale: !!python/tuple [0.3, 1]
 s: 0.5
 p_grayscale: 0.3
-p_blur: 0.5
+p_blur: 0.5 
 
 ## Optimiser ## 
 # Base settings
 lr: 0.06
 momentum: 0.9
 weight_decay: 0.0005
-batch_size: 256
+pretrain_batch_size: 256
 opt: 'sgd'
 # Scheduler
 scheduler: 'cosine' # ['none', 'cosine', 'warmupcosine']

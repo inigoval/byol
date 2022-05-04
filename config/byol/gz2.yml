@@ -1,10 +1,16 @@
 preset: null
 
+# overriding global
+num_workers: 16
+prefetch_factor: 5
+persistent_workers: False
+precision: 16  # [16, 32]-bit. 16 is auto. mixed precision not pure 16. 
+
 model:
     architecture: 'resnet18' 
     features: 512     # Number of encoded features (null just uses original resnet output)
     n_epochs: 400
-    downscale: True
+    downscale: False
 
 projection_head:
     hidden: 1024
@@ -12,9 +18,11 @@ projection_head:
 
 data:
     color_channels: 3
-    classes: 4
-    input_height: 64  # TODO very low
+    r_downscale: 0.72
+    input_height: 128  #TODO very low
+    classes: 7
     rotate: True
+    val_batch_size: 500
 
 linear:
     n_epochs: 100
@@ -26,22 +34,22 @@ linear:
     scheduler: 'cosine' # ['none', 'cosine'] ####
 
 knn:
-  neighbors: 20
+  neighbors: 100
   temperature: 0.1
 
 ## AUGMENTATIONS ##
 center_crop_size: null
-random_crop: !!python/tuple [0.3, 1]
-s: 0.5
-p_grayscale: 0.3
-p_blur: 0.5
+random_crop_scale: !!python/tuple [0.3, 0.85]
+random_crop_ratio: !!python/tuple [0.8, 1.2]
+s: 0.5  # color jitter strength
+p_grayscale: 0.3  # TODO consider
 
 ## Optimiser ## 
 # Base settings
 lr: 0.06
 momentum: 0.9
 weight_decay: 0.0005
-batch_size: 256
+pretrain_batch_size: 256
 opt: 'sgd'
 # Scheduler
 scheduler: 'cosine' # ['none', 'cosine', 'warmupcosine']

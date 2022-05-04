@@ -14,7 +14,7 @@ class CIFAR10_DataModule(Base_DataModule):
 
     def setup(self):
         self.data["train"] = CIFAR10(self.path, train=True, transform=self.T_train)
-        self.data["l"] = CIFAR10(self.path, train=True, transform=self.T_test)
+        self.data["labelled"] = CIFAR10(self.path, train=True, transform=self.T_test)
         self.data["val"] = CIFAR10(self.path, train=False, transform=self.T_test)
         self.data["test"] = CIFAR10(self.path, train=False, transform=self.T_test)
 

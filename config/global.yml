@@ -1,9 +1,12 @@
 type: 'byol'
-project_name: 'byol'
-dataset: 'gz2' # ['imagenette', 'rgz', 'gzmnist', 'gz2', 'stl10', 'cifar10']
+project_name: 'byol_data_redundancy'
+dataset: 'rgz' # ['imagenette', 'rgz', 'gzmnist', 'gz2', 'stl10', 'cifar10']
 compute: 'slurm'
 seed: 69
 debug: False
-num_workers: 8 
+num_workers: 8 # per gpu
 prefetch_factor: 30
 checkpoint_mode: 'last'
+knn_eval: True
+precision: 16 # [16, 32, 'bf16']
+persistent_workers: False # default is False
