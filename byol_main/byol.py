@@ -1,11 +1,7 @@
-import pytorch_lightning as pl
-import torchvision
 import torch
 import torch.nn as nn
 import lightly
 import copy
-import torch.nn.functional as F
-import torchvision.models as M
 
 from math import cos, pi
 from utilities import _optimizer
@@ -14,14 +10,16 @@ from lightly.models.utils import deactivate_requires_grad
 from lightly.models.utils import update_momentum
 from pytorch_lightning.callbacks import Callback
 
-from evaluation import knn_predict, Lightning_Eval
+from evaluation import Lightning_Eval
 from networks.models import _get_backbone
 
 
-class BYOL(Lightning_Eval):  # Lightning_Eval superclass adds validation step options for kNN evaluation
+class BYOL(
+    Lightning_Eval
+):  # Lightning_Eval superclass adds validation step options for kNN evaluation
     def __init__(self, config):
         super().__init__(config)
-        # self.save_hyperparameters()  # save hyperparameters for easy inference
+        self.save_hyperparameters()  # save hyperparameters for easy inference
         self.config = config
 
         self.backbone = _get_backbone(config)
