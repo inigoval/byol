@@ -44,49 +44,63 @@ class RGZ_DataModule(Base_DataModule):
 
     def _train_set(self, transform):
         """Load MiraBest & RGZ datasets, cut MiraBest by angular size, remove duplicates from RGZ and concatenate the two"""
-        D_conf = MBFRConfident(
-            self.path,
-            train=True,
-            transform=transform,
-            test_size=self.config["data"]["conf_test"],
-            aug_type="torchvision",
-        )
-        D_unc = MBFRUncertain(
-            self.path,
-            train=True,
-            transform=transform,
-            test_size=self.config["data"]["unc_test"],
-            aug_type="torchvision",
-        )
-
         D_rgz = RGZ20k(self.path, train=True, transform=transform)
         D_rgz = rgz_cut(D_rgz, self.config["cut_threshold"], mb_cut=True)
 
-        # Concatenate datasets
-        data = [D_conf, D_unc]
+        D_conf, _ = split_dataset(
+            MBFRConfident,
+            self.path,
+            self.config["data"]["conf_test"],
+            transform=transform,
+            aug_type="torchvision",
+        )
+
+        D_unc, _ = split_dataset(
+            MBFRUncertain,
+            self.path,
+            self.config["data"]["unc_test"],
+            transform=transform,
+            aug_type="torchvision",
+        )
+
+        data = []
+        if D_conf is not None:
+            data.append(D_conf)
+
+        if D_unc is not None:
+            data.append(D_unc)
+
         if self.config["data"]["rgz"]:
             data.append(D_rgz)
 
         return D.ConcatDataset(data)
 
     def _val_set(self, transform):
-        D_conf = MBFRConfident(
+
+        _, D_conf = split_dataset(
+            MBFRConfident,
             self.path,
-            train=False,
+            self.config["data"]["conf_test"],
             transform=transform,
-            test_size=self.config["data"]["conf_test"],
             aug_type="torchvision",
         )
 
-        D_unc = MBFRUncertain(
+        _, D_unc = split_dataset(
+            MBFRUncertain,
             self.path,
-            train=False,
+            self.config["data"]["unc_test"],
             transform=transform,
-            test_size=self.config["data"]["unc_test"],
             aug_type="torchvision",
         )
 
-        return D_conf
+        data = []
+        if D_conf is not None:
+            data.append(D_conf)
+
+        if D_unc is not None:
+            data.append(D_unc)
+
+        return D.ConcatDataset(data)
 
 
 class RGZ_DataModule_Eval(Base_DataModule_Eval):
@@ -101,12 +115,7 @@ class RGZ_DataModule_Eval(Base_DataModule_Eval):
         self.update_transforms(D_train)
 
         # Initialise individual datasets
-        self.data["train"] = MBFRFull(
-            self.path,
-            train=True,
-            transform=self.T_train,
-            aug_type="torchvision",
-        )
+        self.data["train"] = self._val_set(self.T_test)
         self.data["val"] = self._val_set(self.T_test)
         self.data["test"] = MBFRFull(
             self.path,
@@ -114,43 +123,45 @@ class RGZ_DataModule_Eval(Base_DataModule_Eval):
             transform=self.T_test,
             aug_type="torchvision",
         )
-        self.data["mb"] = MBFRFull(
-            self.path,
-            train=True,
-            transform=self.T_test,
-            aug_type="torchvision",
-        )
-
-    def _train_set(self, transform):
-        """Load MiraBest & RGZ datasets, cut MiraBest by angular size, remove duplicates from RGZ and concatenate the two"""
-        D_conf = MBFRConfident(
-            self.path,
-            train=True,
-            transform=transform,
-            test_size=1 - self.config["data"]["conf_train"],
-            aug_type="torchvision",
-        )
-
-        # Concatenate datasets
-        # data = [D_conf, D_unc]
-
-        return D_conf
 
     def _val_set(self, transform):
-        D_conf = MBFRConfident(
+
+        _, D_conf = split_dataset(
+            MBFRConfident,
             self.path,
-            train=False,
+            self.config["data"]["conf_test"],
             transform=transform,
-            test_size=self.config["data"]["conf_test"],
             aug_type="torchvision",
         )
 
-        D_unc = MBFRUncertain(
+        _, D_unc = split_dataset(
+            MBFRUncertain,
             self.path,
-            train=False,
+            self.config["data"]["unc_test"],
             transform=transform,
-            test_size=self.config["data"]["unc_test"],
             aug_type="torchvision",
         )
 
-        return D_conf
+        data = []
+        if D_conf is not None:
+            data.append(D_conf)
+
+        if D_unc is not None:
+            data.append(D_unc)
+
+        return D.ConcatDataset(data)
+
+
+def split_dataset(dset, path, test_size, **kwargs):
+    """Split dataset to a given split"""
+    if test_size == 1:
+        return None, dset(path, train=False, test_size=test_size, **kwargs)
+
+    elif test_size == 0:
+        return dset(path, train=True, test_size=test_size, **kwargs), None
+
+    else:
+        return (
+            dset(path, train=True, test_size=test_size, **kwargs),
+            dset(path, train=False, test_size=test_size, **kwargs),
+        )
