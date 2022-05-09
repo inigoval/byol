@@ -20,11 +20,6 @@ from networks.models import MLPHead, LogisticRegression
 from utilities import log_examples
 
 
-def umap(x, y):
-    mapper = umap.UMAP().fit(x.view(x.shape[0], -1))
-    umap.plot.points(mapper, labels=y)
-
-
 def knn_predict(
     feature: torch.Tensor,
     feature_bank: torch.Tensor,
@@ -72,7 +67,7 @@ def knn_predict(
 
     # compute cos similarity between each feature vector and feature bank ---> [B, N]
     sim_matrix = torch.mm(
-        feature, feature_bank
+        feature.squeeze(), feature_bank.squeeze()
     )  # (B, D) matrix. mult (D, N) gives (B, N) (as feature dim got summed over to got cos sim)
 
     # [B, K]
@@ -122,7 +117,8 @@ class Lightning_Eval(pl.LightningModule):
 
         # logger = self.logger.experiment
 
-        log_examples(self.logger, self.trainer.datamodule.data["train"])
+        if not self.config["debug"]:
+            log_examples(self.logger, self.trainer.datamodule.data["train"])
 
     def on_validation_start(self):
         with torch.no_grad():
@@ -136,10 +132,7 @@ class Lightning_Eval(pl.LightningModule):
             target_bank = []
             for data in data_bank_loader:
                 # Load data and move to correct device
-                (
-                    x,
-                    y,
-                ) = data  # supervised-style batch of (images, labels), with batch size from above
+                (x, y) = data  # supervised-style batch of (images, labels), with batch size from above
                 x = x.type_as(self.dummy_param)
                 y = y.type_as(self.dummy_param).long()
 

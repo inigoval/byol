@@ -16,6 +16,8 @@ from byol_main.evaluation import linear_net, Feature_Bank
 from byol_main.config import load_config, update_config
 from byol_main.utilities import freeze_model, log_examples
 
+from redundancy_reduction import BYOL_RR
+
 if __name__ == "__main__":
 
     logging.basicConfig(
@@ -24,7 +26,7 @@ if __name__ == "__main__":
     )
 
     config = load_config()
-    # update_config(config)
+    update_config(config)
 
     pl.seed_everything(config["seed"])
 
@@ -117,7 +119,7 @@ if __name__ == "__main__":
     )
 
     # Initialise model #
-    models = {"byol": BYOL, "nnclr": NNCLR}
+    models = {"byol_rr": BYOL_RR, "byol": BYOL, "nnclr": NNCLR}
     model = models[config["type"]](config)
 
     config["model"]["output_dim"] = config["model"]["features"]
@@ -141,24 +143,20 @@ if __name__ == "__main__":
     ##################################################
 
     # Extract and load best encoder from pretraining
-    if config["debug"] is True:
-        encoder = model.backbone
-    else:
+    if config["debug"] is False:
         best_model_path = pretrain_checkpoint.best_model_path
-        pretrained_model = BYOL.load_from_checkpoint(best_model_path)
-        encoder = model.backbone
+        model = BYOL.load_from_checkpoint(best_model_path)
 
     encoder = model.backbone
+
     # Freeze encoder weights
     freeze_model(encoder)
     encoder.eval()
 
-    logging.info('Training complete - switching to eval mode')
+    logging.info("Training complete - switching to eval mode")
 
-    # Switch data-loader to linear evaluation mode
+    # Load eval data
     eval_data = datasets[config["dataset"]]["linear"](encoder, config)
-    # eval_data.prepare_data()
-    # eval_data.setup()
 
     linear_checkpoint = pl.callbacks.ModelCheckpoint(
         monitor="linear_eval/val_acc",
