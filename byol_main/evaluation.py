@@ -121,8 +121,8 @@ class Lightning_Eval(pl.LightningModule):
         # self.log("train/sig", self.trainer.datamodule.sig)
 
         # logger = self.logger.experiment
-
-        log_examples(self.logger, self.trainer.datamodule.data["train"])
+        if not self.config['debug']:
+            log_examples(self.logger, self.trainer.datamodule.data["train"])
 
     def on_validation_start(self):
         with torch.no_grad():
