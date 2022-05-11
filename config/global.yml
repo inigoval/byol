@@ -3,7 +3,7 @@ project_name: 'byol'
 dataset: 'decals_dr5' # ['imagenette', 'rgz', 'gzmnist', 'gz2', 'decals_dr5', 'stl10', 'cifar10']
 compute: 'slurm'
 seed: 69
-debug: True
+debug: False
 num_workers: 8  # often overriden
 prefetch_factor: 30
 checkpoint_mode: 'last'

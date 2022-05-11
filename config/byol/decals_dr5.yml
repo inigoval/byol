@@ -3,7 +3,7 @@ preset: null
 # copied from gz2.yml
 
 # overriding global
-num_workers: 20
+num_workers: 16
 prefetch_factor: 5
 persistent_workers: False
 precision: 16  # [16, 32]-bit. 16 is auto. mixed precision not pure 16. 
