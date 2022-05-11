@@ -25,8 +25,8 @@ class Legs_DataModule(Base_DataModule):  # not the same as in pytorch-galaxy-dat
 
     def prepare_data(self):
         # will actually just download both anyway, but for completeness
-        legs_setup(train=True, download=True)
-        legs_setup(train=False, download=True)
+        legs_setup(split='labelled', download=True)
+        # legs_setup(train=False, download=True)
 
     def setup(self, stage=None):  # stage by ptl convention
         self.T_train.n_views = 1
