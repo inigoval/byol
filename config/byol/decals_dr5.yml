@@ -20,7 +20,7 @@ projection_head:
 
 data:
     color_channels: 3
-    input_height: 224   # trying 224
+    input_height: 128 
     classes: 2  # binary, not 7-class like GZ2
     rotate: True
     val_batch_size: 500
