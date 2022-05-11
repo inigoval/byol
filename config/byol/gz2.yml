@@ -18,11 +18,11 @@ projection_head:
 
 data:
     color_channels: 3
-    r_downscale: 0.72  # ratio for random crop. Will load at 
     input_height: 128  # TODO still maybe a bit low
     classes: 7
     rotate: True
     val_batch_size: 500
+    precrop_size_ratio: 1.3
 
 linear:
     n_epochs: 100
@@ -43,6 +43,7 @@ random_crop_scale: !!python/tuple [0.3, 0.85]
 random_crop_ratio: !!python/tuple [0.8, 1.2]
 s: 0.5  # color jitter strength
 p_grayscale: 0.3  # TODO consider
+p_blur: 0.
 
 ## Optimiser ## 
 # Base settings
