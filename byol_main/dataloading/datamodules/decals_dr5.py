@@ -5,40 +5,37 @@ import logging
 import numpy as np
 # https://github.com/mwalmsley/pytorch-galaxy-datasets
 from pytorch_galaxy_datasets import galaxy_dataset
-from pytorch_galaxy_datasets.prepared_datasets import gz2_setup
+from pytorch_galaxy_datasets.prepared_datasets import decals_dr5_setup
 from sklearn.model_selection import train_test_split
 
 from byol_main.dataloading.base_dm import Base_DataModule_Eval, Base_DataModule
 
+# pretty much a duplicate of gz2.py
 
-# def split_catalog(catalog, train_fraction=.7, val_fraction=.1, test_fraction=.2):
-#     assert np.isclose(train_fraction + val_fraction + test_fraction, 1.)
-    
-#     train_catalog, hidden_catalog = train_test_split(catalog, train_size=train_fraction)
-#     val_catalog, test_catalog = train_test_split(
-#         hidden_catalog, train_size=val_fraction/(val_fraction+test_fraction))
-#     return train_catalog, val_catalog, test_catalog
-
+def add_smooth_featured_labels(df):
+    df = df[df['smooth-or-featured_artifact_fraction'] < 0.3]  # remove major artifacts
+    df['label'] = (df['smooth-or-featured-dr5_smooth'] > df['smooth-or-featured-dr5_featured-or-disk']).astype(int)
+    return df
 
 # config arg used by super() only for now, but could use to modify behaviour
-class GZ2_DataModule(Base_DataModule):  # not the same as in pytorch-galaxy-datasets
+class Decals_DataModule(Base_DataModule):  # not the same as in pytorch-galaxy-datasets
     def __init__(self, config):
         super().__init__(config, mu=(0,), sig=(1,))
 
     def prepare_data(self):
         # will actually just download both anyway, but for completeness
-        gz2_setup(self.path, train=True, download=True)
-        gz2_setup(self.path, train=False, download=True)
+        decals_dr5_setup(self.path, train=True, download=True)
+        decals_dr5_setup(self.path, train=False, download=True)
 
     def setup(self, stage=None):  # stage by ptl convention
         self.T_train.n_views = 1
 
-        train_and_val_catalog, _ = gz2_setup(self.path, train=True, download=True)
-        test_catalog, _ = gz2_setup(self.path, train=False, download=True)
+        train_and_val_catalog, _ = decals_dr5_setup(self.path, train=True, download=True)
+        test_catalog, _ = decals_dr5_setup(self.path, train=False, download=True)
 
-        # -1 indicates cannot be assigned a label
-        train_and_val_catalog = train_and_val_catalog.query('label >= 0')
-        test_catalog = test_catalog.query('label >= 0') 
+        # only has regression labels. Let's make a smooth/featured class (and drop artifacts) to have simple knn target (under 'label')
+        train_and_val_catalog = add_smooth_featured_labels(train_and_val_catalog)
+        test_catalog = add_smooth_featured_labels(test_catalog)
 
         if self.config['debug']:
             train_catalog = train_and_val_catalog.sample(20000)  
@@ -60,14 +57,14 @@ class GZ2_DataModule(Base_DataModule):  # not the same as in pytorch-galaxy-data
 
 
 # config arg not used
-class GZ2_DataModule_Eval(Base_DataModule_Eval):
+class Decals_DataModule_Eval(Base_DataModule_Eval):
     def __init__(self, encoder, config):
         super().__init__(encoder, config)
 
     def setup(self, stage=None):
 
         # assumes superclass set self.config = config
-        temporary_datamodule = GZ2_DataModule(self.config)
+        temporary_datamodule = Decals_DataModule(self.config)
         temporary_datamodule.setup()
 
         # now re-use exactly the same data from temporary datamodule (now we will actually use the labels)
@@ -75,33 +72,3 @@ class GZ2_DataModule_Eval(Base_DataModule_Eval):
         self.data['val'] = temporary_datamodule.data['val']
         self.data['test'] = temporary_datamodule.data['test']
         self.data['labelled'] = temporary_datamodule.data['labelled']
-
-
-if __name__ == '__main__':
-
-    import yaml
-    import torch
-
-    with open('config/byol/gz2.yml', 'r') as f:
-        config = yaml.load(f, Loader=yaml.FullLoader)
-
-    config['dataset'] = 'gz2'
-    config['debug'] = True
-    config['num_workers'] = 1
-    config['data'] = {'mu': 0, 'sig': 1, 'rotate': True, 'input_height': 64, 'precrop_size_ratio': 1.3, 'p_blur': 0., 'val_batch_size': 16} # needed for _Eval
-    config['p_blur'] = 0.  # TODO shouldn't this be under config['data']?
-    # print(config)
-
-    for datamodule in [GZ2_DataModule(config=config), GZ2_DataModule_Eval(config=config, encoder=lambda x: torch.from_numpy(np.random.rand(len(x), 512)))]:
-
-        datamodule.setup()
-
-        for (images, labels) in datamodule.train_dataloader():
-            print(images[0].shape, labels.shape)  # [0] as list of views
-            assert labels.min() >= 0
-            break
-
-        for (images, labels) in datamodule.val_dataloader():
-            print(images[0].shape, labels.shape)  # [0] as list of views
-            assert labels.min() >= 0
-            break

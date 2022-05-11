@@ -1,12 +1,12 @@
 type: 'byol'
 project_name: 'byol'
-dataset: 'gz2' # ['imagenette', 'rgz', 'gzmnist', 'gz2', 'stl10', 'cifar10']
+dataset: 'decals_dr5' # ['imagenette', 'rgz', 'gzmnist', 'gz2', 'decals_dr5', 'stl10', 'cifar10']
 compute: 'slurm'
 seed: 69
-debug: False
-num_workers: 16 # per gpu
+debug: True
+num_workers: 8  # often overriden
 prefetch_factor: 30
 checkpoint_mode: 'last'
 knn_eval: True
-precision: 16 # [16, 32, 'bf16']
+precision: 16 # [16, 32, 'bf16'], often overriden
 persistent_workers: False # default is False
