@@ -4,7 +4,7 @@ dataset: 'gz2' # ['imagenette', 'rgz', 'gzmnist', 'gz2', 'stl10', 'cifar10']
 compute: 'slurm'
 seed: 69
 debug: False
-num_workers: 8 # per gpu
+num_workers: 16 # per gpu
 prefetch_factor: 30
 checkpoint_mode: 'last'
 knn_eval: True
