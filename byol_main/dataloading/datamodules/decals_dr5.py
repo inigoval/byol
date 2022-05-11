@@ -13,7 +13,7 @@ from byol_main.dataloading.base_dm import Base_DataModule_Eval, Base_DataModule
 # pretty much a duplicate of gz2.py
 
 def add_smooth_featured_labels(df):
-    df = df[df['smooth-or-featured_artifact_fraction'] < 0.3]  # remove major artifacts
+    df = df[df['smooth-or-featured-dr5_artifact_fraction'] < 0.3]  # remove major artifacts
     df['label'] = (df['smooth-or-featured-dr5_smooth'] > df['smooth-or-featured-dr5_featured-or-disk']).astype(int)
     return df
 
