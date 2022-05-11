@@ -1,5 +1,6 @@
 # uses dataset from pytorch-galaxy-datasets/galaxy_zoo_2.py
 # does not use the datamodule, as this code has different requirements (e.g. normalisation, augmentation choice, etc)
+from cgi import test
 import logging
 
 import numpy as np
@@ -33,7 +34,12 @@ class Legs_DataModule(Base_DataModule):  # not the same as in pytorch-galaxy-dat
 
         train_and_val_catalog, _ = legs_setup(split='train', download=True)
         test_catalog, _ = legs_setup(split='test', download=True)
-        unlabelled_catalog = legs_setup(split='unlabelled', download=True)
+        unlabelled_catalog, _ = legs_setup(split='unlabelled', download=True)
+
+        train_and_val_catalog = train_and_val_catalog.query('redshift < 0.1')
+        test_catalog = test_catalog.query('redshift < 0.1')
+        unlabelled_catalog = unlabelled_catalog.query('redshift < 0.1')
+        logging.info('Catalog sizes: train/val={}, test={}, unlabelled={}'.format(train_and_val_catalog, test_catalog, unlabelled_catalog))
 
         # only has regression labels. Let's make a smooth/featured class (and drop artifacts) to have simple knn target (under 'label')
         train_and_val_catalog = add_smooth_featured_labels(train_and_val_catalog)
