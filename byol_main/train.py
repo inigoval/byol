@@ -109,7 +109,8 @@ def run_contrastive_pretraining(config, wandb_logger, trainer_settings):
     # Train model #
     pre_trainer.fit(model, pretrain_data)
 
-    log_examples(wandb_logger, pretrain_data.data["train"])
+    if not config['debug']:
+        log_examples(wandb_logger, pretrain_data.data["train"])
 
     print(model.config["data"]["mu"])
 
