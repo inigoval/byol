@@ -68,20 +68,14 @@ class MultiView(nn.Module):
         if self.config["dataset"] == "rgz":
             return _rgz_view(self.config)
 
-        elif self.config["dataset"] == "imagenette":
-            return _simclr_view(self.config)
-
-        elif self.config["dataset"] == "stl10":
-            return _simclr_view(self.config)
-
-        elif self.config["dataset"] == "cifar10":
+        elif self.config["dataset"] in ["imagenette", "stl10", "cifar10"]:
             return _simclr_view(self.config)
 
         elif self.config["dataset"] == "gzmnist":
             return _gzmnist_view(self.config)
 
-        elif self.config["dataset"] == "gz2":
-            return _gz2_view(self.config)
+        elif self.config["dataset"] in ['gz2', 'decals_dr5', 'legs', 'rings']:
+            return _gz2_view(self.config)  # now badly named TODO
 
         else:
             raise ValueError(self.config["dataset"])
