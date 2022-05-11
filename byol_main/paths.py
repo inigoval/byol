@@ -26,7 +26,7 @@ class Path_Handler:
         path_dict["cifar10"] = path_dict["data"] / "cifar10"
         path_dict["gzmnist"] = path_dict["data"] / "gzmnist"
         path_dict["gz2"] = path_dict["data"] / "gz2"
-        path_dict["legs"] = path_dict["data"] / "legs"
+        path_dict["legs"] = path_dict["data"] / "does_nothing"  # will ignore this and use hardcoded paths
         path_dict["decals_dr5"] = path_dict["data"] / "decals_dr5"
         path_dict["rings"] = path_dict["data"] / "rings"
         path_dict["tidal"] = path_dict["data"] / "tidal"

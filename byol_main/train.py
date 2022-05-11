@@ -9,6 +9,7 @@ from byol_main.dataloading.datamodules import Imagenette_DataModule, Imagenette_
 from byol_main.dataloading.datamodules import GalaxyMNIST_DataModule, GalaxyMNIST_DataModule_Eval
 from byol_main.dataloading.datamodules import GZ2_DataModule, GZ2_DataModule_Eval
 from byol_main.dataloading.datamodules import Decals_DataModule, Decals_DataModule_Eval
+from byol_main.dataloading.datamodules import Legs_DataModule, Legs_DataModule_Eval
 from byol_main.dataloading.datamodules import RGZ_DataModule, RGZ_DataModule_Eval
 from byol_main.dataloading.datamodules import CIFAR10_DataModule, CIFAR10_DataModule_Eval
 from byol_main.byol import BYOL, Update_M
@@ -57,7 +58,10 @@ def run_contrastive_pretraining(config, wandb_logger, trainer_settings):
             "pretrain": Decals_DataModule,
             "linear": Decals_DataModule_Eval,
         },
-
+        "legs": {
+            "pretrain": Legs_DataModule,
+            "linear": Legs_DataModule_Eval,
+        },
         "rgz": {
             "pretrain": RGZ_DataModule,
             "linear": RGZ_DataModule_Eval,
