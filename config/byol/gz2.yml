@@ -18,8 +18,8 @@ projection_head:
 
 data:
     color_channels: 3
-    r_downscale: 0.72
-    input_height: 128  #TODO very low
+    r_downscale: 0.72  # ratio for random crop. Will load at 
+    input_height: 128  # TODO still maybe a bit low
     classes: 7
     rotate: True
     val_batch_size: 500

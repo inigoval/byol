@@ -16,20 +16,10 @@ from byol_main.evaluation import linear_net, Feature_Bank
 from byol_main.config import load_config, update_config
 from byol_main.utilities import freeze_model, log_examples
 
-if __name__ == "__main__":
 
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(levelname)s: %(message)s",
-    )
-
-    config = load_config()
-    # update_config(config)
+def run_contrastive_pretraining(config, wandb_logger, trainer_settings):
 
     pl.seed_everything(config["seed"])
-
-    paths = Path_Handler()
-    path_dict = paths._dict()
 
     # Save model for test evaluation#
     checkpoint_mode = {
@@ -47,13 +37,6 @@ if __name__ == "__main__":
         save_weights_only=True,
     )
 
-    # Initialise wandb logger, change this if you want to use a different logger #
-    wandb_logger = pl.loggers.WandbLogger(
-        project=config["project_name"],
-        save_dir=path_dict["files"],
-        reinit=True,
-        config=config,
-    )
 
     # Load data and record hyperparameters #
     datasets = {
@@ -98,11 +81,6 @@ if __name__ == "__main__":
         LearningRateMonitor(),
     ]
 
-    trainer_settings = {
-        "slurm": {"gpus": 1, "num_nodes": 1},
-        "gpu": {"devices": 1, "accelerator": "gpu"},
-    }
-
     pre_trainer = pl.Trainer(
         # gpus=1,
         **trainer_settings[config["compute"]],
@@ -136,36 +114,28 @@ if __name__ == "__main__":
     if not config["debug"]:
         wandb.save(pretrain_checkpoint.best_model_path)
 
-    ##################################################
-    ########## LINEAR EVALUATION PROTOCOL ############
-    ##################################################
+    return pretrain_checkpoint, datasets, model
+
+
+def run_linear_evaluation_protocol(config, wandb_logger, pretrain_checkpoint, datasets, trainer_settings, model):
 
     # Extract and load best encoder from pretraining
     if config["debug"] is True:
-        encoder = model.backbone
+        encoder = model.backbone  # don't bother loading a checkpoint
     else:
+        # load the best model from pretraining
+        # (as measured according to config['checkpoint_mode'], likely lowest train loss)
         best_model_path = pretrain_checkpoint.best_model_path
         pretrained_model = BYOL.load_from_checkpoint(best_model_path)
-        encoder = model.backbone
+        encoder = pretrained_model.backbone
 
-    encoder = model.backbone
     # Freeze encoder weights
+    logging.info('Switching model encoder to frozen eval mode')
     freeze_model(encoder)
     encoder.eval()
 
-    logging.info('Training complete - switching to eval mode')
-
     # Switch data-loader to linear evaluation mode
     eval_data = datasets[config["dataset"]]["linear"](encoder, config)
-    # eval_data.prepare_data()
-    # eval_data.setup()
-
-    linear_checkpoint = pl.callbacks.ModelCheckpoint(
-        monitor="linear_eval/val_acc",
-        mode="max",
-        every_n_epochs=1,
-        verbose=True,
-    )
 
     linear_trainer = pl.Trainer(
         **trainer_settings[config["compute"]],
@@ -179,5 +149,37 @@ if __name__ == "__main__":
     linear_model = linear_net(config)
     linear_trainer.fit(linear_model, eval_data)
     # linear_trainer.test(linear_model, dataloaders=eval_data, ckpt_path="best")
+
+
+if __name__ == "__main__":
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s: %(message)s",
+    )
+
+    config = load_config()
+    # update_config(config)
+
+    # TODO could probably be directly included in config rather than config['compute'] indexing this
+    trainer_settings = {
+        "slurm": {"gpus": 1, "num_nodes": 1},
+        "gpu": {"devices": 1, "accelerator": "gpu"},
+    }
+
+    paths = Path_Handler()
+    path_dict = paths._dict()
+
+    # Initialise wandb logger, change this if you want to use a different logger #
+    wandb_logger = pl.loggers.WandbLogger(
+        project=config["project_name"],
+        save_dir=path_dict["files"],
+        reinit=True,
+        config=config,
+    )
+
+    pretrain_checkpoint, datasets, model = run_contrastive_pretraining(config, wandb_logger, trainer_settings)
+
+    run_linear_evaluation_protocol(config, wandb_logger, pretrain_checkpoint, datasets, trainer_settings, model)
 
     wandb_logger.experiment.finish()

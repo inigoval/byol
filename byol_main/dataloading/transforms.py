@@ -220,11 +220,17 @@ def _gzmnist_view(config):
 
 
 def _gz2_view(config):
-    # currently the same as gzmnist except for the ToPIL transform
+    # currently the same as gzmnist except for the resizing and ToPIL transform
     s = config["s"]
-    input_height = config["data"]["input_height"]
-    r_downscale = config["data"]["downscale_height"]
-    downscale_height = 424 * r_downscale
+    # images are loaded from disk at whatever size (424, in practice). Not a parameter
+    # images are then downscaled to `downscale_height`, calculated according to the final desired input size * "precrop_size_ratio"
+    # finally, images are random-cropped to input_height and sent to model
+    # e.g. image loaded at 424, resized to downscale_height=300 (424 * precrop_size_ratio=0.75), then random-cropped to input_height=224
+    precrop_size_ratio = config["data"]["precrop_size_ratio"]
+    assert precrop_size_ratio >= 1. # >1 implies image is still bigger than model input height after resizing, leaving room to random-crop
+    input_height = config["data"]["input_height"]  # i.e. after RandomResizedCrop, when input to model
+
+    downscale_height = int(min(424, input_height * precrop_size_ratio))
 
     # Gaussian blurring, kernel 10% of image size (SimCLR paper)
     p_blur = config["p_blur"]

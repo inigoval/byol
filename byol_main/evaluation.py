@@ -307,22 +307,23 @@ class linear_net(pl.LightningModule):
         return opt
 
 
-class pca_net(nn.Module):
-    def __init__(self, config):
-        super(pca_net, self).__init__()
-        self.config = config
-        self.pca = IncrementalPCA(config["pca"]["n_dim"])
+# currently not used
+# class pca_net(nn.Module):
+#     def __init__(self, config):
+#         super(pca_net, self).__init__()
+#         self.config = config
+#         self.pca = IncrementalPCA(config["pca"]["n_dim"])
 
-    def forward(self, x):
-        x = x.view(x.shape[0], -1)
-        x = self.pca.transform(x)
-        return torch.from_numpy(x).float()
+#     def forward(self, x):
+#         x = x.view(x.shape[0], -1)
+#         x = self.pca.transform(x)
+#         return torch.from_numpy(x).float()
 
-    def fit(self, loader):
-        print("Fitting PCA")
-        for epoch in tqdm(np.arange(self.config["pca"]["n_epochs"])):
-            print(f"Epoch {epoch}")
-            for x, _ in tqdm(loader):
-                x = x.view(x.shape[0], -1)
-                x = x.cpu().detach().numpy()
-                self.pca.partial_fit(x)
+#     def fit(self, loader):
+#         print("Fitting PCA")
+#         for epoch in tqdm(np.arange(self.config["pca"]["n_epochs"])):
+#             print(f"Epoch {epoch}")
+#             for x, _ in tqdm(loader):
+#                 x = x.view(x.shape[0], -1)
+#                 x = x.cpu().detach().numpy()
+#                 self.pca.partial_fit(x)
