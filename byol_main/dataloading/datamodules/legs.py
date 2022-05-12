@@ -80,10 +80,10 @@ def legs_smooth_vs_featured(debug):
     unlabelled_catalog['label'] = -1  # should not be used, but will still be accessed
 
     if debug:
-        train_catalog = train_and_val_catalog.sample(20000)  
+        train_and_val_catalog = train_and_val_catalog.sample(20000)  
         test_catalog = test_catalog.sample(2000)  
         unlabelled_catalog = unlabelled_catalog.sample(20000)
-    return train_and_val_catalog,test_catalog,unlabelled_catalog,train_catalog # will be unpacked into feature_bank, target_bank, for knn eval
+    return train_and_val_catalog, test_catalog, unlabelled_catalog  # will be unpacked into feature_bank, target_bank, for knn eval
 
 
 # used for the linear eval at the end
