@@ -18,7 +18,6 @@ projection_head:
 
 supervised_head:
     hidden: 1024
-    out: 2  # = classes below
 
 data:
     color_channels: 3

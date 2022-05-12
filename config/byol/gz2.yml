@@ -16,6 +16,9 @@ projection_head:
     hidden: 1024
     out: 256
 
+supervised_head:
+    hidden: 1024
+
 data:
     color_channels: 3
     input_height: 128  # TODO still maybe a bit low, but 224 doesn't fit well

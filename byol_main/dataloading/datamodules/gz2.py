@@ -15,7 +15,15 @@ from byol_main.dataloading.base_dm import Base_DataModule_Eval, Base_DataModule
 # config arg used by super() only for now, but could use to modify behaviour
 class GZ2_DataModule(Base_DataModule):  # not the same as in pytorch-galaxy-datasets
     def __init__(self, config):
-        super().__init__(config, mu=(0,), sig=(1,))
+        super().__init__(
+            config, 
+            # recalculate
+            # mu=(0,), 
+            # sig=(1,))
+            # standard smooth/featured
+            mu=(0.05309092253446579, 0.04963503032922745, 0.03850013017654419),
+            std=(0.17045791447162628, 0.17045791447162628, 0.17045791447162628)
+        )
 
     def prepare_data(self):
         # will just download both anyway
@@ -33,6 +41,7 @@ class GZ2_DataModule(Base_DataModule):  # not the same as in pytorch-galaxy-data
         dataset_utils.check_dummy_metrics(val_catalog['label'])
 
         # subset as kinda slow as single-threaded here, possibly
+        # will skip if explicitly set in __init__ above (hardcoded from prev. calculation)
         logging.info('Loading 5k subset of train dataset to adjust mu, sigma') 
         D_train = galaxy_dataset.GalaxyDataset(train_catalog.sample(5000), label_cols=['label'], transform=self.T_train)
         self.update_transforms(D_train)

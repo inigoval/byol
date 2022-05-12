@@ -60,18 +60,21 @@ class Base_DataModule(pl.LightningDataModule):
             batch_size=self.config["data"]["val_batch_size"],
             num_workers=n_workers,
             prefetch_factor=20,
-            persistent_workers=self.config["persistent_workers"],
+            persistent_workers=self.config["persistent_workers"], 
         )
         return loader
 
     def update_transforms(self, D_train):
-        if not self.config["debug"]:
+        # if mu (and sig, implicitly) has been explicitly set, trust it is correct
+        if self.mu == 0. and not self.config["debug"]:
             mu, sig = compute_mu_sig_images(D_train, batch_size=1000)
             self.mu, self.sig = mu, sig
 
             # Define transforms with calculated values
             self.T_train.update_normalization(mu, sig)
             self.T_test.update_normalization(mu, sig)
+        else:
+            logging.info('Skipping mu/sig calculation')
 
         self.T_train.n_views = 2
 
