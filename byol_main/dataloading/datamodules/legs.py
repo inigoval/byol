@@ -34,34 +34,15 @@ class Legs_DataModule(Base_DataModule):  # not the same as in pytorch-galaxy-dat
     def setup(self, stage=None):  # stage by ptl convention
         self.T_train.n_views = 1
 
-        train_and_val_catalog, _ = legs_setup(split='train', download=True)
-        test_catalog, _ = legs_setup(split='test', download=True)
-        unlabelled_catalog, _ = legs_setup(split='unlabelled', download=True)
-
-        train_and_val_catalog = train_and_val_catalog.query('redshift < 0.1')
-        test_catalog = test_catalog.query('redshift < 0.1')
-        unlabelled_catalog = unlabelled_catalog.query('redshift < 0.1')
-
-        # only has regression labels. Let's make a smooth/featured class (and drop artifacts) to have simple knn target (under 'label')
-        train_and_val_catalog = add_smooth_featured_labels(train_and_val_catalog)
-        test_catalog = add_smooth_featured_labels(test_catalog)
-        unlabelled_catalog['label'] = -1  # should not be used, but will still be accessed
-
-        if self.config['debug']:
-            train_catalog = train_and_val_catalog.sample(20000)  
-            test_catalog = test_catalog.sample(2000)  
-            unlabelled_catalog = unlabelled_catalog.sample(20000)  
+        train_and_val_catalog, test_catalog, unlabelled_catalog, train_catalog = legs_smooth_vs_featured(debug=self.config['debug'])  
 
         logging.info('Catalog sizes: train/val={}, test={}, unlabelled={}'.format(len(train_and_val_catalog), len(test_catalog), len(unlabelled_catalog)))
-        logging.info('Class balance: {}'.format(train_catalog['labels'].value_counts(normalize=True)))
+        logging.info('Class balance: {}'.format(train_and_val_catalog['labels'].value_counts(normalize=True)))
         
         train_catalog, val_catalog = train_test_split(train_and_val_catalog, train_size=0.8)
 
+        check_dummy_metrics(val_catalog['label'])
 
-        dummy_classifier = DummyClassifier(strategy='prior')
-        dummy_classifier.fit(X=np.zeros(len(val_catalog), 3), Y=val_catalog['label'])
-        naive_predictions = dummy_classifier.predict(X=np.zeros(len(val_catalog), 3))  # in this case, will just be 0000...
-        logging.info('Naive best-case accuracy: {}'.format(accuracy_score(val_catalog['label'], naive_predictions)))
         exit()
 
 
@@ -75,7 +56,34 @@ class Legs_DataModule(Base_DataModule):  # not the same as in pytorch-galaxy-dat
         # Initialise individual datasets with test transform (for evaluation)
         self.data["val"] = galaxy_dataset.GalaxyDataset(label_cols=['label'], catalog=val_catalog, transform=self.T_test)  # use any labelled data NOT in 'labelled' as feature bank
         self.data["test"] = galaxy_dataset.GalaxyDataset(label_cols=['label'], catalog=test_catalog, transform=self.T_test)  # not used
-        self.data["labelled"] = galaxy_dataset.GalaxyDataset(label_cols=['label'], catalog=train_catalog.sample(10000),  transform=self.T_test)  # will be unpacked into feature_bank, target_bank, for knn eval
+        self.data["labelled"] = galaxy_dataset.GalaxyDataset(label_cols=['label'], catalog=train_catalog.sample(10000),  transform=self.T_test) 
+
+def check_dummy_metrics(y_true):
+    dummy_classifier = DummyClassifier(strategy='prior')
+    dummy_classifier.fit(X=np.zeros(len(y_true), 3), Y=y_true)
+    naive_predictions = dummy_classifier.predict(X=np.zeros(len(y_true), 3))  # in this case, will just be 0000...
+    logging.info('Naive best-case accuracy: {}'.format(accuracy_score(y_true, naive_predictions)))
+
+# TODO move elsehwere
+def legs_smooth_vs_featured(debug):
+    train_and_val_catalog, _ = legs_setup(split='train', download=True)
+    test_catalog, _ = legs_setup(split='test', download=True)
+    unlabelled_catalog, _ = legs_setup(split='unlabelled', download=True)
+
+    train_and_val_catalog = train_and_val_catalog.query('redshift < 0.1')
+    test_catalog = test_catalog.query('redshift < 0.1')
+    unlabelled_catalog = unlabelled_catalog.query('redshift < 0.1')
+
+    # only has regression labels. Let's make a smooth/featured class (and drop artifacts) to have simple knn target (under 'label')
+    train_and_val_catalog = add_smooth_featured_labels(train_and_val_catalog)
+    test_catalog = add_smooth_featured_labels(test_catalog)
+    unlabelled_catalog['label'] = -1  # should not be used, but will still be accessed
+
+    if debug:
+        train_catalog = train_and_val_catalog.sample(20000)  
+        test_catalog = test_catalog.sample(2000)  
+        unlabelled_catalog = unlabelled_catalog.sample(20000)
+    return train_and_val_catalog,test_catalog,unlabelled_catalog,train_catalog # will be unpacked into feature_bank, target_bank, for knn eval
 
 
 # used for the linear eval at the end
