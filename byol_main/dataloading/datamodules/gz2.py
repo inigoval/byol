@@ -8,17 +8,9 @@ from pytorch_galaxy_datasets import galaxy_dataset
 from pytorch_galaxy_datasets.prepared_datasets import gz2_setup
 from sklearn.model_selection import train_test_split
 
+from foundation.datasets import gz2, dataset_utils
+
 from byol_main.dataloading.base_dm import Base_DataModule_Eval, Base_DataModule
-
-
-# def split_catalog(catalog, train_fraction=.7, val_fraction=.1, test_fraction=.2):
-#     assert np.isclose(train_fraction + val_fraction + test_fraction, 1.)
-    
-#     train_catalog, hidden_catalog = train_test_split(catalog, train_size=train_fraction)
-#     val_catalog, test_catalog = train_test_split(
-#         hidden_catalog, train_size=val_fraction/(val_fraction+test_fraction))
-#     return train_catalog, val_catalog, test_catalog
-
 
 # config arg used by super() only for now, but could use to modify behaviour
 class GZ2_DataModule(Base_DataModule):  # not the same as in pytorch-galaxy-datasets
@@ -26,23 +18,15 @@ class GZ2_DataModule(Base_DataModule):  # not the same as in pytorch-galaxy-data
         super().__init__(config, mu=(0,), sig=(1,))
 
     def prepare_data(self):
-        # will actually just download both anyway, but for completeness
+        # will just download both anyway
         gz2_setup(self.path, train=True, download=True)
-        gz2_setup(self.path, train=False, download=True)
+        # gz2_setup(self.path, train=False, download=True)
 
     def setup(self, stage=None):  # stage by ptl convention
         self.T_train.n_views = 1
 
-        train_and_val_catalog, _ = gz2_setup(self.path, train=True, download=True)
-        test_catalog, _ = gz2_setup(self.path, train=False, download=True)
-
-        # -1 indicates cannot be assigned a label
-        train_and_val_catalog = train_and_val_catalog.query('label >= 0')
-        test_catalog = test_catalog.query('label >= 0') 
-
-        if self.config['debug']:
-            train_catalog = train_and_val_catalog.sample(20000)  
-            test_catalog = test_catalog.sample(2000)  
+        # TODO control with config once there are other options?
+        train_and_val_catalog, test_catalog = gz2.gz2_valid_labels(self.path, self.config['debug'])  
         
         train_catalog, val_catalog = train_test_split(train_and_val_catalog, train_size=0.8)
 
@@ -56,7 +40,7 @@ class GZ2_DataModule(Base_DataModule):  # not the same as in pytorch-galaxy-data
         # Initialise individual datasets with test transform (for evaluation)
         self.data["val"] = galaxy_dataset.GalaxyDataset(label_cols=['label'], catalog=val_catalog, transform=self.T_test)
         self.data["test"] = galaxy_dataset.GalaxyDataset(label_cols=['label'], catalog=test_catalog, transform=self.T_test)
-        self.data["labelled"] = galaxy_dataset.GalaxyDataset(label_cols=['label'], catalog=train_catalog.sample(10000),  transform=self.T_test)  # will be unpacked into feature_bank, target_bank, for knn eval
+        self.data["labelled"] = galaxy_dataset.GalaxyDataset(label_cols=['label'], catalog=train_catalog.sample(10000),  transform=self.T_test) 
 
 
 # config arg not used

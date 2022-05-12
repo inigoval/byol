@@ -4,22 +4,15 @@ import logging
 
 import numpy as np
 # https://github.com/mwalmsley/pytorch-galaxy-datasets
+from sklearn.model_selection import train_test_split
+
 from pytorch_galaxy_datasets import galaxy_dataset
 from pytorch_galaxy_datasets.prepared_datasets import legs_setup
-from sklearn import naive_bayes
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score
-from sklearn.dummy import DummyClassifier
+from foundation.datasets import legs, dataset_utils
 
 from byol_main.dataloading.base_dm import Base_DataModule_Eval, Base_DataModule
 
 # pretty much a duplicate of gz2.py
-
-def add_smooth_featured_labels(df):
-    df = df[df['smooth-or-featured-dr5_total-votes'] > 20]  # should be somewhat reliable, and classified in dr5 (say)
-    df = df[df['smooth-or-featured-dr5_artifact_fraction'] < 0.3]  # remove major artifacts
-    df['label'] = (df['smooth-or-featured-dr5_smooth'] > df['smooth-or-featured-dr5_featured-or-disk']).astype(int)
-    return df
 
 # config arg used by super() only for now, but could use to modify behaviour
 class Legs_DataModule(Base_DataModule):  # not the same as in pytorch-galaxy-datasets
@@ -34,14 +27,14 @@ class Legs_DataModule(Base_DataModule):  # not the same as in pytorch-galaxy-dat
     def setup(self, stage=None):  # stage by ptl convention
         self.T_train.n_views = 1
 
-        train_and_val_catalog, test_catalog, unlabelled_catalog = legs_smooth_vs_featured(debug=self.config['debug'])  
+        train_and_val_catalog, test_catalog, unlabelled_catalog = legs.legs_smooth_vs_featured(debug=self.config['debug'])  
 
         logging.info('Catalog sizes: train/val={}, test={}, unlabelled={}'.format(len(train_and_val_catalog), len(test_catalog), len(unlabelled_catalog)))
-        logging.info('Class balance: {}'.format(train_and_val_catalog['labels'].value_counts(normalize=True)))
+        logging.info('Class balance: {}'.format(train_and_val_catalog['label'].value_counts(normalize=True)))
         
         train_catalog, val_catalog = train_test_split(train_and_val_catalog, train_size=0.8)
 
-        check_dummy_metrics(val_catalog['label'])
+        dataset_utils.check_dummy_metrics(val_catalog['label'])
 
         exit()
 
@@ -57,33 +50,6 @@ class Legs_DataModule(Base_DataModule):  # not the same as in pytorch-galaxy-dat
         self.data["val"] = galaxy_dataset.GalaxyDataset(label_cols=['label'], catalog=val_catalog, transform=self.T_test)  # use any labelled data NOT in 'labelled' as feature bank
         self.data["test"] = galaxy_dataset.GalaxyDataset(label_cols=['label'], catalog=test_catalog, transform=self.T_test)  # not used
         self.data["labelled"] = galaxy_dataset.GalaxyDataset(label_cols=['label'], catalog=train_catalog.sample(10000),  transform=self.T_test) 
-
-def check_dummy_metrics(y_true):
-    dummy_classifier = DummyClassifier(strategy='prior')
-    dummy_classifier.fit(X=np.zeros(len(y_true), 3), Y=y_true)
-    naive_predictions = dummy_classifier.predict(X=np.zeros(len(y_true), 3))  # in this case, will just be 0000...
-    logging.info('Naive best-case accuracy: {}'.format(accuracy_score(y_true, naive_predictions)))
-
-# TODO move elsehwere
-def legs_smooth_vs_featured(debug):
-    train_and_val_catalog, _ = legs_setup(split='train', download=True)
-    test_catalog, _ = legs_setup(split='test', download=True)
-    unlabelled_catalog, _ = legs_setup(split='unlabelled', download=True)
-
-    train_and_val_catalog = train_and_val_catalog.query('redshift < 0.1')
-    test_catalog = test_catalog.query('redshift < 0.1')
-    unlabelled_catalog = unlabelled_catalog.query('redshift < 0.1')
-
-    # only has regression labels. Let's make a smooth/featured class (and drop artifacts) to have simple knn target (under 'label')
-    train_and_val_catalog = add_smooth_featured_labels(train_and_val_catalog)
-    test_catalog = add_smooth_featured_labels(test_catalog)
-    unlabelled_catalog['label'] = -1  # should not be used, but will still be accessed
-
-    if debug:
-        train_and_val_catalog = train_and_val_catalog.sample(20000)  
-        test_catalog = test_catalog.sample(2000)  
-        unlabelled_catalog = unlabelled_catalog.sample(20000)
-    return train_and_val_catalog, test_catalog, unlabelled_catalog  # will be unpacked into feature_bank, target_bank, for knn eval
 
 
 # used for the linear eval at the end
@@ -104,3 +70,33 @@ class Legs_DataModule_Eval(Base_DataModule_Eval):
         self.data['val'] = temporary_datamodule.data['val']
         self.data['test'] = temporary_datamodule.data['test']
         self.data['labelled'] = temporary_datamodule.data['labelled']
+
+
+if __name__ == '__main__':
+
+    import yaml
+    import torch
+
+    with open('config/byol/legs.yml', 'r') as f:
+        config = yaml.load(f, Loader=yaml.FullLoader)
+
+    config['dataset'] = 'legs'
+    config['debug'] = False
+    config['num_workers'] = 1
+    config['data'] = {'mu': 0, 'sig': 1, 'rotate': True, 'input_height': 64, 'precrop_size_ratio': 1.3, 'p_blur': 0., 'val_batch_size': 16} # needed for _Eval
+    config['p_blur'] = 0.  # TODO shouldn't this be under config['data']?
+    # print(config)
+
+    for datamodule in [Legs_DataModule(config=config), Legs_DataModule_Eval(config=config, encoder=lambda x: torch.from_numpy(np.random.rand(len(x), 512)))]:
+
+        datamodule.setup()
+
+        for (images, labels) in datamodule.train_dataloader():
+            print(images[0].shape, labels.shape)  # [0] as list of views
+            assert labels.min() >= 0
+            break
+
+        for (images, labels) in datamodule.val_dataloader():
+            print(images[0].shape, labels.shape)  # [0] as list of views
+            assert labels.min() >= 0
+            break
