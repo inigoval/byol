@@ -22,7 +22,7 @@ class GZ2_DataModule(Base_DataModule):  # not the same as in pytorch-galaxy-data
             # sig=(1,))
             # standard smooth/featured
             mu=(0.05309092253446579, 0.04963503032922745, 0.03850013017654419),
-            std=(0.17045791447162628, 0.17045791447162628, 0.17045791447162628)
+            sig=(0.17045791447162628, 0.17045791447162628, 0.17045791447162628)
         )
 
     def prepare_data(self):
