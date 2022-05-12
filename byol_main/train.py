@@ -47,7 +47,7 @@ def run_contrastive_pretraining(config, wandb_logger, trainer_settings):
     callbacks = [pretrain_checkpoint]
     if wandb_logger is not None:
         # only supported with a logger
-        callbacks += LearningRateMonitor()
+        callbacks += [LearningRateMonitor()]
 
     pre_trainer = pl.Trainer(
         # gpus=1,
