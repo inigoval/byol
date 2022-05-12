@@ -14,10 +14,10 @@ from sklearn.decomposition import IncrementalPCA
 from pytorch_lightning.callbacks import Callback
 from torch.utils.data import DataLoader
 
-from dataloading.utils import dset2tens
-from paths import Path_Handler
-from networks.models import MLPHead, LogisticRegression
-from utilities import log_examples
+from byol_main.dataloading.utils import dset2tens
+from byol_main.paths import Path_Handler
+from byol_main.networks.models import MLPHead, LogisticRegression
+from byol_main.utilities import log_examples
 
 
 def umap(x, y):

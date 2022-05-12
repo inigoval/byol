@@ -16,7 +16,7 @@ from dataloading.transforms import MultiView, SimpleView, ReduceView
 paths = Path_Handler()
 path_dict = paths._dict()
 
-
+# TODO move to imagenette?
 class imagenette_DataModule(pl.LightningDataModule):
     def __init__(self, config, path=path_dict["imagenette"]):
         super().__init__()

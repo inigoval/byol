@@ -1,8 +1,8 @@
 import torch.utils.data as D
 
-from dataloading.base_dm import Base_DataModule_Eval, Base_DataModule
-from dataloading.utils import rgz_cut
-from dataloading.datasets import RGZ20k
+from byol_main.dataloading.base_dm import Base_DataModule_Eval, Base_DataModule
+from byol_main.dataloading.utils import rgz_cut
+from byol_main.dataloading.datasets import RGZ20k
 from astroaugmentations.datasets.MiraBest_F import MBFRFull, MBFRConfident, MBFRUncertain
 
 

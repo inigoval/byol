@@ -4,14 +4,14 @@ import lightly
 import copy
 
 from math import cos, pi
-from utilities import _optimizer
+from byol_main.utilities import _optimizer
 from lightly.models.modules.heads import BYOLProjectionHead
 from lightly.models.utils import deactivate_requires_grad
 from lightly.models.utils import update_momentum
 from pytorch_lightning.callbacks import Callback
 
-from evaluation import Lightning_Eval
-from networks.models import _get_backbone
+from byol_main.evaluation import Lightning_Eval
+from byol_main.networks.models import _get_backbone
 
 
 class BYOL(
@@ -27,6 +27,11 @@ class BYOL(
         # create a byol model based on ResNet
         features = self.config["model"]["features"]
         proj = self.config["projection_head"]
+        # these are both basically small dense networks of different sizes
+        # architecture is: linear w/ relu, batch-norm, linear
+        # by default: representation (features)=512, hidden (both heads)=1024, out=256
+        # so projection_head is 512->1024,relu/BN,1024->256
+        # and prediction_head is 256->1024,relu/BN,1024->256
         self.projection_head = BYOLProjectionHead(features, proj["hidden"], proj["out"])
         self.prediction_head = BYOLProjectionHead(proj["out"], proj["hidden"], proj["out"])
 
@@ -46,8 +51,11 @@ class BYOL(
         return self.backbone(x)  # dimension (batch, features), features from config e.g. 512
 
     def project(self, x):
+        # representation
         y = self.backbone(x).flatten(start_dim=1)
+        # projection
         z = self.projection_head(y)
+        # prediction (of proj of target network)
         p = self.prediction_head(z)
         return p
 
@@ -106,3 +114,95 @@ class Update_M(Callback):
             epoch = pl_module.current_epoch
             n_epochs = config["model"]["n_epochs"]
             pl_module.m = 1 - (1 - pl_module.m) * (cos(pi * epoch / n_epochs) + 1) / 2
+
+
+class BYOL_Supervised(BYOL):
+
+    def __init__(self, config):
+        super().__init__(config)
+        # re-use the projection head pattern
+        # also re-use the dimension
+        features = self.config["model"]["features"]
+        sup_head_dims = self.config["supervised_head"]
+        num_classes = config['data']['classes']
+        # remember this has batch-norm
+        self.supervised_head = nn.Sequential(
+            BYOLProjectionHead(features, sup_head_dims["hidden"], num_classes),
+            torch.nn.Softmax(dim=-1)
+        )
+
+        # input, target convention
+        # classification loss
+        self.supervised_loss_func = torch.nn.CrossEntropyLoss(ignore_index=-1)
+
+        # TODO add dirichlet loss
+
+# I'm splitting self.project into two steps, self.represent then self.project, so I can use the rep without recalculating
+
+    def represent(self, x):
+        # representation
+        return self.backbone(x).flatten(start_dim=1)
+
+    def project(self, y):
+        # now takes representation y as input
+        # projection
+        z = self.projection_head(y)
+        # prediction (of proj of target network)
+        p = self.prediction_head(z)
+        return p
+
+
+    def training_step(self, batch, batch_idx):
+
+        # Update momentum value
+        # aka update self.backbone_momentum with exp. moving av. of self.backbone
+        # (similarly for heads)
+        update_momentum(self.backbone, self.backbone_momentum, m=self.m)
+        update_momentum(self.projection_head, self.projection_head_momentum, m=self.m)
+        # prediction head not EMA'd as target (averaged) network doesn't need one
+        # similarly don't need to EMA the supervised head as target network doesn't need one
+
+        # Load in data
+        # transforms.MultiView gives 2 views of same image
+        (x0, x1), labels = batch
+        x0 = x0.type_as(self.dummy_param)
+        x1 = x1.type_as(self.dummy_param)
+
+        y0 = self.represent(x0)  # supervised head uses y0
+        p0 = self.project(y0)
+        
+        y1 = self.represent(x1)  # y1 not used except below
+        p1 = self.project(y1)  # but re-using same funcs
+
+        # I'm not splitting project_momentum as target network doesn't have/need supervised head
+        # TODO should probably rename
+        z0 = self.project_momentum(x0)
+        z1 = self.project_momentum(x1)
+
+        contrastive_loss = 0.5 * (self.criterion(p0, z1) + self.criterion(p1, z0))
+
+        supervised_head_out = self.supervised_head(y0)
+        # TODO will alter for dirichlet
+        print(supervised_head_out)
+        print(labels)
+
+        labels[0] = -1
+
+        # ignore targets with value (aka class index) of -1
+        supervised_loss = self.supervised_loss_func(supervised_head_out, labels)  
+        # print(supervised_loss)
+
+        loss = contrastive_loss + self.config['supervised_loss_weight'] * supervised_loss
+
+        # complications: 
+        # handling classification labels which are missing aka -1
+        # (handling vote counts with 0 answers should be easy, dirichlet can ignore)
+        # (weighting with missing labels should be okay: loss will be per batch element, total doesn't matter)
+
+        print(supervised_loss, contrastive_loss, loss)
+
+        # keep same name for wandb comparison
+        self.log("train/loss", contrastive_loss, on_step=False, on_epoch=True)
+        self.log("train/supervised_loss", supervised_loss, on_step=False, on_epoch=True)  
+        self.log("train/total_weighted_loss", loss, on_step=False, on_epoch=True)  
+        return loss

@@ -12,7 +12,8 @@ class Base_DataModule(pl.LightningDataModule):
     def __init__(self, config, mu, sig):
         super().__init__()
 
-        paths = Path_Handler()
+        # override default paths via config if desired
+        paths = Path_Handler(**config.get('paths_to_override', {}))
         path_dict = paths._dict()
         self.path = path_dict[config["dataset"]]
 

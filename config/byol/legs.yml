@@ -16,10 +16,14 @@ projection_head:
     hidden: 1024
     out: 256
 
+supervised_head:
+    hidden: 1024
+    out: 2  # = classes below
+
 data:
     color_channels: 3
     input_height: 128  # TODO still maybe a bit low, but 224 doesn't fit well
-    classes: 7
+    classes: 2
     rotate: True
     val_batch_size: 500
     precrop_size_ratio: 1.3

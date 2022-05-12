@@ -8,8 +8,8 @@ from lightly.models.modules import NNCLRProjectionHead
 from lightly.models.modules import NNCLRPredictionHead
 from lightly.models.modules import NNMemoryBankModule
 
-from evaluation import Lightning_Eval
-from networks.models import _get_backbone
+from byol_main.evaluation import Lightning_Eval
+from byol_main.networks.models import _get_backbone
 
 
 class NNCLR(Lightning_Eval):

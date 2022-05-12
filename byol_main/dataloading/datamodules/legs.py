@@ -45,7 +45,9 @@ class Legs_DataModule(Base_DataModule):  # not the same as in pytorch-galaxy-dat
         self.update_transforms(D_train)
 
         # Re-initialise dataset with new mu and sig values
-        self.data["train"] = galaxy_dataset.GalaxyDataset(catalog=unlabelled_catalog, label_cols=['label'], transform=self.T_train)  # train on all unlabelled data (don't need train catalog itself here)
+
+        # train on all train+unlabelled data (labels not used)
+        self.data["train"] = galaxy_dataset.GalaxyDataset(catalog=pd.concat([unlabelled_catalog, train_catalog], axis=0), label_cols=['label'], transform=self.T_train)  
         # Initialise individual datasets with test transform (for evaluation)
         self.data["val"] = galaxy_dataset.GalaxyDataset(label_cols=['label'], catalog=val_catalog, transform=self.T_test)  # use any labelled data NOT in 'labelled' as feature bank
         self.data["test"] = galaxy_dataset.GalaxyDataset(label_cols=['label'], catalog=test_catalog, transform=self.T_test)  # not used

@@ -30,6 +30,8 @@ class GZ2_DataModule(Base_DataModule):  # not the same as in pytorch-galaxy-data
         
         train_catalog, val_catalog = train_test_split(train_and_val_catalog, train_size=0.8)
 
+        dataset_utils.check_dummy_metrics(val_catalog['label'])
+
         # subset as kinda slow as single-threaded here, possibly
         logging.info('Loading 5k subset of train dataset to adjust mu, sigma') 
         D_train = galaxy_dataset.GalaxyDataset(train_catalog.sample(5000), label_cols=['label'], transform=self.T_train)

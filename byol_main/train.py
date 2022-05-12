@@ -4,15 +4,9 @@ import logging
 
 from pytorch_lightning.callbacks import LearningRateMonitor
 
-from paths import Path_Handler
-from byol_main.dataloading.datamodules import Imagenette_DataModule, Imagenette_DataModule_Eval
-from byol_main.dataloading.datamodules import GalaxyMNIST_DataModule, GalaxyMNIST_DataModule_Eval
-from byol_main.dataloading.datamodules import GZ2_DataModule, GZ2_DataModule_Eval
-from byol_main.dataloading.datamodules import Decals_DataModule, Decals_DataModule_Eval
-from byol_main.dataloading.datamodules import Legs_DataModule, Legs_DataModule_Eval
-from byol_main.dataloading.datamodules import RGZ_DataModule, RGZ_DataModule_Eval
-from byol_main.dataloading.datamodules import CIFAR10_DataModule, CIFAR10_DataModule_Eval
-from byol_main.byol import BYOL, Update_M
+from byol_main.paths import Path_Handler
+from byol_main.dataloading.datamodules import datasets
+from byol_main.byol import BYOL, BYOL_Supervised, Update_M
 from byol_main.nnclr import NNCLR
 from byol_main.evaluation import linear_net, Feature_Bank
 from byol_main.config import load_config, update_config
@@ -40,42 +34,6 @@ def run_contrastive_pretraining(config, wandb_logger, trainer_settings):
     )
 
 
-    # Load data and record hyperparameters #
-    datasets = {
-        "imagenette": {
-            "pretrain": Imagenette_DataModule,
-            "linear": Imagenette_DataModule_Eval,
-        },
-        "gzmnist": {
-            "pretrain": GalaxyMNIST_DataModule,
-            "linear": GalaxyMNIST_DataModule_Eval,
-        },
-        "gz2": {
-            "pretrain": GZ2_DataModule,
-            "linear": GZ2_DataModule_Eval,
-        },
-        "decals_dr5": {
-            "pretrain": Decals_DataModule,
-            "linear": Decals_DataModule_Eval,
-        },
-        "legs": {
-            "pretrain": Legs_DataModule,
-            "linear": Legs_DataModule_Eval,
-        },
-        "rgz": {
-            "pretrain": RGZ_DataModule,
-            "linear": RGZ_DataModule_Eval,
-        },
-        # "stl10": {
-        #     "pretrain": STL10_DataModule,
-        #     "linear": STL10_DataModule_Eval,
-        # },
-        "cifar10": {
-            "pretrain": CIFAR10_DataModule,
-            "linear": CIFAR10_DataModule_Eval,
-        },
-    }
-
     pretrain_data = datasets[config["dataset"]]["pretrain"](config)
     # pretrain_data.prepare_data()
     # pretrain_data.setup()
@@ -86,10 +44,10 @@ def run_contrastive_pretraining(config, wandb_logger, trainer_settings):
     # config["data"]["n_steps"] = len(pretrain_data.train_dataloader())
 
     # List of callbacks
-    callbacks = [
-        pretrain_checkpoint,
-        LearningRateMonitor(),
-    ]
+    callbacks = [pretrain_checkpoint]
+    if wandb_logger is not None:
+        # only supported with a logger
+        callbacks += LearningRateMonitor()
 
     pre_trainer = pl.Trainer(
         # gpus=1,
@@ -105,7 +63,11 @@ def run_contrastive_pretraining(config, wandb_logger, trainer_settings):
     )
 
     # Initialise model #
-    models = {"byol": BYOL, "nnclr": NNCLR}
+    models = {
+        "byol": BYOL, 
+        "byol_supervised": BYOL_Supervised,
+        "nnclr": NNCLR
+    }
     model = models[config["type"]](config)
 
     config["model"]["output_dim"] = config["model"]["features"]
@@ -125,10 +87,10 @@ def run_contrastive_pretraining(config, wandb_logger, trainer_settings):
     if not config["debug"]:
         wandb.save(pretrain_checkpoint.best_model_path)
 
-    return pretrain_checkpoint, datasets, model
+    return pretrain_checkpoint, model
 
 
-def run_linear_evaluation_protocol(config, wandb_logger, pretrain_checkpoint, datasets, trainer_settings, model):
+def run_linear_evaluation_protocol(config, wandb_logger, pretrain_checkpoint, trainer_settings, model):
 
     # Extract and load best encoder from pretraining
     if config["debug"] is True:
@@ -137,6 +99,7 @@ def run_linear_evaluation_protocol(config, wandb_logger, pretrain_checkpoint, da
         # load the best model from pretraining
         # (as measured according to config['checkpoint_mode'], likely lowest train loss)
         best_model_path = pretrain_checkpoint.best_model_path
+        # TODO this currently ignores the model selected via config['type']
         pretrained_model = BYOL.load_from_checkpoint(best_model_path)
         encoder = pretrained_model.backbone
 
@@ -162,7 +125,7 @@ def run_linear_evaluation_protocol(config, wandb_logger, pretrain_checkpoint, da
     # linear_trainer.test(linear_model, dataloaders=eval_data, ckpt_path="best")
 
 
-if __name__ == "__main__":
+def main():
 
     logging.basicConfig(
         level=logging.INFO,
@@ -178,19 +141,24 @@ if __name__ == "__main__":
         "gpu": {"devices": 1, "accelerator": "gpu"},
     }
 
+    # Initialise wandb logger, change this if you want to use a different logger #
     paths = Path_Handler()
     path_dict = paths._dict()
-
-    # Initialise wandb logger, change this if you want to use a different logger #
+    wandb_save_dir = path_dict["files"]
     wandb_logger = pl.loggers.WandbLogger(
         project=config["project_name"],
-        save_dir=path_dict["files"],
+        save_dir=wandb_save_dir,
         reinit=True,
         config=config,
     )
 
-    pretrain_checkpoint, datasets, model = run_contrastive_pretraining(config, wandb_logger, trainer_settings)
+    pretrain_checkpoint, model = run_contrastive_pretraining(config, wandb_logger, trainer_settings)
 
-    run_linear_evaluation_protocol(config, wandb_logger, pretrain_checkpoint, datasets, trainer_settings, model)
+    run_linear_evaluation_protocol(config, wandb_logger, pretrain_checkpoint, trainer_settings, model)
 
     wandb_logger.experiment.finish()
+
+
+if __name__ == "__main__":
+
+    main()
