@@ -1,13 +1,15 @@
 # uses dataset from pytorch-galaxy-datasets/galaxy_zoo_2.py
 # does not use the datamodule, as this code has different requirements (e.g. normalisation, augmentation choice, etc)
-from cgi import test
 import logging
 
 import numpy as np
 # https://github.com/mwalmsley/pytorch-galaxy-datasets
 from pytorch_galaxy_datasets import galaxy_dataset
 from pytorch_galaxy_datasets.prepared_datasets import legs_setup
+from sklearn import naive_bayes
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
+from sklearn.dummy import DummyClassifier
 
 from byol_main.dataloading.base_dm import Base_DataModule_Eval, Base_DataModule
 
@@ -39,7 +41,6 @@ class Legs_DataModule(Base_DataModule):  # not the same as in pytorch-galaxy-dat
         train_and_val_catalog = train_and_val_catalog.query('redshift < 0.1')
         test_catalog = test_catalog.query('redshift < 0.1')
         unlabelled_catalog = unlabelled_catalog.query('redshift < 0.1')
-        logging.info('Catalog sizes: train/val={}, test={}, unlabelled={}'.format(train_and_val_catalog, test_catalog, unlabelled_catalog))
 
         # only has regression labels. Let's make a smooth/featured class (and drop artifacts) to have simple knn target (under 'label')
         train_and_val_catalog = add_smooth_featured_labels(train_and_val_catalog)
@@ -49,8 +50,20 @@ class Legs_DataModule(Base_DataModule):  # not the same as in pytorch-galaxy-dat
         if self.config['debug']:
             train_catalog = train_and_val_catalog.sample(20000)  
             test_catalog = test_catalog.sample(2000)  
+            unlabelled_catalog = unlabelled_catalog.sample(20000)  
+
+        logging.info('Catalog sizes: train/val={}, test={}, unlabelled={}'.format(len(train_and_val_catalog), len(test_catalog), len(unlabelled_catalog)))
+        logging.info('Class balance: {}'.format(train_catalog['labels'].value_counts(normalize=True)))
         
         train_catalog, val_catalog = train_test_split(train_and_val_catalog, train_size=0.8)
+
+
+        dummy_classifier = DummyClassifier(strategy='prior')
+        dummy_classifier.fit(X=np.zeros(len(val_catalog), 3), Y=val_catalog['label'])
+        naive_predictions = dummy_classifier.predict(X=np.zeros(len(val_catalog), 3))  # in this case, will just be 0000...
+        logging.info('Naive best-case accuracy: {}'.format(accuracy_score(val_catalog['label'], naive_predictions)))
+        exit()
+
 
         # subset as kinda slow as single-threaded here, possibly
         logging.info('Loading 5k subset of train dataset to adjust mu, sigma') 
