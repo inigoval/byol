@@ -34,7 +34,7 @@ class Legs_DataModule(Base_DataModule):  # not the same as in pytorch-galaxy-dat
     def setup(self, stage=None):  # stage by ptl convention
         self.T_train.n_views = 1
 
-        train_and_val_catalog, test_catalog, unlabelled_catalog, train_catalog = legs_smooth_vs_featured(debug=self.config['debug'])  
+        train_and_val_catalog, test_catalog, unlabelled_catalog = legs_smooth_vs_featured(debug=self.config['debug'])  
 
         logging.info('Catalog sizes: train/val={}, test={}, unlabelled={}'.format(len(train_and_val_catalog), len(test_catalog), len(unlabelled_catalog)))
         logging.info('Class balance: {}'.format(train_and_val_catalog['labels'].value_counts(normalize=True)))
