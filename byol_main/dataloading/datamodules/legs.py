@@ -48,7 +48,7 @@ class Legs_DataModule(generic_galaxy.Galaxy_DataModule):
         self.data["test"] = galaxy_dataset.GalaxyDataset(
             label_cols=['label'], catalog=test_catalog, transform=self.T_test)  # not used
         self.data["labelled"] = galaxy_dataset.GalaxyDataset(
-            label_cols=['label'], catalog=train_catalog.sample(10000),  transform=self.T_test)
+            label_cols=['label'], catalog=test_catalog.sample(10000),  transform=self.T_test)  # TODO temp
 
 
 if __name__ == '__main__':
