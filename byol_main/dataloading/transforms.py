@@ -74,7 +74,8 @@ class MultiView(nn.Module):
         elif self.config["dataset"] == "gzmnist":
             return _gzmnist_view(self.config)
 
-        elif self.config["dataset"] in ['gz2', 'decals_dr5', 'legs', 'rings']:
+        # TODO could get ugly
+        elif self.config["dataset"] in ['gz2', 'decals_dr5', 'legs', 'rings', 'legs_and_rings']:
             return _gz2_view(self.config)  # now badly named TODO
 
         else:

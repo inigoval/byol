@@ -34,6 +34,8 @@ class Path_Handler:
         self.path_dict["gzmnist"] = self.path_dict["data"] / "gzmnist"
         self.path_dict["gz2"] = self.path_dict["data"] / "gz2"
         self.path_dict["legs"] = self.path_dict["data"] / "does_nothing"  # will ignore this and use hardcoded paths
+        # TODO this is going to get really ugly, needs a rethink?
+        self.path_dict["legs_and_rings"] = self.path_dict["data"]  # sets its own subdirectories in foundation.datasets.legs.legs_and_rings
         self.path_dict["decals_dr5"] = self.path_dict["data"] / "decals_dr5"
         self.path_dict["rings"] = self.path_dict["data"] / "rings"
         self.path_dict["tidal"] = self.path_dict["data"] / "tidal"

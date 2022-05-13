@@ -3,6 +3,7 @@ import torch.nn as nn
 import lightly
 import copy
 
+import logging
 from math import cos, pi
 from byol_main.utilities import _optimizer
 from lightly.models.modules.heads import BYOLProjectionHead
@@ -129,17 +130,20 @@ class BYOL_Supervised(BYOL):
         supervised_head_params = self.config["supervised_head"]
 
         if supervised_head_params['training_mode'] == 'classification':
-
+            num_classes = config['data']['classes']
+            logging.info('Adding supervised head in classification mode, {} classes'.format(num_classes))
             # remember this has batch-norm
             self.supervised_head = nn.Sequential(
-                BYOLProjectionHead(features, supervised_head_params["hidden"], config['data']['classes']),
+                BYOLProjectionHead(features, supervised_head_params["hidden"], ),
                 torch.nn.Softmax(dim=-1)
             )
             # ignore targets with value (aka class index) of -1
             self.supervised_loss_func = torch.nn.CrossEntropyLoss(ignore_index=-1)
         elif supervised_head_params['training_mode'] == 'dirichlet':
+            num_outputs = supervised_head_params['out']
+            logging.info('Adding supervised head in dirichlet mode, {} outputs'.format(num_outputs))
             self.supervised_head = nn.Sequential(
-                BYOLProjectionHead(features, supervised_head_params["hidden"], supervised_head_params['out']),
+                BYOLProjectionHead(features, supervised_head_params["hidden"], num_outputs),
                 efficientnet_custom.ScaledSigmoid()   # sigmoid from 1 to 100
             )
             # my losses. code uses the wrong input convention (torch does preds, labels, but I did labels, preds) - adjust with lambda

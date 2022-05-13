@@ -1,10 +1,11 @@
 from .imagenette import Imagenette_DataModule_Eval, Imagenette_DataModule
 from .gzmnist import GalaxyMNIST_DataModule, GalaxyMNIST_DataModule_Eval
 from .gz2 import GZ2_DataModule, GZ2_DataModule_Eval
-from .decals_dr5 import Decals_DataModule, Decals_DataModule_Eval
-from .legs import Legs_DataModule, Legs_DataModule_Eval
+from .decals_dr5 import Decals_DataModule
+from .legs import Legs_DataModule
 from .rgz import RGZ_DataModule, RGZ_DataModule_Eval
 from .cifar10 import CIFAR10_DataModule_Eval, CIFAR10_DataModule
+from .generic_galaxy import Galaxy_DataModule, Galaxy_DataModule_Eval
 
 # Load data and record hyperparameters #
 datasets = {
@@ -14,19 +15,23 @@ datasets = {
     },
     "gzmnist": {
         "pretrain": GalaxyMNIST_DataModule,
-        "linear": GalaxyMNIST_DataModule_Eval,
+        "linear": Galaxy_DataModule_Eval,
     },
     "gz2": {
         "pretrain": GZ2_DataModule,
-        "linear": GZ2_DataModule_Eval,
+        "linear": Galaxy_DataModule_Eval,
     },
     "decals_dr5": {
         "pretrain": Decals_DataModule,
-        "linear": Decals_DataModule_Eval,
+        "linear": Galaxy_DataModule_Eval,
     },
     "legs": {
         "pretrain": Legs_DataModule,
-        "linear": Legs_DataModule_Eval,
+        "linear": Galaxy_DataModule_Eval,
+    },
+    "legs_and_rings": {
+        "pretrain": Legs_DataModule,
+        "linear": Galaxy_DataModule_Eval,  # not used
     },
     "rgz": {
         "pretrain": RGZ_DataModule,
