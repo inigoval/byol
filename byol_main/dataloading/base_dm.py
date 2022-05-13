@@ -67,16 +67,24 @@ class Base_DataModule(pl.LightningDataModule):
     def update_transforms(self, D_train):
         # if mu (and sig, implicitly) has been explicitly set, trust it is correct
         if self.mu == 0. and not self.config["debug"]:
+
+            original_T_train_views = self.T_train.n_views
+            # temporarily set one view to calculate mu, sig easily
+            self.T_train.n_views = 1  
+
             mu, sig = compute_mu_sig_images(D_train, batch_size=1000)
             self.mu, self.sig = mu, sig
 
             # Define transforms with calculated values
             self.T_train.update_normalization(mu, sig)
             self.T_test.update_normalization(mu, sig)
+
+            # restore to normal 2-view mode (assumed the only sensible option)
+            self.T_train.n_views = original_T_train_views 
         else:
             logging.info('Skipping mu/sig calculation')
 
-        self.T_train.n_views = 2
+
 
 
 class Base_DataModule_Eval(pl.LightningDataModule):
@@ -91,6 +99,9 @@ class Base_DataModule_Eval(pl.LightningDataModule):
 
         self.T_train = ReduceView(encoder, config, train=True)
         self.T_test = ReduceView(encoder, config, train=False)
+
+        # hardcoded default for now, currently always 2 except within mu/sig calculation
+        self.T_train.n_views = 2  
 
         self.data = {}
 

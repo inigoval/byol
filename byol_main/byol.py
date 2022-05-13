@@ -10,6 +10,9 @@ from lightly.models.utils import deactivate_requires_grad
 from lightly.models.utils import update_momentum
 from pytorch_lightning.callbacks import Callback
 
+from zoobot.pytorch.estimators import efficientnet_custom
+from zoobot.pytorch.training import losses
+
 from byol_main.evaluation import Lightning_Eval
 from byol_main.networks.models import _get_backbone
 
@@ -123,19 +126,30 @@ class BYOL_Supervised(BYOL):
         # re-use the projection head pattern
         # also re-use the dimension
         features = self.config["model"]["features"]
-        sup_head_dims = self.config["supervised_head"]
-        num_classes = config['data']['classes']
-        # remember this has batch-norm
-        self.supervised_head = nn.Sequential(
-            BYOLProjectionHead(features, sup_head_dims["hidden"], num_classes),
-            torch.nn.Softmax(dim=-1)
-        )
+        supervised_head_params = self.config["supervised_head"]
 
-        # input, target convention
-        # classification loss
-        self.supervised_loss_func = torch.nn.CrossEntropyLoss(ignore_index=-1)
+        if supervised_head_params['training_mode'] == 'classification':
 
-        # TODO add dirichlet loss
+            # remember this has batch-norm
+            self.supervised_head = nn.Sequential(
+                BYOLProjectionHead(features, supervised_head_params["hidden"], config['data']['classes']),
+                torch.nn.Softmax(dim=-1)
+            )
+            # ignore targets with value (aka class index) of -1
+            self.supervised_loss_func = torch.nn.CrossEntropyLoss(ignore_index=-1)
+        elif supervised_head_params['training_mode'] == 'dirichlet':
+            self.supervised_head = nn.Sequential(
+                BYOLProjectionHead(features, supervised_head_params["hidden"], supervised_head_params['out']),
+                efficientnet_custom.ScaledSigmoid()   # sigmoid from 1 to 100
+            )
+            # my losses. code uses the wrong input convention (torch does preds, labels, but I did labels, preds) - adjust with lambda
+            # sum is over questions as losses.multiquestion_loss gives loss like (batch, neg_log_prob_per_question)
+            def dirichlet_loss_aggregated_to_scalar(preds, labels):
+                dirichlet_loss = losses.calculate_multiquestion_loss(labels, preds, supervised_head_params['question_index_groups'])
+                return torch.mean(dirichlet_loss)  # over both (batch, question)
+                # p of (N=0, k=0) = 1 -> neg log p = 0 -> no effect on sum, but will reduce mean. Only absolute value though, not gradients per se if normalised
+
+            self.supervised_loss_func = dirichlet_loss_aggregated_to_scalar
 
 # I'm splitting self.project into two steps, self.represent then self.project, so I can use the rep without recalculating
 
@@ -182,27 +196,19 @@ class BYOL_Supervised(BYOL):
         contrastive_loss = 0.5 * (self.criterion(p0, z1) + self.criterion(p1, z0))
 
         supervised_head_out = self.supervised_head(y0)
-        # TODO will alter for dirichlet
-        print(supervised_head_out)
-        print(labels)
 
-        labels[0] = -1
-
-        # ignore targets with value (aka class index) of -1
         supervised_loss = self.supervised_loss_func(supervised_head_out, labels)  
-        # print(supervised_loss)
-
-        loss = contrastive_loss + self.config['supervised_loss_weight'] * supervised_loss
-
-        # complications: 
-        # handling classification labels which are missing aka -1
-        # (handling vote counts with 0 answers should be easy, dirichlet can ignore)
-        # (weighting with missing labels should be okay: loss will be per batch element, total doesn't matter)
-
-        print(supervised_loss, contrastive_loss, loss)
 
         # keep same name for wandb comparison
+        # print('supervised vs contrastive: ', supervised_loss, contrastive_loss)
         self.log("train/loss", contrastive_loss, on_step=False, on_epoch=True)
-        self.log("train/supervised_loss", supervised_loss, on_step=False, on_epoch=True)  
+        self.log("train/supervised_loss", supervised_loss, on_step=False, on_epoch=True) 
+
+        # normalise supervised loss by contrastive loss
+        # will have the gradients from supervised loss, but scaled to by similar to contrastive loss
+        supervised_normalising_constant = torch.abs(contrastive_loss.detach()) / supervised_loss.detach()
+        loss = contrastive_loss + self.config['supervised_loss_weight'] * supervised_normalising_constant * supervised_loss  
+ 
+        # print('train/total_weighted_loss: ', loss)
         self.log("train/total_weighted_loss", loss, on_step=False, on_epoch=True)  
         return loss
