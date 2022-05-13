@@ -31,11 +31,11 @@ class Decals_DataModule(generic_galaxy.Galaxy_DataModule):
         else:
             raise ValueError(self.config['labels'])
     
-        label_cols, (train_catalog, val_catalog, test_catalog) = catalog_creation_func(self.path, self.config['debug'])
+        label_cols, (train_catalog, val_catalog, test_catalog, unlabelled_catalog) = catalog_creation_func(self.path, self.config['debug'])
 
         self.adjust_mu_and_std_from_subset(train_catalog, label_cols, size=5000)
 
-        self.create_transformed_datasets_from_catalogs(label_cols, train_catalog, val_catalog, test_catalog)
+        self.create_transformed_datasets_from_catalogs(label_cols, train_catalog, val_catalog, test_catalog, unlabelled_catalog)
 
 
 

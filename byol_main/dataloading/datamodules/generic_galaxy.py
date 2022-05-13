@@ -1,4 +1,7 @@
 import logging
+from typing import List
+
+import pandas as pd
 
 from pytorch_galaxy_datasets import galaxy_dataset
 
@@ -20,10 +23,38 @@ class Galaxy_DataModule(Base_DataModule):
             train_catalog.sample(size), label_cols=label_cols, transform=self.T_train)
         self.update_transforms(D_train)
 
-    def create_transformed_datasets_from_catalogs(self, label_cols, train_catalog, val_catalog, test_catalog):
+    def create_transformed_datasets_from_catalogs(
+        self,
+        training_label_cols: List,
+        train_catalog: pd.DataFrame,
+        val_catalog: pd.DataFrame,
+        test_catalog: pd.DataFrame,
+        unlabelled_catalog=pd.DataFrame()  # optional, not all datasets have unlabelled data
+        ):
+        """
+        Assign keys of self.data (e.g. self.data['train']) to GalaxyDataset's created from the catalogs above.
+        These are then used for training BYOL ('train') or for knn evaluation ('val', 'labelled')
+
+        All catalogs are assumed to have label column(s) even if e.g. -1 everywhere.
+        
+        train_catalog should have training_label_cols (e.g. the GZ vote counts, or simply ['label']).
+        Expected to be either classification target or vote counts.
+        If no supervised head, these are ignored.
+
+        val and labelled catalogs should have a single 'label' column with integer classification targets
+        these are used for knn validation
+        (ideally, labelled catalog should exclude val catalog to avoid cheating TODO)
+
+        Args:
+            training_label_cols (list): Catalog columns to use as targets during training. Only used if BYOL includes supervised head
+            train_catalog (pd.DataFrame): _description_
+            val_catalog (pd.DataFrame): _description_
+            test_catalog (pd.DataFrame): _description_
+            unlabelled_catalog (pd.DataFrame): optional (default empty dataframe). If passed, added to train_catalog for constrastive training. Ignored by supervised head.
+        """
         # Re-initialise dataset with new mu and sig values
         self.data["train"] = galaxy_dataset.GalaxyDataset(
-            catalog=train_catalog, label_cols=label_cols, transform=self.T_train)
+            catalog=pd.concat([train_catalog, unlabelled_catalog]), label_cols=training_label_cols, transform=self.T_train)
         # Initialise individual datasets with test transform (for evaluation)
         # these must always be classification problems with a int label, for knn to make sense
         # val used for knn input, searched within feature/target bank

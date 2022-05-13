@@ -4,11 +4,9 @@ import logging
 
 import pandas as pd
 # https://github.com/mwalmsley/pytorch-galaxy-datasets
-from sklearn.model_selection import train_test_split
 
 from pytorch_galaxy_datasets import galaxy_dataset
-from pytorch_galaxy_datasets.prepared_datasets import legs_setup
-from foundation.datasets import legs, dataset_utils
+from foundation.datasets import legs
 
 from byol_main.dataloading.datamodules import generic_galaxy
 
@@ -22,17 +20,18 @@ class Legs_DataModule(generic_galaxy.Galaxy_DataModule):
 
     def setup(self, stage=None):
 
-        if self.config['labels'] == 'classification':
+        if self.config['catalog_to_use'] == 'smooth_vs_featured':
             catalog_creation_func = legs.legs_smooth_vs_featured
-        elif self.config['labels'] == 'dirichlet':
+        elif self.config['catalog_to_use'] == 'labelled_dirichlet_with_rings':
             # currently only gives labelled data, will extend
-            catalog_creation_func = legs.legs_dirichlet_with_rings
+            catalog_creation_func = legs.legs_labelled_dirichlet_with_rings
+        elif self.config['catalog_to_use'] == 'all_dirichlet_with_rings':
+            catalog_creation_func = legs.legs_all_dirichlet_with_rings
         else:
-            raise ValueError(self.config['labels'])
+            raise ValueError(self.config['catalog_to_use'])
     
-        label_cols, (train_catalog, val_catalog, test_catalog) = catalog_creation_func(
+        label_cols, (train_catalog, val_catalog, test_catalog, unlabelled_catalog) = catalog_creation_func(
             self.path, self.config['debug'], download=True)
-        unlabelled_catalog = pd.DataFrame()  # for now, no unlabelled
 
         self.adjust_mu_and_std_from_subset(train_catalog, label_cols, size=5000)
 
