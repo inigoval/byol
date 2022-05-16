@@ -50,6 +50,7 @@ def _get_backbone(config):
         net[0] = nn.Conv2d(n_c, 64, kernel_size=3, stride=1, padding=1, bias=False)
 
     features = config["model"]["features"]  # e.g. 512
+    # TODO need to check if effnet includes these conv/avg pool layers already - zoobot does
     backbone = nn.Sequential(
         *list(net.children())[:-1],  # resnet minus classification layer
         nn.Conv2d(c_out, features, 1),  # another conv layer, to `features` channels

@@ -1,6 +1,7 @@
 import wandb
 import pytorch_lightning as pl
 import logging
+import time
 
 from pytorch_lightning.callbacks import LearningRateMonitor
 
@@ -28,8 +29,8 @@ def run_contrastive_pretraining(config, wandb_logger, trainer_settings):
         save_on_train_epoch_end=True,
         auto_insert_metric_name=False,
         verbose=True,
-        dirpath="wandb/",
-        filename="{train/loss:.3f}",
+        dirpath="wandb/" + config['timestamp'],  # e.g. byol/files/wandb/smth
+        # filename="{train/loss:.3f}",
         save_weights_only=True,
     )
 
@@ -134,6 +135,8 @@ def main():
 
     config = load_config()
     # update_config(config)
+    config['timestamp'] = str(time.time())
+
 
     # TODO could probably be directly included in config rather than config['compute'] indexing this
     trainer_settings = {
@@ -144,7 +147,7 @@ def main():
     # Initialise wandb logger, change this if you want to use a different logger #
     paths = Path_Handler()
     path_dict = paths._dict()
-    wandb_save_dir = path_dict["files"]
+    wandb_save_dir = path_dict["files"]  # e.g. byol/files
     wandb_logger = pl.loggers.WandbLogger(
         project=config["project_name"],
         save_dir=wandb_save_dir,
