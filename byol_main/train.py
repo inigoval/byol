@@ -1,11 +1,11 @@
 import wandb
 import pytorch_lightning as pl
 import logging
-import time
+import os
 
 from pytorch_lightning.callbacks import LearningRateMonitor
 
-from byol_main.paths import Path_Handler
+# from byol_main.paths import Path_Handler
 from byol_main.dataloading.datamodules import datasets
 from byol_main.byol import BYOL, BYOL_Supervised, Update_M
 from byol_main.nnclr import NNCLR
@@ -23,13 +23,19 @@ def run_contrastive_pretraining(config, wandb_logger, trainer_settings):
         "min_loss": {"mode": "min", "monitor": "train/loss"},
         "last": {"monitor": None},
     }
+
+    experiment_dir = config['files'] / config['run_id']
+    if not os.path.isdir(experiment_dir):
+        os.mkdir(experiment_dir)
+
     pretrain_checkpoint = pl.callbacks.ModelCheckpoint(
         **checkpoint_mode[config["checkpoint_mode"]],
         every_n_epochs=1,
         save_on_train_epoch_end=True,
         auto_insert_metric_name=False,
         verbose=True,
-        dirpath="wandb/" + config['timestamp'],  # e.g. byol/files/wandb/smth
+        # dirpath="wandb/" + config['timestamp'],  # e.g. byol/files/wandb/smth. Relative to repo root, does not auto-add wandb
+        dirpath=experiment_dir / 'checkpoints',  # e.g. byol/files/wandb/smth. Relative to repo root, does not auto-add wandb
         # filename="{train/loss:.3f}",
         save_weights_only=True,
     )
@@ -135,7 +141,9 @@ def main():
 
     config = load_config()
     # update_config(config)
-    config['timestamp'] = str(time.time())
+
+    wandb.init()
+    config['run_id'] = str(wandb.run.id)
 
 
     # TODO could probably be directly included in config rather than config['compute'] indexing this
@@ -145,12 +153,18 @@ def main():
     }
 
     # Initialise wandb logger, change this if you want to use a different logger #
-    paths = Path_Handler()
-    path_dict = paths._dict()
-    wandb_save_dir = path_dict["files"]  # e.g. byol/files
+    # paths = Path_Handler()
+    # path_dict = paths._dict()
+    # wandb_save_dir = path_dict["files"] / 'wandb'  # e.g. (repo aka byol)/files
+    # independent of model checkpoint loc
+
+    # structure will be e.g.
+    # config['files'] / l5ikqywp / checkpoints / {}.ckpt
+    # config['files'] / l5ikqywp / run-20220513_122412-l5ikqywp / (wandb stuff)
+
     wandb_logger = pl.loggers.WandbLogger(
         project=config["project_name"],
-        save_dir=wandb_save_dir,
+        save_dir=config['files'] / config['run_id'],  # and will then add e.g. run-20220513_122412-l5ikqywp automatically
         reinit=True,
         config=config,
     )
