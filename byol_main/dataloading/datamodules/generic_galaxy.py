@@ -1,13 +1,16 @@
+from distutils.command.config import config
 import logging
 from typing import List
 
 import pandas as pd
 
+import pytorch_lightning as pl
+from torch.utils.data import DataLoader
+
 from pytorch_galaxy_datasets import galaxy_dataset
-
 from foundation.datasets import dataset_utils
-
 from byol_main.dataloading.base_dm import Base_DataModule, Base_DataModule_Eval
+from byol_main.dataloading.transforms import ReduceView
 
 
 class Galaxy_DataModule(Base_DataModule):
@@ -81,6 +84,40 @@ class Galaxy_DataModule(Base_DataModule):
 
     def setup(self, stage=None):
         raise NotImplementedError
+
+
+
+class GalaxyInferenceDataModule(pl.LightningDataModule):
+
+    def __init__(self, encoder, catalog, config):
+        super().__init__()
+        # self.mu, self.sig = mu, sig
+
+        # config must include mu, sig
+        # used by ReduceView.pre_normalize
+
+        # train flag controls if rotations/flips will be applied
+        self.T_test = ReduceView(encoder, config, train=False)
+
+        self.id_strs = list(catalog['id_str'].values)
+
+        self.data = {
+            'predict': galaxy_dataset.GalaxyDataset(
+            label_cols=['label'], catalog=catalog, transform=self.T_test)
+        }  
+
+    def predict_dataloader(self):
+        n_workers = self.config["num_workers"]
+        batch_size = self.config["linear"]["batch_size"]
+        loader = DataLoader(
+            self.data["predict"],
+            batch_size,
+            shuffle=False,  # crucial
+            num_workers=n_workers,
+            prefetch_factor=self.config['prefetch_factor'],
+        )
+        return loader 
+
 
 
 class Galaxy_DataModule_Eval(Base_DataModule_Eval):
