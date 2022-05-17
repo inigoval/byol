@@ -242,7 +242,7 @@ class linear_net(pl.LightningModule):
         self.dummy_param = nn.Parameter(torch.empty(0))
 
         paths = Path_Handler()
-        self.paths = paths.dict
+        self.paths = paths._dict()
 
     def forward(self, x):
         """Return prediction"""
