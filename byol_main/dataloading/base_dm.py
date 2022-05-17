@@ -67,7 +67,7 @@ class Base_DataModule(pl.LightningDataModule):
     def update_transforms(self, D_train):
         # if mu (and sig, implicitly) has been explicitly set, trust it is correct
         if self.mu == 0.:
-            logging.info('Skipping mu/sig calculation - mu, sig explicitly set to {:.3f}, {:.3f}'.format(self.mu, self.sig))
+            logging.info('Skipping mu/sig calculation - mu, sig explicitly set to {:.4f}, {:.4f}'.format(self.mu, self.sig))
         elif self.config["debug"]:
             logging.info('Skipping mu/sig calculation - debug mode')
         else:
@@ -77,6 +77,7 @@ class Base_DataModule(pl.LightningDataModule):
 
             mu, sig = compute_mu_sig_images(D_train, batch_size=1000)
             self.mu, self.sig = mu, sig
+            logging.info('mu, sig re-calculated as set to {:.4f}, {:.4f}'.format(self.mu, self.sig))
 
             # Define transforms with calculated values
             self.T_train.update_normalization(mu, sig)
