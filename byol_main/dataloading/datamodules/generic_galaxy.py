@@ -92,6 +92,7 @@ class GalaxyInferenceDataModule(pl.LightningDataModule):
     def __init__(self, encoder, catalog, config):
         super().__init__()
         # self.mu, self.sig = mu, sig
+        self.config = config
 
         # config must include mu, sig
         # used by ReduceView.pre_normalize
