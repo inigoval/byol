@@ -13,7 +13,12 @@ from byol_main.dataloading.datamodules import generic_galaxy
 
 class Legs_DataModule(generic_galaxy.Galaxy_DataModule):
     def __init__(self, config):
-        super().__init__(config, mu=(0.,), sig=(1.,))  # TODO set explicitly
+        super().__init__(
+            config,
+            mu=((0.1207394003868103, 0.11860499531030655, 0.11299177259206772)),
+            sig=(0.21977204084396362, 0.21977204084396362, 0.21977204084396362)
+        )
+
 
     def prepare_data(self):
         pass
