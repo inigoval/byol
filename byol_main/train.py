@@ -34,9 +34,8 @@ def run_contrastive_pretraining(config, wandb_logger, trainer_settings):
         save_on_train_epoch_end=True,
         auto_insert_metric_name=False,
         verbose=True,
-        # dirpath="wandb/" + config['timestamp'],  # e.g. byol/files/wandb/smth. Relative to repo root, does not auto-add wandb
-        dirpath=experiment_dir / 'checkpoints',  # e.g. byol/files/wandb/smth. Relative to repo root, does not auto-add wandb
-        # filename="{train/loss:.3f}",
+        dirpath=experiment_dir / 'checkpoints',  # e.g. byol/files/(run_id)/checkpoints/12-344-18.134.ckpt. 
+        filename="{epoch}-{step}-{train/loss:.3f}",
         save_weights_only=True,
     )
 
