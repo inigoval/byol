@@ -77,7 +77,7 @@ class Base_DataModule(pl.LightningDataModule):
 
             mu, sig = compute_mu_sig_images(D_train, batch_size=1000)
             self.mu, self.sig = mu, sig
-            logging.info('mu, sig re-calculated as set to {:.4f}, {:.4f}'.format(self.mu, self.sig))
+            logging.info('mu, sig re-calculated as set to {}, {}'.format(self.mu, self.sig))
 
             # Define transforms with calculated values
             self.T_train.update_normalization(mu, sig)

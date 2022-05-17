@@ -238,6 +238,7 @@ class linear_net(pl.LightningModule):
 
         self.train_acc = tm.Accuracy(average="micro", top_k=1, threshold=0)
         self.val_acc = tm.Accuracy(average="micro", top_k=1, threshold=0)
+        self.test_acc = tm.Accuracy(average="micro", top_k=1, threshold=0)
 
         self.dummy_param = nn.Parameter(torch.empty(0))
 
@@ -280,6 +281,23 @@ class linear_net(pl.LightningModule):
         # acc = tmF.accuracy(y_pred, y)
         self.val_acc(logits, y)
         self.log("linear_eval/val_acc", self.val_acc, on_step=False, on_epoch=True)
+
+    # renamed duplicate of self.validation_step
+    def test_step(self, batch, batch_idx):
+        x, y = batch
+        x = x.type_as(self.dummy_param)
+
+        x = x.view(x.shape[0], -1)
+        logits = self.forward(x)
+        # y_pred = logits.softmax(dim=-1)
+
+        loss = self.ce_loss(logits, y)
+        self.log("linear_eval/test_loss", loss)
+
+        # predictions = torch.argmax(logits, dim=1).int()
+        # acc = tmF.accuracy(y_pred, y)
+        self.test_acc(logits, y)
+        self.log("linear_eval/test_acc", self.test_acc, on_step=False, on_epoch=True)
 
     def configure_optimizers(self):
         lr = self.config["linear"]["lr"]
