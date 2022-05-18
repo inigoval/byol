@@ -30,36 +30,33 @@ class Base_DataModule(pl.LightningDataModule):
         return
 
     def train_dataloader(self):
-        # Batch all data together
-        batch_size = self.config["pretrain_batch_size"]
-        n_workers = self.config["num_workers"]
         loader = DataLoader(
             self.data["train"],
-            batch_size,
+            batch_size=self.config["pretrain_batch_size"],
             shuffle=True,
-            num_workers=n_workers,
-            prefetch_factor=20,
+            num_workers=self.config["num_workers"],
+            prefetch_factor=self.config['prefetch_factor'],
+            pin_memory=self.config['pin_memory'],
+            persistent_workers=self.config["persistent_workers"]
         )
         return loader
 
     def val_dataloader(self):
-        n_workers = self.config["num_workers"]
         loader = DataLoader(
             self.data["val"],
             batch_size=self.config["data"]["val_batch_size"],
-            num_workers=n_workers,
-            prefetch_factor=20,
+            num_workers=self.config["num_workers"],
+            prefetch_factor=self.config['prefetch_factor'],
             persistent_workers=self.config["persistent_workers"],
         )
         return loader
 
     def test_dataloader(self):
-        n_workers = self.config["num_workers"]
         loader = DataLoader(
             self.data["test"],
             batch_size=self.config["data"]["val_batch_size"],
-            num_workers=n_workers,
-            prefetch_factor=20,
+            num_workers=self.config["num_workers"],
+            prefetch_factor=self.config['prefetch_factor'],
             persistent_workers=self.config["persistent_workers"], 
         )
         return loader

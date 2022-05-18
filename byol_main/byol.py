@@ -106,6 +106,7 @@ class BYOL(
             self.m = 1 - (1 - self.m) * (cos(pi * epoch / n_epochs) + 1) / 2
 
 
+
 class Update_M(Callback):
     """Updates EMA momentum"""
 
@@ -180,6 +181,26 @@ class BYOL_Supervised(BYOL):
         # prediction head not EMA'd as target (averaged) network doesn't need one
         # similarly don't need to EMA the supervised head as target network doesn't need one
 
+        contrastive_loss, supervised_loss = self.calculate_losses(batch)
+
+        # keep same name for wandb comparison
+        # print('supervised vs contrastive: ', supervised_loss, contrastive_loss)
+        self.log("train/loss", contrastive_loss, on_step=False, on_epoch=True)
+        self.log("train/supervised_loss", supervised_loss, on_step=False, on_epoch=True) 
+
+        # normalise supervised loss by contrastive loss
+        # will have the gradients from supervised loss, but scaled to by similar to contrastive loss
+        supervised_normalising_constant = torch.abs(contrastive_loss.detach()) / supervised_loss.detach()
+        loss = contrastive_loss + self.config['supervised_loss_weight'] * supervised_normalising_constant * supervised_loss  
+ 
+        # print('train/total_weighted_loss: ', loss)
+        self.log("train/total_weighted_loss", loss, on_step=False, on_epoch=True)  
+        return loss
+
+
+    def calculate_losses(self, batch):
+        # used in both train and val, so must have no side-effects on model(s)
+
         # Load in data
         # transforms.MultiView gives 2 views of same image
         (x0, x1), labels = batch
@@ -203,16 +224,15 @@ class BYOL_Supervised(BYOL):
 
         supervised_loss = self.supervised_loss_func(supervised_head_out, labels)  
 
-        # keep same name for wandb comparison
-        # print('supervised vs contrastive: ', supervised_loss, contrastive_loss)
-        self.log("train/loss", contrastive_loss, on_step=False, on_epoch=True)
-        self.log("train/supervised_loss", supervised_loss, on_step=False, on_epoch=True) 
+        return contrastive_loss, supervised_loss
+    
 
-        # normalise supervised loss by contrastive loss
-        # will have the gradients from supervised loss, but scaled to by similar to contrastive loss
-        supervised_normalising_constant = torch.abs(contrastive_loss.detach()) / supervised_loss.detach()
-        loss = contrastive_loss + self.config['supervised_loss_weight'] * supervised_normalising_constant * supervised_loss  
- 
-        # print('train/total_weighted_loss: ', loss)
-        self.log("train/total_weighted_loss", loss, on_step=False, on_epoch=True)  
-        return loss
+    def validation_step(self, batch, batch_idx):
+        
+        # get contrastive and supervised loss on validation set
+        contrastive_loss, supervised_loss = self.calculate_losses(batch)
+        self.log("val/loss", contrastive_loss, on_step=False, on_epoch=True)
+        self.log("val/supervised_loss", supervised_loss, on_step=False, on_epoch=True) 
+
+        super().validation_step(batch, batch_idx)  # knn validation
+

@@ -125,6 +125,9 @@ class Lightning_Eval(pl.LightningModule):
             log_examples(self.logger, self.trainer.datamodule.data["train"])
 
     def on_validation_start(self):
+        self.setup_knn_validation()
+
+    def setup_knn_validation(self):
         with torch.no_grad():
             data_bank = self.trainer.datamodule.data[
                 "labelled"
@@ -162,17 +165,21 @@ class Lightning_Eval(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         if hasattr(self, "feature_bank") and hasattr(self, "target_bank"):
-            # Load batch
-            x, y = batch
+            self.knn_validation_step(batch)
+        # used as super() by BYOL_Supervised
+
+    def knn_validation_step(self, batch):
+        # Load batch
+        x, y = batch
             # Extract + normalize features
-            feature = self.forward(x).squeeze()
-            feature = F.normalize(feature, dim=1)
+        feature = self.forward(x).squeeze()
+        feature = F.normalize(feature, dim=1)
 
             # Load feature bank and labels
-            feature_bank = self.feature_bank.type_as(x)
-            target_bank = self.target_bank.type_as(y)
+        feature_bank = self.feature_bank.type_as(x)
+        target_bank = self.target_bank.type_as(y)
 
-            pred_labels = knn_predict(
+        pred_labels = knn_predict(
                 feature,  # feature to search for
                 feature_bank,  # feature bank to identify NN within
                 target_bank,  # labels of those features in feature_bank, same index
@@ -181,11 +188,11 @@ class Lightning_Eval(pl.LightningModule):
                 knn_t=self.config["knn"]["temperature"],
             )
 
-            top1 = pred_labels[:, 0]
+        top1 = pred_labels[:, 0]
 
             # Compute accuracy
             # assert top1.min() >= 0
-            self.knn_acc.update(top1, y)
+        self.knn_acc.update(top1, y)
 
     def validation_epoch_end(self, outputs):
         if hasattr(self, "feature_bank") and hasattr(self, "target_bank"):
