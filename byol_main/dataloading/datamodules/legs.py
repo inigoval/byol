@@ -48,10 +48,16 @@ class Legs_DataModule(generic_galaxy.Galaxy_DataModule):
 
         # Initialise individual datasets with test transform (for evaluation)
         # use any labelled data NOT in 'labelled' as feature bank
+        # 'val' is for knn, must be classification e.g. rings
+        # missing labels are encoded as -1
         self.data["val"] = galaxy_dataset.GalaxyDataset(
-            label_cols=['label'], catalog=val_catalog, transform=self.T_test)
+            label_cols=['label'], catalog=val_catalog.query('label >= 0'), transform=self.T_test)
+        # 'val_supervised' is for supervised head (if present, otherwise ignored)
+        self.data['val_supervised'] = galaxy_dataset.GalaxyDataset(
+            label_cols=label_cols, catalog=val_catalog, transform=self.T_test)
+        # 'test' is not used
         self.data["test"] = galaxy_dataset.GalaxyDataset(
-            label_cols=['label'], catalog=test_catalog, transform=self.T_test)  # not used
+            label_cols=['label'], catalog=test_catalog, transform=self.T_test)
 
         # only used for knn feature bank (and so has no effect other than val metric)
         self.data["labelled"] = galaxy_dataset.GalaxyDataset(
