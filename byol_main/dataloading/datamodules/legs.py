@@ -60,8 +60,9 @@ class Legs_DataModule(generic_galaxy.Galaxy_DataModule):
             label_cols=['label'], catalog=test_catalog, transform=self.T_test)
 
         # only used for knn feature bank (and so has no effect other than val metric)
+        # also needs to be filtered to avoid missing labels
         self.data["labelled"] = galaxy_dataset.GalaxyDataset(
-            label_cols=['label'], catalog=test_catalog.sample(10000),  transform=self.T_test)  # TODO temp
+            label_cols=['label'], catalog=test_catalog.query('label >= 0').sample(10000),  transform=self.T_test)  # TODO temp
 
 
 if __name__ == '__main__':
