@@ -51,9 +51,9 @@ class Legs_DataModule(generic_galaxy.Galaxy_DataModule):
         # Initialise individual datasets with test transform (for evaluation)
         # use any labelled data NOT in 'labelled' as feature bank
         self.data["val"] = galaxy_dataset.GalaxyDataset(
-            label_cols=['label'], catalog=val_catalog, transform=self.T_test)
+            label_cols=['label'], catalog=val_catalog.sample(5000), transform=self.T_test)
         self.data["test"] = galaxy_dataset.GalaxyDataset(
-            label_cols=['label'], catalog=test_catalog, transform=self.T_test)  # not used
+            label_cols=['label'], catalog=test_catalog.sample(5000), transform=self.T_test)  # not used
 
         # only used for knn feature bank (and so has no effect other than val metric)
         self.data["labelled"] = galaxy_dataset.GalaxyDataset(
