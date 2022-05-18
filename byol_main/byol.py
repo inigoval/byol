@@ -227,12 +227,18 @@ class BYOL_Supervised(BYOL):
         return contrastive_loss, supervised_loss
     
 
-    def validation_step(self, batch, batch_idx):
-        
-        # get contrastive and supervised loss on validation set
-        contrastive_loss, supervised_loss = self.calculate_losses(batch)
-        self.log("val/loss", contrastive_loss, on_step=False, on_epoch=True)
-        self.log("val/supervised_loss", supervised_loss, on_step=False, on_epoch=True) 
+    # will only work if datamodule has seld.data['val_supervised'] key
+    # else will not be passed the extra dataloader_idx argument
+    def validation_step(self, batch, batch_idx, dataloader_idx):
+        if dataloader_idx == 0:
+            super().validation_step(batch, batch_idx)  # knn validation
+        elif dataloader_idx == 1:
+            # get contrastive and supervised loss on validation set
+            contrastive_loss, supervised_loss = self.calculate_losses(batch)
+            self.log("val/loss", contrastive_loss, on_step=False, on_epoch=True)
+            self.log("val/supervised_loss", supervised_loss, on_step=False, on_epoch=True) 
+        else:
+            raise ValueError(dataloader_idx)
 
-        super().validation_step(batch, batch_idx)  # knn validation
+
 

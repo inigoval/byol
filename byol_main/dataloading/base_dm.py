@@ -42,14 +42,26 @@ class Base_DataModule(pl.LightningDataModule):
         return loader
 
     def val_dataloader(self):
-        loader = DataLoader(
+        knn_loader = DataLoader(
             self.data["val"],
             batch_size=self.config["data"]["val_batch_size"],
             num_workers=self.config["num_workers"],
             prefetch_factor=self.config['prefetch_factor'],
             persistent_workers=self.config["persistent_workers"],
         )
-        return loader
+        if 'val_supervised' not in self.data.keys():
+            return knn_loader
+        else:
+            suphead_loader = DataLoader(
+                self.data["val_supervised"],
+                batch_size=self.config["data"]["val_batch_size"],
+                num_workers=self.config["num_workers"],
+                prefetch_factor=self.config['prefetch_factor'],
+                persistent_workers=self.config["persistent_workers"],
+            )
+        # validation_step will need additional dataloader_idx argument
+        # https://pytorch-lightning.readthedocs.io/en/stable/guides/data.html#multiple-validation-test-predict-dataloaders
+        return [knn_loader, suphead_loader]  
 
     def test_dataloader(self):
         loader = DataLoader(
