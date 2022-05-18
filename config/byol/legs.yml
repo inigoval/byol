@@ -54,9 +54,9 @@ lr: 0.06
 momentum: 0.9
 weight_decay: 0.0005
 pretrain_batch_size: 512
-opt: 'sgd'
+opt: 'adam'
 # Scheduler
-scheduler: 'cosine' # ['none', 'cosine', 'warmupcosine']
+scheduler: 'none' # ['none', 'cosine', 'warmupcosine']
 warmup_epochs: 10  # Only used in linear warmup cosine annealing
 
 # LARS

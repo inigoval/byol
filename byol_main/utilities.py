@@ -106,10 +106,10 @@ def _optimizer(params, config):
     if config["lars"]:
         opt = LARSWrapper(opt, eta=config["trust_coef"])
 
+    # pick scheduler
     if config["scheduler"] == "cosine":
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(opt, config["model"]["n_epochs"])
         return [opt], [scheduler]
-
     elif config["scheduler"] == "warmupcosine":
         scheduler = LinearWarmupCosineAnnealingLR(
             opt,
@@ -117,9 +117,10 @@ def _optimizer(params, config):
             max_epochs=config["train"]["n_epochs"],
         )
         return [opt], [scheduler]
-
-    elif config["scheduler"] == "None":
+    elif config["scheduler"].lower() == "none":
         return opt
+    else:
+        raise ValueError(config['scheduler'])
 
 
 def log_examples(wandb_logger, dset, n=18):
