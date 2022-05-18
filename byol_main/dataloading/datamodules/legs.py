@@ -43,8 +43,10 @@ class Legs_DataModule(generic_galaxy.Galaxy_DataModule):
         # might generalise later
 
         # train on all train+unlabelled data (labels not used)
+        # self.data["train"] = galaxy_dataset.GalaxyDataset(catalog=pd.concat(
+        #     [unlabelled_catalog, train_catalog], axis=0), label_cols=label_cols, transform=self.T_train)
         self.data["train"] = galaxy_dataset.GalaxyDataset(catalog=pd.concat(
-            [unlabelled_catalog, train_catalog], axis=0), label_cols=label_cols, transform=self.T_train)
+            [train_catalog], axis=0), label_cols=label_cols, transform=self.T_train)
 
         # Initialise individual datasets with test transform (for evaluation)
         # use any labelled data NOT in 'labelled' as feature bank
