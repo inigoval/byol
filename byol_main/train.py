@@ -69,68 +69,68 @@ def run_contrastive_pretraining(config, wandb_logger, trainer_settings):
     # config["data"]["sig"] = pretrain_data.sig
     # config["data"]["n_steps"] = len(pretrain_data.train_dataloader())
 
-    from torch.profiler import tensorboard_trace_handler
-    import torch
-    import glob
+    # from torch.profiler import tensorboard_trace_handler
+    # import torch
+    # import glob
 
-    # default scheduler
-    profiler = torch.profiler.profile(on_trace_ready=tensorboard_trace_handler(str(experiment_dir)), with_stack=True)
+    # # default scheduler
+    # profiler = torch.profiler.profile(on_trace_ready=tensorboard_trace_handler(str(experiment_dir)), with_stack=True)
 
-    with profiler:
-        profiler_callback = TorchTensorboardProfilerCallback(profiler)
+    # with profiler:
+    #     profiler_callback = TorchTensorboardProfilerCallback(profiler)
 
 
-        # List of callbacks
-        callbacks = [pretrain_checkpoint]
-        if wandb_logger is not None:
-            # only supported with a logger
-            callbacks += [LearningRateMonitor(logging_interval='step')]  # change to step, may be slow
-            # if config['profiler'] == 'kineto':
+    # List of callbacks
+    callbacks = [pretrain_checkpoint]
+    if wandb_logger is not None:
+        # only supported with a logger
+        callbacks += [LearningRateMonitor(logging_interval='step')]  # change to step, may be slow
+        # if config['profiler'] == 'kineto':
 
-            callbacks += [profiler_callback]
-                
+        # callbacks += [profiler_callback]
+            
 
-        # if config['profiler'] == 'advanced':
-        #     logging.info('Using advanced profiler')
-        #     profiler = AdvancedProfiler(dirpath=experiment_dir, filename='advanced_profile')  # .txt
-        # elif config['profiler'] == 'pytorch':
-        #     logging.info('Using pytorch profiler')
-        #     profiler = PyTorchProfiler(dirpath=experiment_dir, filename='pytorch_profile', row_limit=-1)  # .txt
-        # else:
-        #     logging.info('No profiler used')
-        #     profiler=None
+    if config['profiler'] == 'advanced':
+        logging.info('Using advanced profiler')
+        profiler = AdvancedProfiler(dirpath=experiment_dir, filename='advanced_profile')  # .txt
+    elif config['profiler'] == 'pytorch':
+        logging.info('Using pytorch profiler')
+        profiler = PyTorchProfiler(dirpath=experiment_dir, filename='pytorch_profile', row_limit=-1)  # .txt
+    else:
+        logging.info('No profiler used')
+        profiler=None
 
-        pre_trainer = pl.Trainer(
-            # gpus=1,
-            **trainer_settings[config["compute"]],
-            fast_dev_run=config["debug"],
-            max_epochs=config["model"]["n_epochs"],  # note that this will affect momentum of BYOL ensemble!
-            logger=wandb_logger,
-            deterministic=True,
-            callbacks=callbacks,
-            precision=config["precision"],
-            #    check_val_every_n_epoch=3,
-            log_every_n_steps=200,
-            profiler=profiler,
-            max_steps = 200  # TODO temp
-        )
+    pre_trainer = pl.Trainer(
+        # gpus=1,
+        **trainer_settings[config["compute"]],
+        fast_dev_run=config["debug"],
+        max_epochs=config["model"]["n_epochs"],  # note that this will affect momentum of BYOL ensemble!
+        logger=wandb_logger,
+        deterministic=True,
+        callbacks=callbacks,
+        precision=config["precision"],
+        #    check_val_every_n_epoch=3,
+        log_every_n_steps=200,
+        profiler=profiler,
+        # max_steps = 200  # TODO temp
+    )
 
-        # Initialise model #
-        models = {
-            "byol": BYOL, 
-            "byol_supervised": BYOL_Supervised,
-            "nnclr": NNCLR
-        }
-        model = models[config["type"]](config)
+    # Initialise model #
+    models = {
+        "byol": BYOL, 
+        "byol_supervised": BYOL_Supervised,
+        "nnclr": NNCLR
+    }
+    model = models[config["type"]](config)
 
-        config["model"]["output_dim"] = config["model"]["features"]
+    config["model"]["output_dim"] = config["model"]["features"]
 
-        # Train model #
-        pre_trainer.fit(model, pretrain_data)
-    
-    profile_art = wandb.Artifact(f"trace-{wandb.run.id}", type="profile")
-    profile_art.add_file(glob.glob(str(experiment_dir / "*.pt.trace.json"))[0], "trace.pt.trace.json")
-    wandb.run.log_artifact(profile_art)
+    # Train model #
+    pre_trainer.fit(model, pretrain_data)
+
+    # profile_art = wandb.Artifact(f"trace-{wandb.run.id}", type="profile")
+    # profile_art.add_file(glob.glob(str(experiment_dir / "*.pt.trace.json"))[0], "trace.pt.trace.json")
+    # wandb.run.log_artifact(profile_art)
 
     if not config['debug']:
         log_examples(wandb_logger, pretrain_data.data["train"])

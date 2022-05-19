@@ -34,7 +34,8 @@ class Base_DataModule(pl.LightningDataModule):
             self.data["train"],
             batch_size=self.config["pretrain_batch_size"],
             shuffle=True,
-            num_workers=self.config["num_workers"],
+            # num_workers=self.config["num_workers"],
+            num_workers=1,
             prefetch_factor=self.config['prefetch_factor'],
             pin_memory=self.config['pin_memory'],
             persistent_workers=self.config["persistent_workers"]
@@ -45,7 +46,8 @@ class Base_DataModule(pl.LightningDataModule):
         knn_loader = DataLoader(
             self.data["val"],
             batch_size=self.config["data"]["val_batch_size"],
-            num_workers=self.config["num_workers"],
+            # num_workers=self.config["num_workers"],
+            num_workers=1,
             prefetch_factor=self.config['prefetch_factor'],
             persistent_workers=self.config["persistent_workers"],
         )
@@ -57,7 +59,8 @@ class Base_DataModule(pl.LightningDataModule):
             suphead_loader = DataLoader(
                 self.data["val_supervised"],
                 batch_size=self.config["data"]["val_batch_size"],
-                num_workers=self.config["num_workers"],
+                # num_workers=self.config["num_workers"],
+            num_workers=1,
                 prefetch_factor=self.config['prefetch_factor'],
                 persistent_workers=self.config["persistent_workers"],
             )
@@ -69,7 +72,8 @@ class Base_DataModule(pl.LightningDataModule):
         loader = DataLoader(
             self.data["test"],
             batch_size=self.config["data"]["val_batch_size"],
-            num_workers=self.config["num_workers"],
+            # num_workers=self.config["num_workers"],
+            num_workers=1,
             prefetch_factor=self.config['prefetch_factor'],
             persistent_workers=self.config["persistent_workers"], 
         )
