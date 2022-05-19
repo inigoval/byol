@@ -5,8 +5,9 @@ compute: 'slurm'
 seed: 69
 debug: False
 num_workers: 8  # often overriden
-prefetch_factor: 30
+prefetch_factor: 10
+persistent_workers: False  # torch default is False
+pin_memory: True
 checkpoint_mode: 'last'
 knn_eval: True
 precision: 16 # [16, 32, 'bf16'], often overriden
-persistent_workers: False # default is False
