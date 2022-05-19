@@ -87,7 +87,7 @@ def run_contrastive_pretraining(config, wandb_logger, trainer_settings):
             callbacks += [LearningRateMonitor(logging_interval='step')]  # change to step, may be slow
             # if config['profiler'] == 'kineto':
 
-            callbacks += profiler_callback
+            callbacks += [profiler_callback]
                 
 
         # if config['profiler'] == 'advanced':
