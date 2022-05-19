@@ -58,10 +58,10 @@ def run_contrastive_pretraining(config, wandb_logger, trainer_settings):
 
     if config['profiler'] == 'advanced':
         logging.info('Using advanced profiler')
-        profiler = AdvancedProfiler(dirpath=experiment_dir, filename='advanced_profile.txt')
+        profiler = AdvancedProfiler(dirpath=experiment_dir, filename='advanced_profile')  # .txt
     elif config['profiler'] == 'pytorch':
         logging.info('Using pytorch profiler')
-        profiler = PyTorchProfiler(dirpath=experiment_dir, filename='pytorch_profile.txt', row_limit=-1)
+        profiler = PyTorchProfiler(dirpath=experiment_dir, filename='pytorch_profile', row_limit=-1)  # .txt
     else:
         logging.info('No profiler used')
         profiler=None
