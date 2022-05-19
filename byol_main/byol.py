@@ -235,8 +235,9 @@ class BYOL_Supervised(BYOL):
         elif dataloader_idx == 1:
             # get contrastive and supervised loss on validation set
             x, labels = batch
+            logging.info(x)
             x = x.type_as(self.dummy_param)
-            y = self.represent(x)
+            y = self.represent(x)  # not a great name - this is the representation, pre-projection
             supervised_head_out = self.supervised_head(y)
             supervised_loss = self.supervised_loss_func(supervised_head_out, labels)  
             self.log("val/supervised_loss", supervised_loss, on_step=False, on_epoch=True) 

@@ -1,6 +1,7 @@
 # uses dataset from pytorch-galaxy-datasets/galaxy_zoo_2.py
 # does not use the datamodule, as this code has different requirements (e.g. normalisation, augmentation choice, etc)
 import logging
+import numpy as np
 
 import pandas as pd
 # https://github.com/mwalmsley/pytorch-galaxy-datasets
@@ -52,7 +53,9 @@ class Legs_DataModule(generic_galaxy.Galaxy_DataModule):
         # missing labels are encoded as -1
         self.data["val"] = galaxy_dataset.GalaxyDataset(
             label_cols=['label'], catalog=val_catalog.query('label >= 0'), transform=self.T_test)
+    
         # 'val_supervised' is for supervised head (if present, otherwise ignored)
+        assert not np.any(val_catalog[label_cols].isna())  # all vote counts should be 0 or counts
         self.data['val_supervised'] = galaxy_dataset.GalaxyDataset(
             label_cols=label_cols, catalog=val_catalog, transform=self.T_test)
         # 'test' is not used
