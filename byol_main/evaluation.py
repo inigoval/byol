@@ -165,7 +165,7 @@ class Lightning_Eval(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         # this class isn't designed for supervised val loss from dataloader 1
-        # if error 'dataloader_idx' arg not expected, remove 'val_supervised' key from datamodule.data
+        # if error 'dataloader_idx' arg not expected, check config['type'] and base dm val setup
         # is overriden by BYOL_Supervised so shouldn't happen
         if hasattr(self, "feature_bank") and hasattr(self, "target_bank"):
             self.knn_validation_step(batch)

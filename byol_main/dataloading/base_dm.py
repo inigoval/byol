@@ -49,9 +49,11 @@ class Base_DataModule(pl.LightningDataModule):
             prefetch_factor=self.config['prefetch_factor'],
             persistent_workers=self.config["persistent_workers"],
         )
-        if 'val_supervised' not in self.data.keys():
+        if 'supervised' not in self.config['type']:
+            logging.info('Setting up datamodule with knn val dataloader only')
             return knn_loader
-        else:
+        else:  # e.g. type=byol_supervised
+            logging.info('Setting up datamodule with knn and supervised head val dataloaders')
             suphead_loader = DataLoader(
                 self.data["val_supervised"],
                 batch_size=self.config["data"]["val_batch_size"],
