@@ -53,7 +53,7 @@ def run_contrastive_pretraining(config, wandb_logger, trainer_settings):
     callbacks = [pretrain_checkpoint]
     if wandb_logger is not None:
         # only supported with a logger
-        callbacks += [LearningRateMonitor()]
+        callbacks += [LearningRateMonitor(logging_interval='step')]  # change to step, may be slow
 
     pre_trainer = pl.Trainer(
         # gpus=1,
@@ -63,9 +63,9 @@ def run_contrastive_pretraining(config, wandb_logger, trainer_settings):
         logger=wandb_logger,
         deterministic=True,
         callbacks=callbacks,
-        precision=config["precision"]
+        precision=config["precision"],
         #    check_val_every_n_epoch=3,
-        #    log_every_n_steps=10,
+        log_every_n_steps=200,
     )
 
     # Initialise model #

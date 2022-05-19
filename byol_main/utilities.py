@@ -1,3 +1,5 @@
+import logging
+
 import yaml
 import torch.nn as nn
 import torch.nn.functional as F
@@ -99,6 +101,9 @@ def _optimizer(params, config):
             weight_decay=w_decay,
         ),
     }
+
+    if config['opt'] == 'adam' and config['lr'] > 0.01:
+        logging.warning('Learning rate {} may be too high for adam'.format(config['lr']))
 
     opt = opts[config["opt"]](params)
 
