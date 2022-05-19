@@ -4,6 +4,7 @@ import logging
 import os
 
 from pytorch_lightning.callbacks import LearningRateMonitor
+from pytorch_lightning.profiler import AdvancedProfiler, PyTorchProfiler
 
 # from byol_main.paths import Path_Handler
 from byol_main.dataloading.datamodules import datasets
@@ -55,6 +56,16 @@ def run_contrastive_pretraining(config, wandb_logger, trainer_settings):
         # only supported with a logger
         callbacks += [LearningRateMonitor(logging_interval='step')]  # change to step, may be slow
 
+    if config['profiler'] == 'advanced':
+        logging.info('Using advanced profiler')
+        profiler = AdvancedProfiler(dirpath=experiment_dir, filename='advanced_profile.txt')
+    elif config['profiler'] == 'pytorch':
+        logging.info('Using pytorch profiler')
+        profiler = PyTorchProfiler(dirpath=experiment_dir, filename='pytorch_profile.txt', row_limit=-1)
+    else:
+        logging.info('No profiler used')
+        profiler=None
+
     pre_trainer = pl.Trainer(
         # gpus=1,
         **trainer_settings[config["compute"]],
@@ -66,6 +77,7 @@ def run_contrastive_pretraining(config, wandb_logger, trainer_settings):
         precision=config["precision"],
         #    check_val_every_n_epoch=3,
         log_every_n_steps=200,
+        profiler=profiler
     )
 
     # Initialise model #
