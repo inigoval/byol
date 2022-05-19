@@ -101,7 +101,7 @@ def run_contrastive_pretraining(config, wandb_logger, trainer_settings):
         profiler=None
 
     import torch
-    logging.info('Threads: {}'.format(torch.get_num_theads()))
+    logging.info('Threads: {}'.format(torch.get_num_threads()))
 
     pre_trainer = pl.Trainer(
         # gpus=1,
