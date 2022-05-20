@@ -59,7 +59,7 @@ class Mixed_DataModule(generic_galaxy.Galaxy_DataModule):
             # kinda imperfect either way
             # maybe I should use train after all - TODO ponder
             # (changing now will mess with current experiments)
-            ring_test_filtered = test_catalog.query('label >= 0')
+            ring_test_filtered = test_catalog.query('ring_label >= 0')
             ring_knn_bank = galaxy_dataset.GalaxyDataset(
                 label_cols=['ring_label'], catalog=ring_test_filtered.sample(min(len(ring_test_filtered), 10000)),  transform=self.T_test
             )
