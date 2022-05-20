@@ -112,6 +112,15 @@ class Lightning_Eval(pl.LightningModule):
     def on_train_start(self):
         self.config["data"]["mu"] = self.trainer.datamodule.mu
         self.config["data"]["sig"] = self.trainer.datamodule.sig
+
+        data = self.trainer.datamodule.data
+        self.logger.log_hyperparams(
+            {
+                "n_val": len(data["val"]),
+                "n_test": len(data["test"]),
+                "n_train": len(data["train"]),
+            }
+        )
         # self.log("train/mu", self.trainer.datamodule.mu)
         # self.log("train/sig", self.trainer.datamodule.sig)
 
