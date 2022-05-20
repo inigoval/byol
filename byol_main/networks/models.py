@@ -35,9 +35,21 @@ class LogisticRegression(torch.nn.Module):
 
 def _get_backbone(config):
     net = _get_net(config)  # e.g. resnet
-    c_out = list(net.children())[-1].in_features  # output dim of e.g. resnet, once the classification layer is removed (below)
 
-    net = torch.nn.Sequential(*list(net.children())[:-1])  # i.e. remove the last layer of resnet (aka the classification layer) as default-defined
+    print(net)
+
+    print(list(net.children())[-1])
+    print(list(net.children())[-2])
+
+    if 'resnet' in config["model"]["architecture"]:
+        # c_out = channels out
+        c_out = list(net.children())[-1].in_features  # output dim of e.g. resnet, once the classification layer is removed (below)
+    # elif 'efficientnet' in config["model"]["architecture"]:
+    #     c_out = 1280 # but not needed anyway
+
+    # i.e. remove the last layer of resnet (aka the classification layer) as default-defined
+    # effnet may need to be a little different
+    net = torch.nn.Sequential(*list(net.children())[:-1])  
 
     # Change first layer for color channels B/W images
     n_c = config["data"]["color_channels"]
@@ -51,11 +63,26 @@ def _get_backbone(config):
 
     features = config["model"]["features"]  # e.g. 512
     # TODO need to check if effnet includes these conv/avg pool layers already - zoobot does
-    backbone = nn.Sequential(
-        *list(net.children())[:-1],  # resnet minus classification layer
-        nn.Conv2d(c_out, features, 1),  # another conv layer, to `features` channels
-        nn.AdaptiveAvgPool2d(1),  # remove filter height/width, so now just (batch, features)
-    )
+
+    if 'resnet' in config["model"]["architecture"]:
+        backbone = nn.Sequential(
+            *list(net.children())[:-1],  # resnet minus classification layer
+            nn.Conv2d(c_out, features, 1),  # another conv layer, to `features` channels
+            nn.AdaptiveAvgPool2d(1),  # remove filter height/width, so now just (batch, features)
+        )
+    elif 'efficientnet' in config["model"]["architecture"]:
+        backbone = nn.Sequential(
+            *list(net.children())[:-1],  # effnet minus classification layer
+            # will ignore "features"
+        )
+
+# AdaptiveAvgPool2d(output_size=1)
+
+# Sequential(
+#   (0): Dropout(p=0.2, inplace=True)
+#   (1): Linear(in_features=1280, out_features=1000, bias=True)
+# )
+
 
     return backbone
 
