@@ -231,14 +231,20 @@ class BYOL_Supervised(BYOL):
     # else will not be passed the extra dataloader_idx argument
     def validation_step(self, batch, batch_idx, dataloader_idx):
         if dataloader_idx == 0:
-            super().validation_step(batch, batch_idx)  # knn validation
+            # super().validation_step(batch, batch_idx)  # knn validation
+            self.log("val/kNN_acc", 0)  # TODO temp debug
         elif dataloader_idx == 1:
             # get contrastive and supervised loss on validation set
             x, labels = batch
+            logging.info('x')
             logging.info(x)
             x = x.type_as(self.dummy_param)
             y = self.represent(x)  # not a great name - this is the representation, pre-projection
+            logging.info('y')
+            logging.info(y)
             supervised_head_out = self.supervised_head(y)
+            logging.info('supervised_head_out')
+            logging.info(supervised_head_out)
             supervised_loss = self.supervised_loss_func(supervised_head_out, labels)  
             self.log("val/supervised_loss", supervised_loss, on_step=False, on_epoch=True) 
         else:
