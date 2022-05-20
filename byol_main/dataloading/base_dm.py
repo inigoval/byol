@@ -44,7 +44,7 @@ class Base_DataModule(pl.LightningDataModule):
 
     def val_dataloader(self):
         knn_loader = DataLoader(
-            self.data["val"],
+            self.data["val_knn"],
             batch_size=self.config["data"]["val_batch_size"],
             num_workers=self.config["num_workers"],
             # num_workers=1,

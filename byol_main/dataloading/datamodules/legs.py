@@ -51,7 +51,7 @@ class Legs_DataModule(generic_galaxy.Galaxy_DataModule):
         # use any labelled data NOT in 'labelled' as feature bank
         # 'val' is for knn, must be classification e.g. rings
         # missing labels are encoded as -1
-        self.data["val"] = galaxy_dataset.GalaxyDataset(
+        self.data["val_knn"] = galaxy_dataset.GalaxyDataset(
             label_cols=['label'], catalog=val_catalog.query('label >= 0'), transform=self.T_test)
     
         # 'val_supervised' is for supervised head (if present, otherwise ignored)
