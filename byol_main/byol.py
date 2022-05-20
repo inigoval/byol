@@ -231,8 +231,7 @@ class BYOL_Supervised(BYOL):
     # else will not be passed the extra dataloader_idx argument
     def validation_step(self, batch, batch_idx, dataloader_idx):
         if dataloader_idx == 0:
-            # super().validation_step(batch, batch_idx)  # knn validation
-            self.log("val/kNN_acc", 0)  # TODO temp debug
+            super().validation_step(batch, batch_idx)  # knn validation
         elif dataloader_idx == 1:
             # get contrastive and supervised loss on validation set
             x, labels = batch
