@@ -89,11 +89,16 @@ def freeze_model(model):
 
 def _optimizer(params, config):
     lr = config["lr"]
+    
+    # sgd only
     mom = config["momentum"]
     w_decay = config["weight_decay"]
 
+    betas = (config.get('beta_1', 0.9), config.get('beta_2', 0.999))
+
+    # for adam, lr is the step size and is modified by exp. moving av. of prev. gradients
     opts = {
-        "adam": lambda p: torch.optim.Adam(p, lr=lr),
+        "adam": lambda p: torch.optim.Adam(p, lr=lr, betas=betas),
         "sgd": lambda p: torch.optim.SGD(
             p,
             lr=lr,
