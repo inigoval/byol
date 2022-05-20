@@ -51,9 +51,10 @@ class Mixed_DataModule(generic_galaxy.Galaxy_DataModule):
             label_cols=['ring_label'], catalog=test_catalog, transform=self.T_test)
 
         if self.config['val_dataset'] == 'rings':
-
+            
+            ring_val_filtered = val_catalog.query('ring_label >= 0')
             ring_knn_targets =  galaxy_dataset.GalaxyDataset(
-                label_cols=['ring_label'], catalog=val_catalog.query('ring_label >= 0'), transform=self.T_test)
+                label_cols=['ring_label'], catalog=ring_val_filtered.sample(min(len(ring_val_filtered), 10000)), transform=self.T_test)
 
             # using test here is a slight cheat as I wouldn't really know the labels yet, but equally I am training on the train set already
             # kinda imperfect either way

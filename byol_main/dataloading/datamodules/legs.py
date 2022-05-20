@@ -52,7 +52,7 @@ class Legs_DataModule(generic_galaxy.Galaxy_DataModule):
         # 'val' is for knn, must be classification e.g. rings
         # missing labels are encoded as -1
         self.data["val_knn"] = galaxy_dataset.GalaxyDataset(
-            label_cols=['label'], catalog=val_catalog.query('label >= 0'), transform=self.T_test)
+            label_cols=['ring_label'], catalog=val_catalog.query('ring_label >= 0'), transform=self.T_test)
     
         # 'val_supervised' is for supervised head (if present, otherwise ignored)
         assert not np.any(val_catalog[label_cols].isna())  # all vote counts should be 0 or counts
@@ -60,13 +60,13 @@ class Legs_DataModule(generic_galaxy.Galaxy_DataModule):
             label_cols=label_cols, catalog=val_catalog, transform=self.T_test)
         # 'test' is not used
         self.data["test"] = galaxy_dataset.GalaxyDataset(
-            label_cols=['label'], catalog=test_catalog, transform=self.T_test)
+            label_cols=['ring_label'], catalog=test_catalog, transform=self.T_test)
 
         # only used for knn feature bank (and so has no effect other than val metric)
         # also needs to be filtered to avoid missing labels
-        test_filtered = test_catalog.query('label >= 0')
+        test_filtered = test_catalog.query('ring_label >= 0')
         self.data["labelled"] = galaxy_dataset.GalaxyDataset(
-            label_cols=['label'], catalog=test_filtered.sample(min(len(test_filtered), 10000)),  transform=self.T_test)  # TODO temp
+            label_cols=['ring_label'], catalog=test_filtered.sample(min(len(test_filtered), 10000)),  transform=self.T_test)  # TODO temp
 
 
 if __name__ == '__main__':
