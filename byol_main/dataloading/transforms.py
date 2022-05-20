@@ -75,7 +75,7 @@ class MultiView(nn.Module):
             return _gzmnist_view(self.config)
 
         # TODO could get ugly
-        elif self.config["dataset"] in ['gz2', 'decals_dr5', 'legs', 'rings', 'legs_and_rings']:
+        elif self.config["dataset"] in ['gz2', 'decals_dr5', 'legs', 'rings', 'legs_and_rings', 'mixed']:
             return _gz2_view(self.config)  # now badly named TODO
 
         else:
