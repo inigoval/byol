@@ -14,4 +14,4 @@ nvidia-smi
 
 PYTHON=/share/nas2/walml/miniconda3/envs/zoobot/bin/python
 
-$PYTHON /share/nas2/walml/repos/byol/byol_main/dataloading/datmodules/mixed.py
+$PYTHON /share/nas2/walml/repos/byol/byol_main/dataloading/datamodules/mixed.py
