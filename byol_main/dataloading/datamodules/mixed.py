@@ -102,13 +102,13 @@ if __name__ == '__main__':
     import yaml
     import torch
 
-    with open('config/byol/legs.yml', 'r') as f:
+    with open('/share/nas2/walml/repos/byol/config/byol/legs.yml', 'r') as f:
         config = yaml.load(f, Loader=yaml.FullLoader)
 
     config['dataset'] = 'mixed'
     config['debug'] = False
     config['num_workers'] = 20
-    config['data'] = {'mu': 0, 'sig': 1, 'rotate': True, 'input_height': 128,
+    config['data'] = {'mu': 0, 'sig': 1, 'rotate': True, 'input_height': config['data']['input_height'],
                       'precrop_size_ratio': 1.3, 'p_blur': 0., 'val_batch_size': 16}  # needed for _Eval
     config['p_blur'] = 0.  # TODO shouldn't this be under config['data']?
     # print(config)
@@ -117,18 +117,28 @@ if __name__ == '__main__':
 
         datamodule.setup()
 
-        logging.info('Checking image shapes')
+        logging.info('Checking image shapes - {}'.format(config['data']['input_height']))
+
+        for dataloader_idx, dataloader in enumerate(datamodule.val_dataloader()):
+            logging.info('Val dataloader {}'.format(dataloader_idx))
+            for images, _ in dataloader:
+                assert images.shape[0] == config['data']['input_height']
+                assert images.shape[1] == config['data']['input_height']
+        
+        logging.info('All val images are correct shape')
 
         for (images, labels) in datamodule.train_dataloader():
             # print(images[0].shape, labels.shape)  # [0] as list of views
             # assert labels.min() >= 0
             # break
-            assert images.shape[0] == 128
-            assert images.shape[1] == 128
+            assert images.shape[0] == config['data']['input_height']
+            assert images.shape[1] == config['data']['input_height']
 
         logging.info('All train images are correct shape')
 
-        # for (images, labels) in datamodule.val_dataloader():
-        #     print(images[0].shape, labels.shape)  # [0] as list of views
-        #     assert labels.min() >= 0
-        #     break
+
+        for (images, labels) in datamodule.data['labelled']:  # the labelled dataloader
+            assert images.shape[0] == config['data']['input_height']
+            assert images.shape[1] == config['data']['input_height']
+
+        logging.info('All labelled images are correct shape')
