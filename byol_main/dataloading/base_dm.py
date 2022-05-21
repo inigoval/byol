@@ -50,6 +50,7 @@ class Base_DataModule(pl.LightningDataModule):
             # num_workers=1,
             prefetch_factor=self.config['prefetch_factor'],
             persistent_workers=self.config["persistent_workers"],
+            pin_memory=self.config['pin_memory']
         )
         if 'supervised' not in self.config['type']:
             logging.info('Setting up datamodule with knn val dataloader only')
@@ -63,6 +64,7 @@ class Base_DataModule(pl.LightningDataModule):
             # num_workers=1,
                 prefetch_factor=self.config['prefetch_factor'],
                 persistent_workers=self.config["persistent_workers"],
+                pin_memory=self.config['pin_memory']
             )
         # validation_step will need additional dataloader_idx argument
         # https://pytorch-lightning.readthedocs.io/en/stable/guides/data.html#multiple-validation-test-predict-dataloaders
