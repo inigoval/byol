@@ -16,8 +16,8 @@ class Mixed_DataModule(generic_galaxy.Galaxy_DataModule):
     def __init__(self, config):
         super().__init__(
             config,
-            mu=((0.)),
-            sig=((1.))
+            mu=((0)),
+            sig=((1))
         )
 
     def prepare_data(self):
