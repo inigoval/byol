@@ -1,3 +1,5 @@
+import logging
+
 import torch
 import numpy as np
 import torch.nn as nn
@@ -35,9 +37,24 @@ class LogisticRegression(torch.nn.Module):
 
 def _get_backbone(config):
     net = _get_net(config)  # e.g. resnet
-    c_out = list(net.children())[-1].in_features  # output dim of e.g. resnet, once the classification layer is removed (below)
 
-    net = torch.nn.Sequential(*list(net.children())[:-1])  # i.e. remove the last layer of resnet (aka the classification layer) as default-defined
+    # print(net)
+
+    # print(list(net.children())[-1])
+    # print(list(net.children())[-2])
+
+    logging.info(config['model']['architecture'])
+
+    if 'resnet' in config["model"]["architecture"]:
+        # c_out = channels out
+        c_out = list(net.children())[-1].in_features  # output dim of e.g. resnet, once the classification layer is removed (below)
+    elif 'efficientnet' in config["model"]["architecture"]:
+        c_out = list(net.children())[-1][1].in_features  # sequential is -1, then 1 is linear (0 being dropout)
+
+    # i.e. remove the last layer (aka the classification layer) as default-defined
+    # for resnet, is linear. for effnet, is sequential([dropout, linear]). Same thing.
+    # net now ends with adaptivepool in both cases
+    net = torch.nn.Sequential(*list(net.children())[:-1])  
 
     # Change first layer for color channels B/W images
     n_c = config["data"]["color_channels"]
@@ -51,11 +68,14 @@ def _get_backbone(config):
 
     features = config["model"]["features"]  # e.g. 512
     # TODO need to check if effnet includes these conv/avg pool layers already - zoobot does
+
+    # if 'resnet' in config["model"]["architecture"]:
     backbone = nn.Sequential(
-        *list(net.children())[:-1],  # resnet minus classification layer
-        nn.Conv2d(c_out, features, 1),  # another conv layer, to `features` channels
-        nn.AdaptiveAvgPool2d(1),  # remove filter height/width, so now just (batch, features)
+        *list(net.children())[:-1],  # also remove adaptive pool (both cases)
+        nn.Conv2d(c_out, features, 1),  # another conv layer, to `features` channels with 1x1 kernel
+        nn.AdaptiveAvgPool2d(1),  # put adaptive pool back
     )
+
 
     return backbone
 

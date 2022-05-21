@@ -102,9 +102,10 @@ class GalaxyInferenceDataModule(pl.LightningDataModule):
 
         self.id_strs = list(catalog['id_str'].values)
 
+        catalog['dummy_labels'] = 0
         self.data = {
             'predict': galaxy_dataset.GalaxyDataset(
-            label_cols=['label'], catalog=catalog, transform=self.T_test)
+            label_cols=['dummy_labels'], catalog=catalog, transform=self.T_test)
         }  
 
     def predict_dataloader(self):

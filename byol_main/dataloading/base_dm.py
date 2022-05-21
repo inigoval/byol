@@ -81,7 +81,7 @@ class Base_DataModule(pl.LightningDataModule):
 
     def update_transforms(self, D_train):
         # if mu (and sig, implicitly) has been explicitly set, trust it is correct
-        if self.mu != (0.,):
+        if self.mu != ((0,)):
             logging.info('Skipping mu/sig calculation - mu, sig explicitly set to {}, {}'.format(self.mu, self.sig))
         elif self.config["debug"]:
             logging.info('Skipping mu/sig calculation - debug mode')
