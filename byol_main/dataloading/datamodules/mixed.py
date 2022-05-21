@@ -105,10 +105,10 @@ if __name__ == '__main__':
     with open('config/byol/legs.yml', 'r') as f:
         config = yaml.load(f, Loader=yaml.FullLoader)
 
-    config['dataset'] = 'legs'
+    config['dataset'] = 'mixed'
     config['debug'] = False
-    config['num_workers'] = 1
-    config['data'] = {'mu': 0, 'sig': 1, 'rotate': True, 'input_height': 64,
+    config['num_workers'] = 20
+    config['data'] = {'mu': 0, 'sig': 1, 'rotate': True, 'input_height': 128,
                       'precrop_size_ratio': 1.3, 'p_blur': 0., 'val_batch_size': 16}  # needed for _Eval
     config['p_blur'] = 0.  # TODO shouldn't this be under config['data']?
     # print(config)
@@ -117,12 +117,18 @@ if __name__ == '__main__':
 
         datamodule.setup()
 
-        for (images, labels) in datamodule.train_dataloader():
-            print(images[0].shape, labels.shape)  # [0] as list of views
-            assert labels.min() >= 0
-            break
+        logging.info('Checking image shapes')
 
-        for (images, labels) in datamodule.val_dataloader():
-            print(images[0].shape, labels.shape)  # [0] as list of views
-            assert labels.min() >= 0
-            break
+        for (images, labels) in datamodule.train_dataloader():
+            # print(images[0].shape, labels.shape)  # [0] as list of views
+            # assert labels.min() >= 0
+            # break
+            assert images.shape[0] == 128
+            assert images.shape[1] == 128
+
+        logging.info('All train images are correct shape')
+
+        # for (images, labels) in datamodule.val_dataloader():
+        #     print(images[0].shape, labels.shape)  # [0] as list of views
+        #     assert labels.min() >= 0
+        #     break
