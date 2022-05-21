@@ -126,8 +126,8 @@ if __name__ == '__main__':
         for dataloader_idx, dataloader in enumerate(datamodule.val_dataloader()):
             logging.info('Val dataloader {}'.format(dataloader_idx))
             for images, _ in dataloader:
-                assert images.shape[0] == config['data']['input_height']
-                assert images.shape[1] == config['data']['input_height']
+                if not (images.shape[0], images.shape[1]) == (config['data']['input_height'], config['data']['input_height']):
+                    raise ValueError(images.shape)
         
         logging.info('All val images are correct shape')
 
@@ -135,14 +135,13 @@ if __name__ == '__main__':
             # print(images[0].shape, labels.shape)  # [0] as list of views
             # assert labels.min() >= 0
             # break
-            assert images.shape[0] == config['data']['input_height']
-            assert images.shape[1] == config['data']['input_height']
-
+            if not (images.shape[0], images.shape[1]) == (config['data']['input_height'], config['data']['input_height']):
+                raise ValueError(images.shape)
         logging.info('All train images are correct shape')
 
 
         for (images, labels) in datamodule.data['labelled']:  # the labelled dataloader
-            assert images.shape[0] == config['data']['input_height']
-            assert images.shape[1] == config['data']['input_height']
+            if not (images.shape[0], images.shape[1]) == (config['data']['input_height'], config['data']['input_height']):
+                raise ValueError(images.shape)
 
         logging.info('All labelled images are correct shape')
