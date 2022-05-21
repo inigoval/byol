@@ -102,11 +102,13 @@ if __name__ == '__main__':
     import yaml
     import torch
 
+    logging.basicConfig(level=logging.INFO)
+
     with open('/share/nas2/walml/repos/byol/config/byol/legs.yml', 'r') as f:
         config = yaml.load(f, Loader=yaml.FullLoader)
 
     config['dataset'] = 'mixed'
-    config['debug'] = False
+    config['debug'] = True
     config['num_workers'] = 20
     config['data'] = {'mu': 0, 'sig': 1, 'rotate': True, 'input_height': config['data']['input_height'],
                       'precrop_size_ratio': 1.3, 'p_blur': 0., 'val_batch_size': 16}  # needed for _Eval
