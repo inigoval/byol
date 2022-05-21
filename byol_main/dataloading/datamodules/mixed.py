@@ -104,6 +104,9 @@ if __name__ == '__main__':
 
     logging.basicConfig(level=logging.INFO)
 
+    torch.set_num_threads(24)
+    logging.info('Threads: {}'.format(torch.get_num_threads()))
+
     with open('/share/nas2/walml/repos/byol/config/byol/legs.yml', 'r') as f:
         config = yaml.load(f, Loader=yaml.FullLoader)
 
@@ -125,20 +128,21 @@ if __name__ == '__main__':
 
         logging.info('Checking image shapes - {}'.format(config['data']['input_height']))
 
-        for dataloader_idx, dataloader in enumerate(datamodule.val_dataloader()):
-            logging.info('Val dataloader {}'.format(dataloader_idx))
-            for images, _ in dataloader:
-                if not (images.shape[2], images.shape[3]) == (config['data']['input_height'], config['data']['input_height']):
-                    raise ValueError(images.shape)
+        # for dataloader_idx, dataloader in enumerate(datamodule.val_dataloader()):
+        #     logging.info('Val dataloader {}'.format(dataloader_idx))
+        #     for images, _ in dataloader:
+        #         if not (images.shape[2], images.shape[3]) == (config['data']['input_height'], config['data']['input_height']):
+        #             raise ValueError(images.shape)
         
-        logging.info('All val images are correct shape')
+        # logging.info('All val images are correct shape')
 
-        for (images, labels) in datamodule.train_dataloader():
+        for ((view_a, view_b), labels) in datamodule.train_dataloader():
             # print(images[0].shape, labels.shape)  # [0] as list of views
             # assert labels.min() >= 0
             # break
-            if not (images.shape[2], images.shape[3]) == (config['data']['input_height'], config['data']['input_height']):
-                raise ValueError(images.shape)
+            for view in [view_a, view_b]:
+                if not (view.shape[2], view.shape[3]) == (config['data']['input_height'], config['data']['input_height']):
+                    raise ValueError(view.shape)
         logging.info('All train images are correct shape')
 
 
