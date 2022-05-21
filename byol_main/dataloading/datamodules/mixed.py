@@ -28,6 +28,9 @@ class Mixed_DataModule(generic_galaxy.Galaxy_DataModule):
         label_cols, (train_catalog, val_catalog, test_catalog, unlabelled_catalog) = mixed.everything_all_dirichlet_with_rings(
             self.path, self.config['debug'], download=True)
 
+        # TODO temp
+        val_catalog = val_catalog.query('in_legs')
+
         self.adjust_mu_and_std_from_subset(train_catalog, label_cols, size=5000)
 
         # not using self.create_transformed_datasets_from_catalogs here, custom as unlabelled
