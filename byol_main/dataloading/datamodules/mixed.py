@@ -114,6 +114,7 @@ if __name__ == '__main__':
                       'precrop_size_ratio': 1.3, 'p_blur': 0., 'val_batch_size': 16}  # needed for _Eval
     config['p_blur'] = 0.  # TODO shouldn't this be under config['data']?
     # print(config)
+    config['val_dataset'] = 'rings'
 
     for datamodule in [Mixed_DataModule(config=config)]:
 
