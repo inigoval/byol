@@ -115,6 +115,7 @@ if __name__ == '__main__':
     config['p_blur'] = 0.  # TODO shouldn't this be under config['data']?
     # print(config)
     config['val_dataset'] = 'rings'
+    config['type'] = 'byol_supervised'
 
     for datamodule in [Mixed_DataModule(config=config)]:
 
