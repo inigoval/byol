@@ -111,7 +111,7 @@ if __name__ == '__main__':
     config['debug'] = True
     config['num_workers'] = 20
     config['data'] = {'mu': 0, 'sig': 1, 'rotate': True, 'input_height': config['data']['input_height'],
-                      'precrop_size_ratio': 1.3, 'p_blur': 0., 'val_batch_size': 16}  # needed for _Eval
+                      'precrop_size_ratio': 1.3, 'p_blur': 0., 'val_batch_size': 512}  # needed for _Eval
     config['p_blur'] = 0.  # TODO shouldn't this be under config['data']?
     # print(config)
     config['val_dataset'] = 'rings'
@@ -126,7 +126,7 @@ if __name__ == '__main__':
         for dataloader_idx, dataloader in enumerate(datamodule.val_dataloader()):
             logging.info('Val dataloader {}'.format(dataloader_idx))
             for images, _ in dataloader:
-                if not (images.shape[0], images.shape[1]) == (config['data']['input_height'], config['data']['input_height']):
+                if not (images.shape[2], images.shape[3]) == (config['data']['input_height'], config['data']['input_height']):
                     raise ValueError(images.shape)
         
         logging.info('All val images are correct shape')
@@ -135,13 +135,13 @@ if __name__ == '__main__':
             # print(images[0].shape, labels.shape)  # [0] as list of views
             # assert labels.min() >= 0
             # break
-            if not (images.shape[0], images.shape[1]) == (config['data']['input_height'], config['data']['input_height']):
+            if not (images.shape[2], images.shape[3]) == (config['data']['input_height'], config['data']['input_height']):
                 raise ValueError(images.shape)
         logging.info('All train images are correct shape')
 
 
         for (images, labels) in datamodule.data['labelled']:  # the labelled dataloader
-            if not (images.shape[0], images.shape[1]) == (config['data']['input_height'], config['data']['input_height']):
+            if not (images.shape[2], images.shape[3]) == (config['data']['input_height'], config['data']['input_height']):
                 raise ValueError(images.shape)
 
         logging.info('All labelled images are correct shape')
