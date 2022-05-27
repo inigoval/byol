@@ -247,7 +247,11 @@ class BYOL_Supervised(BYOL):
             y = self.represent(x)  # not a great name - this is the representation, pre-projection
             # logging.info('y')
             # logging.info(y)
-            supervised_head_out = self.supervised_head(y)
+
+            # supervised_head_out = self.supervised_head(y)
+            p = self.project(y)
+            supervised_head_out = self.supervised_head(p)
+
             # logging.info('supervised_head_out')
             # logging.info(supervised_head_out)
             supervised_loss = self.supervised_loss_func(supervised_head_out, labels)  
