@@ -127,11 +127,11 @@ class BYOL_Supervised(BYOL):
         super().__init__(config)
         # re-use the projection head pattern
         # also re-use the dimension
-        # supervised_in_features = self.config["model"]["features"]
+        supervised_in_features = self.config["model"]["features"]
 
         # new version - built on top of the projection head (but not prediction head)
         # will use  the projection head output dim as feature dim 
-        supervised_in_features = self.config['projection_head']['out']
+        # supervised_in_features = self.config['projection_head']['out']
 
         supervised_head_params = self.config["supervised_head"]
 
@@ -225,8 +225,8 @@ class BYOL_Supervised(BYOL):
 
         contrastive_loss = 0.5 * (self.criterion(p0, z1) + self.criterion(p1, z0))
 
-        # supervised_head_out = self.supervised_head(y0)
-        supervised_head_out = self.supervised_head(p0)
+        supervised_head_out = self.supervised_head(y0)
+        # supervised_head_out = self.supervised_head(p0)
 
         supervised_loss = self.supervised_loss_func(supervised_head_out, labels)  
 
@@ -248,9 +248,9 @@ class BYOL_Supervised(BYOL):
             # logging.info('y')
             # logging.info(y)
 
-            # supervised_head_out = self.supervised_head(y)
-            p = self.project(y)
-            supervised_head_out = self.supervised_head(p)
+            supervised_head_out = self.supervised_head(y)
+            # p = self.project(y)
+            # supervised_head_out = self.supervised_head(p)
 
             # logging.info('supervised_head_out')
             # logging.info(supervised_head_out)
