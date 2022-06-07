@@ -27,7 +27,7 @@ class Mixed_DataModule(generic_galaxy.Galaxy_DataModule):
     def setup(self, stage=None):
 
         label_cols, (train_catalog, val_catalog, test_catalog, unlabelled_catalog) = mixed.everything_all_dirichlet_with_rings(
-            self.path, self.config['debug'], download=True)
+            self.path, self.config['debug'], download=False, use_cache=True)
 
         self.adjust_mu_and_std_from_subset(train_catalog, label_cols, size=5000)
 
