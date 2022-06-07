@@ -59,22 +59,28 @@ def _get_backbone(config):
     # Change first layer for color channels B/W images
     n_c = config["data"]["color_channels"]
     if n_c != 3:
+        logging.warning('Adapting network for greyscale images, may not match Zoobot')
         # c_out, k, s, p = net[0].out_channels, net[0].kernel_size, net[0].stride, net[0].padding
         # net[0] = nn.Conv2d(n_c, c_out, kernel_size=k, stride=s, padding=p, bias=False)
         net[0] = nn.Conv2d(n_c, 64, kernel_size=7, stride=2, padding=2, bias=False)
 
     if config["model"]["downscale"]:
+        logging.warning('Adapting network with downscaling, may not match Zoobot')
         net[0] = nn.Conv2d(n_c, 64, kernel_size=3, stride=1, padding=1, bias=False)
 
     features = config["model"]["features"]  # e.g. 512
     # TODO need to check if effnet includes these conv/avg pool layers already - zoobot does
 
     # if 'resnet' in config["model"]["architecture"]:
-    backbone = nn.Sequential(
-        *list(net.children())[:-1],  # also remove adaptive pool (both cases)
-        nn.Conv2d(c_out, features, 1),  # another conv layer, to `features` channels with 1x1 kernel
-        nn.AdaptiveAvgPool2d(1),  # put adaptive pool back
-    )
+    if features != c_out:
+        logging.warning('Requested num. features {} does not equal backbone output {} - adding 1x1 conv layer with {} features'.format(features, c_out, features))
+        backbone = nn.Sequential(
+            *list(net.children())[:-1],  # also remove adaptive pool (both cases)
+            nn.Conv2d(c_out, features, 1),  # another conv layer, to `features` channels with 1x1 kernel
+            nn.AdaptiveAvgPool2d(1),  # put adaptive pool back
+        )
+    else:
+        backbone = net
 
 
     return backbone

@@ -11,7 +11,7 @@ from lightly.models.utils import deactivate_requires_grad
 from lightly.models.utils import update_momentum
 from pytorch_lightning.callbacks import Callback
 
-from zoobot.pytorch.estimators import efficientnet_custom
+from zoobot.pytorch.estimators import efficientnet_custom, custom_layers
 from zoobot.pytorch.training import losses
 
 from byol_main.evaluation import Lightning_Eval
@@ -140,17 +140,28 @@ class BYOL_Supervised(BYOL):
             logging.info('Adding supervised head in classification mode, {} classes'.format(num_classes))
             # remember this has batch-norm
             self.supervised_head = nn.Sequential(
-                BYOLProjectionHead(supervised_in_features, supervised_head_params["hidden"], ),
+                BYOLProjectionHead(supervised_in_features, supervised_head_params["hidden"], num_classes),
                 torch.nn.Softmax(dim=-1)
             )
             # ignore targets with value (aka class index) of -1
             self.supervised_loss_func = torch.nn.CrossEntropyLoss(ignore_index=-1)
+
         elif supervised_head_params['training_mode'] == 'dirichlet':
             num_outputs = supervised_head_params['out']
             logging.info('Adding supervised head in dirichlet mode, {} outputs'.format(num_outputs))
+
+           
+
             self.supervised_head = nn.Sequential(
-                BYOLProjectionHead(supervised_in_features, supervised_head_params["hidden"], num_outputs),
-                efficientnet_custom.ScaledSigmoid()   # sigmoid from 1 to 100
+
+                # this prediction head is not quite the same as zoobot - has batchnorm, does not have dropout
+                # BYOLProjectionHead(supervised_in_features, supervised_head_params["hidden"], num_outputs),
+                # efficientnet_custom.ScaledSigmoid()   # sigmoid from 1 to 100
+
+                # this is exactly as with zoobot
+                custom_layers.PermaDropout(0.2),
+                efficientnet_custom.custom_top_dirichlet(supervised_in_features, num_outputs)
+
             )
             # my losses. code uses the wrong input convention (torch does preds, labels, but I did labels, preds) - adjust with lambda
             # sum is over questions as losses.multiquestion_loss gives loss like (batch, neg_log_prob_per_question)
