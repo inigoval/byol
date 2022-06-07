@@ -11,6 +11,8 @@ from albumentations.pytorch import ToTensorV2
 from byol_main.paths import Path_Handler
 import cv2
 
+from pytorch_galaxy_datasets import galaxy_datamodule
+
 
 class Circle_Crop(torch.nn.Module):
     """
@@ -75,8 +77,11 @@ class MultiView(nn.Module):
             return _gzmnist_view(self.config)
 
         # TODO could get ugly
-        elif self.config["dataset"] in ['gz2', 'decals_dr5', 'legs', 'rings', 'legs_and_rings', 'mixed']:
-            return _gz2_view(self.config)  # now badly named TODO
+        elif self.config["dataset"] in ['gz2', 'decals_dr5', 'legs', 'rings', 'legs_and_rings']:
+            _gz2_view(self.config)  # now badly named TODO
+
+        elif self.config["dataset"] == 'mixed':
+            return _zoobot_default_view(self.config)
 
         else:
             raise ValueError(self.config["dataset"])
@@ -255,6 +260,17 @@ def _gz2_view(config):
         ]
     )
 
+    return view
+
+
+def _zoobot_default_view(config):
+    transforms = galaxy_datamodule.default_torchvision_transforms(
+        greyscale=False,
+        resize_size=config['data']['input_height'], 
+        crop_scale_bounds=(0.7, 0.8),
+        crop_ratio_bounds=(0.9, 1.1),
+    )
+    view = T.Compose(transforms)
     return view
 
 
