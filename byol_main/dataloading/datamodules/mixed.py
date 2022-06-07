@@ -34,6 +34,10 @@ class Mixed_DataModule(generic_galaxy.Galaxy_DataModule):
         # not using self.create_transformed_datasets_from_catalogs here, custom as unlabelled
         # might generalise later
 
+        if self.config['supervised_loss_weight'] > 1e5:
+            logging.warning('Ignoring unlabelled galaxies for speed and consistent loss')
+            unlabelled_catalog = pd.DataFrame()
+
         # train on all train+unlabelled data (labels not used)
         self.data["train"] = galaxy_dataset.GalaxyDataset(catalog=pd.concat(
             [unlabelled_catalog, train_catalog], axis=0), label_cols=label_cols, transform=self.T_train)
