@@ -192,6 +192,8 @@ class BYOL_Supervised(BYOL):
 
     def training_step(self, batch, batch_idx):
 
+        log_on_step = True
+
         # Update momentum value
         # aka update self.backbone_momentum with exp. moving av. of self.backbone
         # (similarly for heads)
@@ -204,8 +206,8 @@ class BYOL_Supervised(BYOL):
 
         # keep same name for wandb comparison
         # print('supervised vs contrastive: ', supervised_loss, contrastive_loss)
-        self.log("train/contrastive_loss", contrastive_loss, on_step=False, on_epoch=True)
-        self.log("train/supervised_loss", supervised_loss, on_step=False, on_epoch=True) 
+        self.log("train/contrastive_loss", contrastive_loss, on_step=log_on_step, on_epoch=True)
+        self.log("train/supervised_loss", supervised_loss, on_step=log_on_step, on_epoch=True) 
 
         supervised_loss_weight = self.config['supervised_loss_weight']
         if supervised_loss_weight > 1e5:
@@ -219,7 +221,7 @@ class BYOL_Supervised(BYOL):
     
         # total weighted loss, used for checkpoint monitoring
         # TODO might be better to use val/supervised_loss when available
-        self.log("train/loss", loss, on_step=False, on_epoch=True)  
+        self.log("train/loss", loss, on_step=log_on_step, on_epoch=True)  
         return loss
 
 
