@@ -51,7 +51,8 @@ class MultiView(nn.Module):
 
         # Define a view
         self.view = self._view()  # creates a callable transform
-        self.normalize = T.Normalize(mu, sig)
+        # self.normalize = T.Normalize(mu, sig)
+        self.normalize = lambda x: x  # TODO temporarily disable normalisation (see also SimpleView)
         self.n_views = n_views
 
     def __call__(self, x):
@@ -108,7 +109,8 @@ class SimpleView(nn.Module):
         augs.append(T.ToTensor())
         self.view = T.Compose(augs)
 
-        self.normalize = T.Normalize(mu, sig)
+        # self.normalize = T.Normalize(mu, sig)
+        self.normalize = lambda x: x  # TODO temporarily disable normalisation (see also MultiView)
 
     def __call__(self, x):
         # Use rotation if training
