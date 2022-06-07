@@ -135,6 +135,9 @@ class BYOL_Supervised(BYOL):
 
         supervised_head_params = self.config["supervised_head"]
 
+        if self.config['supervised_loss_weight'] > 1e5:
+            logging.warning('Debug mode - using only supervised head loss and IGNORING contrastive loss')
+
         if supervised_head_params['training_mode'] == 'classification':
             num_classes = config['data']['classes']
             logging.info('Adding supervised head in classification mode, {} classes'.format(num_classes))
@@ -204,11 +207,16 @@ class BYOL_Supervised(BYOL):
         self.log("train/loss", contrastive_loss, on_step=False, on_epoch=True)
         self.log("train/supervised_loss", supervised_loss, on_step=False, on_epoch=True) 
 
-        # normalise supervised loss by contrastive loss
-        # will have the gradients from supervised loss, but scaled to by similar to contrastive loss
-        supervised_normalising_constant = torch.abs(contrastive_loss.detach()) / supervised_loss.detach()
-        loss = contrastive_loss + self.config['supervised_loss_weight'] * supervised_normalising_constant * supervised_loss  
- 
+        supervised_loss_weight = self.config['supervised_loss_weight']
+        if supervised_loss_weight > 1e5:
+            # debug mode - ignore contrastive entirely
+            loss = supervised_loss
+        else:
+            # normalise supervised loss by contrastive loss
+            # will have the gradients from supervised loss, but scaled to by similar to contrastive loss
+            supervised_normalising_constant = torch.abs(contrastive_loss.detach()) / supervised_loss.detach()
+            loss = contrastive_loss + self.config['supervised_loss_weight'] * supervised_normalising_constant * supervised_loss  
+    
         # print('train/total_weighted_loss: ', loss)
         self.log("train/total_weighted_loss", loss, on_step=False, on_epoch=True)  
         return loss
