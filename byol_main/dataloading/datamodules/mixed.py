@@ -136,18 +136,17 @@ if __name__ == '__main__':
         
         # logging.info('All val images are correct shape')
 
-        for ((view_a, view_b), labels) in datamodule.train_dataloader():
-            # print(images[0].shape, labels.shape)  # [0] as list of views
-            # assert labels.min() >= 0
-            # break
+        # for ((view_a, view_b), labels) in datamodule.train_dataloader():
+        #     for view in [view_a, view_b]:
+        #         if not (view.shape[2], view.shape[3]) == (config['data']['input_height'], config['data']['input_height']):
+        #             raise ValueError(view.shape)
+        # logging.info('All train images are correct shape')
+
+
+        for ((view_a, view_b), labels) in datamodule.data['labelled']:
+
             for view in [view_a, view_b]:
                 if not (view.shape[2], view.shape[3]) == (config['data']['input_height'], config['data']['input_height']):
                     raise ValueError(view.shape)
-        logging.info('All train images are correct shape')
-
-
-        for (images, labels) in datamodule.data['labelled']:  # the labelled dataloader
-            if not (images.shape[2], images.shape[3]) == (config['data']['input_height'], config['data']['input_height']):
-                raise ValueError(images.shape)
 
         logging.info('All labelled images are correct shape')
