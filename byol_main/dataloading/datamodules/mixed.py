@@ -15,6 +15,7 @@ from byol_main.dataloading.datamodules import generic_galaxy
 class Mixed_DataModule(generic_galaxy.Galaxy_DataModule):
     def __init__(self, config):
         super().__init__(
+            # TODO still need to fix this I think
             config,
             mu=((0)),
             sig=((1))

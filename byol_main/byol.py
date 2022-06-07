@@ -127,7 +127,12 @@ class BYOL_Supervised(BYOL):
         super().__init__(config)
         # re-use the projection head pattern
         # also re-use the dimension
-        features = self.config["model"]["features"]
+        supervised_in_features = self.config["model"]["features"]
+
+        # new version - built on top of the projection head (but not prediction head)
+        # will use  the projection head output dim as feature dim 
+        # supervised_in_features = self.config['projection_head']['out']
+
         supervised_head_params = self.config["supervised_head"]
 
         if supervised_head_params['training_mode'] == 'classification':
@@ -135,7 +140,7 @@ class BYOL_Supervised(BYOL):
             logging.info('Adding supervised head in classification mode, {} classes'.format(num_classes))
             # remember this has batch-norm
             self.supervised_head = nn.Sequential(
-                BYOLProjectionHead(features, supervised_head_params["hidden"], ),
+                BYOLProjectionHead(supervised_in_features, supervised_head_params["hidden"], ),
                 torch.nn.Softmax(dim=-1)
             )
             # ignore targets with value (aka class index) of -1
@@ -144,7 +149,7 @@ class BYOL_Supervised(BYOL):
             num_outputs = supervised_head_params['out']
             logging.info('Adding supervised head in dirichlet mode, {} outputs'.format(num_outputs))
             self.supervised_head = nn.Sequential(
-                BYOLProjectionHead(features, supervised_head_params["hidden"], num_outputs),
+                BYOLProjectionHead(supervised_in_features, supervised_head_params["hidden"], num_outputs),
                 efficientnet_custom.ScaledSigmoid()   # sigmoid from 1 to 100
             )
             # my losses. code uses the wrong input convention (torch does preds, labels, but I did labels, preds) - adjust with lambda
@@ -221,6 +226,7 @@ class BYOL_Supervised(BYOL):
         contrastive_loss = 0.5 * (self.criterion(p0, z1) + self.criterion(p1, z0))
 
         supervised_head_out = self.supervised_head(y0)
+        # supervised_head_out = self.supervised_head(p0)
 
         supervised_loss = self.supervised_loss_func(supervised_head_out, labels)  
 
@@ -241,7 +247,11 @@ class BYOL_Supervised(BYOL):
             y = self.represent(x)  # not a great name - this is the representation, pre-projection
             # logging.info('y')
             # logging.info(y)
+
             supervised_head_out = self.supervised_head(y)
+            # p = self.project(y)
+            # supervised_head_out = self.supervised_head(p)
+
             # logging.info('supervised_head_out')
             # logging.info(supervised_head_out)
             supervised_loss = self.supervised_loss_func(supervised_head_out, labels)  
