@@ -204,7 +204,7 @@ class BYOL_Supervised(BYOL):
 
         # keep same name for wandb comparison
         # print('supervised vs contrastive: ', supervised_loss, contrastive_loss)
-        self.log("train/loss", contrastive_loss, on_step=False, on_epoch=True)
+        self.log("train/contrastive_loss", contrastive_loss, on_step=False, on_epoch=True)
         self.log("train/supervised_loss", supervised_loss, on_step=False, on_epoch=True) 
 
         supervised_loss_weight = self.config['supervised_loss_weight']
@@ -217,8 +217,9 @@ class BYOL_Supervised(BYOL):
             supervised_normalising_constant = torch.abs(contrastive_loss.detach()) / supervised_loss.detach()
             loss = contrastive_loss + self.config['supervised_loss_weight'] * supervised_normalising_constant * supervised_loss  
     
-        # print('train/total_weighted_loss: ', loss)
-        self.log("train/total_weighted_loss", loss, on_step=False, on_epoch=True)  
+        # total weighted loss, used for checkpoint monitoring
+        # TODO might be better to use val/supervised_loss when available
+        self.log("train/loss", loss, on_step=False, on_epoch=True)  
         return loss
 
 
