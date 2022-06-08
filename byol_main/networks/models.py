@@ -45,6 +45,20 @@ def _get_backbone(config):
 
     logging.info(config['model']['architecture'])
 
+    if config['model']['architecture'] == 'zoobot':
+
+        from zoobot.pytorch.estimators import define_model, efficientnet_standard
+
+        assert config["model"]["features"] == 1280
+        backbone = define_model.get_plain_pytorch_zoobot_model(
+            output_dim=0,  # doesn't matter, top not included
+            include_top=False,
+            channels=config["data"]["color_channels"],
+            get_architecture=efficientnet_standard.efficientnet_b0,
+            representation_dim=1280
+        )
+        return backbone
+
     if 'resnet' in config["model"]["architecture"]:
         # c_out = channels out
         c_out = list(net.children())[-1].in_features  # output dim of e.g. resnet, once the classification layer is removed (below)
