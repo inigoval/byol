@@ -170,7 +170,12 @@ class BYOL_Supervised(BYOL):
             # sum is over questions as losses.multiquestion_loss gives loss like (batch, neg_log_prob_per_question)
             def dirichlet_loss_aggregated_to_scalar(preds, labels):
                 dirichlet_loss = losses.calculate_multiquestion_loss(labels, preds, supervised_head_params['question_index_groups'])
-                return torch.mean(dirichlet_loss)  # over both (batch, question)
+                # divide by labels.shape[1] to avoid a factor from num questions with sum/mean. Doesn't matter, just be consistent with zoobot
+                num_questions = labels.shape[1]
+                # divide by num labels > 0, to avoid reducing the mean with unlabelled data for which the loss is 0
+                # or, by dirichlet_loss.sum(axis=1) > 0
+                num_labelled_galaxies = labels.sum(axis=1) > 0
+                return torch.sum(dirichlet_loss)/(num_labelled_galaxies * num_questions)  # over both (batch, question)
                 # p of (N=0, k=0) = 1 -> neg log p = 0 -> no effect on sum, but will reduce mean. Only absolute value though, not gradients per se if normalised
 
             self.supervised_loss_func = dirichlet_loss_aggregated_to_scalar
