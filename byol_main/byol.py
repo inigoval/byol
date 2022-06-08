@@ -175,6 +175,18 @@ class BYOL_Supervised(BYOL):
 
             self.supervised_loss_func = dirichlet_loss_aggregated_to_scalar
 
+
+    def configure_optimizers(self):
+        params = (
+            list(self.backbone.parameters())
+            + list(self.projection_head.parameters())
+            + list(self.prediction_head.parameters())
+            # need to add supervised head parameters to optimizer
+            + list(self.supervised_head.parameters())
+        )
+
+        return _optimizer(params, self.config)
+
 # I'm splitting self.project into two steps, self.represent then self.project, so I can use the rep without recalculating
 
     def represent(self, x):

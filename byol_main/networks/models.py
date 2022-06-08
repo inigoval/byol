@@ -36,12 +36,6 @@ class LogisticRegression(torch.nn.Module):
 
 
 def _get_backbone(config):
-    net = _get_net(config)  # e.g. resnet
-
-    # print(net)
-
-    # print(list(net.children())[-1])
-    # print(list(net.children())[-2])
 
     logging.info(config['model']['architecture'])
 
@@ -58,6 +52,10 @@ def _get_backbone(config):
             representation_dim=1280
         )
         return backbone
+
+    # otherwise, continue with torchvision
+
+    net = _get_net(config)  # e.g. resnet
 
     if 'resnet' in config["model"]["architecture"]:
         # c_out = channels out
