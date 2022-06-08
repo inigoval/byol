@@ -174,7 +174,7 @@ class BYOL_Supervised(BYOL):
                 num_questions = labels.shape[1]
                 # divide by num labels > 0, to avoid reducing the mean with unlabelled data for which the loss is 0
                 # or, by dirichlet_loss.sum(axis=1) > 0
-                num_labelled_galaxies = labels.sum(axis=1) > 0
+                num_labelled_galaxies = (labels.sum(axis=1) > 0).sum()
                 return torch.sum(dirichlet_loss)/(num_labelled_galaxies * num_questions)  # over both (batch, question)
                 # p of (N=0, k=0) = 1 -> neg log p = 0 -> no effect on sum, but will reduce mean. Only absolute value though, not gradients per se if normalised
 
