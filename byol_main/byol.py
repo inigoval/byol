@@ -176,7 +176,13 @@ class BYOL_Supervised(BYOL):
                 # or, by dirichlet_loss.sum(axis=1) > 0
                 num_labelled_galaxies = (labels.sum(axis=1) > 0).sum()
                 logging.info((torch.sum(dirichlet_loss), num_labelled_galaxies, num_questions))
-                return torch.sum(dirichlet_loss)/(num_labelled_galaxies * num_questions)  # over both (batch, question)
+
+                # currently too small by factor of num_unlabelled/num_labelled
+                # aka  loss * num_unlabelled/num_labelled  = goal loss
+                num_unlabelled_galaxies = len(labels)
+                empirical_factor = num_unlabelled_galaxies/num_labelled_galaxies
+
+                return empirical_factor * torch.sum(dirichlet_loss)/(num_labelled_galaxies * num_questions)  # over both (batch, question)
                 # p of (N=0, k=0) = 1 -> neg log p = 0 -> no effect on sum, but will reduce mean. Only absolute value though, not gradients per se if normalised
 
             self.supervised_loss_func = dirichlet_loss_aggregated_to_scalar

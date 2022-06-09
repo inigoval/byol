@@ -8,6 +8,7 @@ import pandas as pd
 
 from pytorch_galaxy_datasets import galaxy_dataset
 from foundation.datasets import mixed, tidal
+from sklearn.model_selection import train_test_split
 
 from byol_main.dataloading.datamodules import generic_galaxy
 
@@ -57,6 +58,23 @@ class Mixed_DataModule(generic_galaxy.Galaxy_DataModule):
 
         if self.config['val_dataset'] == 'rings':
             
+            # # TODO uncomment once happy with loss
+            # from pytorch_galaxy_datasets.prepared_datasets import rings
+            # # load the ring dataset directly - we only need the images and ring labels, it's a separate dataloader
+            # # save the test split for later (much later)
+            # train_catalog, label_cols = rings.rings_setup(root=self.path/'rings', download=False, train=True)
+            # train_catalog['ring_label'] = (train_catalog['ring_fraction'] > 0.5).astype(int)
+            # # sample a subset that we pretend the astronomer has already labelled (can make config arg if needed)
+            # subset_for_byol_val = train_catalog.sample(10000, random_state=42)
+            # # use 80% as labelled bank and 20% as targets to classify
+            # ring_knn_bank, ring_knn_targets = train_test_split(subset_for_byol_val, test_size=0.2, random_state=42)
+            # # convert to GalaxyDataset
+            # ring_knn_bank = galaxy_dataset.GalaxyDataset(
+            #     label_cols=['ring_label'], catalog=ring_knn_bank, transform=self.T_test)
+            # ring_knn_targets = galaxy_dataset.GalaxyDataset(
+            #     label_cols=['ring_label'], catalog=ring_knn_targets, transform=self.T_test)
+
+
             ring_val_filtered = val_catalog.query('ring_label >= 0')
             ring_knn_targets =  galaxy_dataset.GalaxyDataset(
                 label_cols=['ring_label'], catalog=ring_val_filtered.sample(min(len(ring_val_filtered), 10000)), transform=self.T_test)
