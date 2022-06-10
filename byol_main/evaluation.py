@@ -212,7 +212,7 @@ class KNN_Eval(pl.LightningModule):   # lightning subclass purely for self.log
         feature = self.forward(x).squeeze()  # from init(forward), likely BYOL's forward 
         feature = F.normalize(feature, dim=1)
 
-        # Load feature bank and labels
+        # Load feature bank and labels (with same dtypes as x, y)
         feature_bank = self.feature_bank.type_as(x)
         target_bank = self.target_bank.type_as(y)
 
@@ -229,7 +229,8 @@ class KNN_Eval(pl.LightningModule):   # lightning subclass purely for self.log
 
             # Compute accuracy
             # assert top1.min() >= 0
-        self.knn_acc.update(top1, y)
+            # seems to have an error moving top1 to cpu, or y to cuda, automatically via pl?
+        self.knn_acc.update(top1.to(device='cpu'), y)
 
     def validation_epoch_end(self, outputs):
         if hasattr(self, "feature_bank") and hasattr(self, "target_bank"):
