@@ -137,10 +137,10 @@ class Lightning_Eval(pl.LightningModule):
             for knn_dataset_name, (_, val_databank) in self.trainer.datamodule.data['val_knn'].items():
                 logging.info('Using knn dataset {}, {} bank labels'.format(knn_dataset_name, len(val_databank)))
                 # each KNN_Eval does the actual val work
-                self.knn_eval_datasets.append(KNN_Eval(knn_dataset_name, val_databank, self.config, self.dummy_param, self.forward))
+                self.knn_eval_datasets.append(KNN_Eval(knn_dataset_name, val_databank, self.config, self.dummy_param, self.forward, self.log))
 
     def setup_supervised_validation(self):
-        self.supervised_dataset = Supervised_Eval(self.represent, self.supervised_head, self.supervised_loss_func, self.dummy_param)
+        self.supervised_dataset = Supervised_Eval(self.represent, self.supervised_head, self.supervised_loss_func, self.dummy_param, self.log)
 
     # will only work if datamodule has self.data['val_supervised'] key
     # else will not be passed the extra dataloader_idx argument
@@ -156,17 +156,18 @@ class Lightning_Eval(pl.LightningModule):
         raise NotImplementedError('Must be subclassed by e.g. BYOL, which implements .forward(x)')
 
 # for a single knn eval dataset
-class KNN_Eval(pl.LightningModule):   # lightning subclass purely for self.log
+class KNN_Eval():   # lightning subclass purely for self.log
 
-    def __init__(self, name, data_bank, config, dummy_param, forward: callable):
+    def __init__(self, name, data_bank, config, dummy_param, forward: callable, log: callable):
 
-        super().__init__()
+        # super().__init__()
         
         self.name = name
         self.data_bank = data_bank
         self.dummy_param = dummy_param
         self.config = config
         self.forward = forward  # explictly passed to __init__, composition-style
+        self.log = log
 
         # https://torchmetrics.readthedocs.io/en/latest/pages/overview.html#metrics-and-devices
         self.knn_acc = tm.Accuracy(average="micro", threshold=0).to(device='cuda:0')
@@ -241,9 +242,9 @@ class KNN_Eval(pl.LightningModule):   # lightning subclass purely for self.log
             self.log("val/kNN_acc/{}".format(self.name), self.knn_acc.compute() * 100)
             self.knn_acc.reset()
 
-class Supervised_Eval(pl.LightningModule):
+class Supervised_Eval():
 
-    def __init__(self, represent, supervised_head, supervised_loss_func, dummy_param) -> None:
+    def __init__(self, represent, supervised_head, supervised_loss_func, dummy_param, log) -> None:
         # this is getting a bit ugly because these get to Lightning_Eval's subclass via inheritance,
         # but I'm trying to use composition here to have a small object that does one thing
         # would work better to also get the above into Lightning_Eval via comp.
@@ -256,6 +257,7 @@ class Supervised_Eval(pl.LightningModule):
         self.supervised_head = supervised_head
         self.supervised_loss_func = supervised_loss_func
         self.dummy_param = dummy_param
+        self.log = log
 
     def validation_step(self, batch):
         # get contrastive and supervised loss on validation set
