@@ -159,6 +159,8 @@ class Lightning_Eval(pl.LightningModule):
 class KNN_Eval(pl.LightningModule):   # lightning subclass purely for self.log
 
     def __init__(self, name, data_bank, config, dummy_param, forward: callable):
+
+        super().__init__()
         
         self.name = name
         self.data_bank = data_bank
@@ -240,6 +242,11 @@ class Supervised_Eval(pl.LightningModule):
         # this is getting a bit ugly because these get to Lightning_Eval's subclass via inheritance,
         # but I'm trying to use composition here to have a small object that does one thing
         # would work better to also get the above into Lightning_Eval via comp.
+        # or would work better to refactor the supervised pieces into one bit of code
+
+        super().__init__()
+
+
         self.represent = represent
         self.supervised_head = supervised_head
         self.supervised_loss_func = supervised_loss_func
