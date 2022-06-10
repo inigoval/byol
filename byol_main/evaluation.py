@@ -134,7 +134,7 @@ class Lightning_Eval(pl.LightningModule):
         with torch.no_grad():
             self.knn_eval_datasets = []
             # deprecating self.trainer.datamodule.data["labelled"] in favor of both being part of val_knn
-            for knn_dataset_name, (_, val_databank) in self.data['val_knn'].items():
+            for knn_dataset_name, (_, val_databank) in self.trainer.datamodule.data['val_knn'].items():
                 logging.info('Using knn dataset {}, {} bank labels'.format(knn_dataset_name, len(val_databank)))
                 # each KNN_Eval does the actual val work
                 self.knn_eval_datasets += KNN_Eval(knn_dataset_name, val_databank, self.config, self.dummy_param, self.forward)
