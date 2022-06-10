@@ -250,7 +250,7 @@ class Supervised_Eval():
         # would work better to also get the above into Lightning_Eval via comp.
         # or would work better to refactor the supervised pieces into one bit of code
 
-        super().__init__()
+        # super().__init__()
 
 
         self.represent = represent
