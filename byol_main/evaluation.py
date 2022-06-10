@@ -137,7 +137,7 @@ class Lightning_Eval(pl.LightningModule):
             for knn_dataset_name, (_, val_databank) in self.trainer.datamodule.data['val_knn'].items():
                 logging.info('Using knn dataset {}, {} bank labels'.format(knn_dataset_name, len(val_databank)))
                 # each KNN_Eval does the actual val work
-                self.knn_eval_datasets += KNN_Eval(knn_dataset_name, val_databank, self.config, self.dummy_param, self.forward)
+                self.knn_eval_datasets.append(KNN_Eval(knn_dataset_name, val_databank, self.config, self.dummy_param, self.forward))
 
     def setup_supervised_validation(self):
         self.supervised_dataset = Supervised_Eval(self.represent, self.supervised_head, self.supervised_loss_func, self.dummy_param)
