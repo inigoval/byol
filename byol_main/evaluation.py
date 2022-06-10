@@ -234,7 +234,7 @@ class KNN_Eval(pl.LightningModule):   # lightning subclass purely for self.log
             self.log("val/kNN_acc/{}".format(self.name), self.knn_acc.compute() * 100)
             self.knn_acc.reset()
 
-class Supervised_Eval():
+class Supervised_Eval(pl.LightningModule):
 
     def __init__(self, represent, supervised_head, supervised_loss_func, dummy_param) -> None:
         # this is getting a bit ugly because these get to Lightning_Eval's subclass via inheritance,
