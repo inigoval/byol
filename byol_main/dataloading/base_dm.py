@@ -63,7 +63,7 @@ class Base_DataModule(pl.LightningDataModule):
                 persistent_workers=self.config["persistent_workers"],
                 pin_memory=self.config['pin_memory']
             )
-            knn_loaders += knn_loader
+            knn_loaders.append(knn_loader)
 
 
         if 'supervised' not in self.config['type']:
@@ -82,8 +82,10 @@ class Base_DataModule(pl.LightningDataModule):
             )
             
             # validation_step will need additional dataloader_idx argument
-            # https://pytorch-lightning.readthedocs.io/en/stable/guides/data.html#multiple-validation-test-predict-dataloaders
-            return knn_loaders + [suphead_loader]  
+            # https://pytorch-lightning.readthedocs.io/en/stable/guides/data.html#multiple-validation-test-predict-
+            val_dataloaders = knn_loaders + [suphead_loader]  # if you naively add, will combine - not the goal
+            logging.info(val_dataloaders)
+            return val_dataloaders
 
     def test_dataloader(self):
         loader = DataLoader(
