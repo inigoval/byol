@@ -7,12 +7,13 @@ import pandas as pd
 # https://github.com/mwalmsley/pytorch-galaxy-datasets
 
 from pytorch_galaxy_datasets import galaxy_dataset
+from pytorch_galaxy_datasets.prepared_datasets import rings
 from foundation.datasets import mixed, tidal
 from sklearn.model_selection import train_test_split
 
 from byol_main.dataloading.datamodules import generic_galaxy
 
-
+# inherits but doesn't actually use
 class Mixed_DataModule(generic_galaxy.Galaxy_DataModule):
     def __init__(self, config):
         super().__init__(
@@ -56,42 +57,42 @@ class Mixed_DataModule(generic_galaxy.Galaxy_DataModule):
         self.data["test"] = galaxy_dataset.GalaxyDataset(
             label_cols=['ring_label'], catalog=test_catalog, transform=self.T_test)
 
-        if self.config['val_dataset'] == 'rings':
+        self.data["val_knn"] = {}  # will add by key below
+
+        if 'rings' in self.config['val_dataset']:
+
             
-            # # TODO uncomment once happy with loss
-            # from pytorch_galaxy_datasets.prepared_datasets import rings
-            # # load the ring dataset directly - we only need the images and ring labels, it's a separate dataloader
-            # # save the test split for later (much later)
-            # train_catalog, label_cols = rings.rings_setup(root=self.path/'rings', download=False, train=True)
-            # train_catalog['ring_label'] = (train_catalog['ring_fraction'] > 0.5).astype(int)
-            # # sample a subset that we pretend the astronomer has already labelled (can make config arg if needed)
-            # subset_for_byol_val = train_catalog.sample(10000, random_state=42)
-            # # use 80% as labelled bank and 20% as targets to classify
-            # ring_knn_bank, ring_knn_targets = train_test_split(subset_for_byol_val, test_size=0.2, random_state=42)
-            # # convert to GalaxyDataset
-            # ring_knn_bank = galaxy_dataset.GalaxyDataset(
-            #     label_cols=['ring_label'], catalog=ring_knn_bank, transform=self.T_test)
-            # ring_knn_targets = galaxy_dataset.GalaxyDataset(
-            #     label_cols=['ring_label'], catalog=ring_knn_targets, transform=self.T_test)
-
-
-            ring_val_filtered = val_catalog.query('ring_label >= 0')
-            ring_knn_targets =  galaxy_dataset.GalaxyDataset(
-                label_cols=['ring_label'], catalog=ring_val_filtered.sample(min(len(ring_val_filtered), 10000)), transform=self.T_test)
-
-            # using test here is a slight cheat as I wouldn't really know the labels yet, but equally I am training on the train set already
-            # kinda imperfect either way
-            # maybe I should use train after all - TODO ponder
-            # (changing now will mess with current experiments)
-            ring_test_filtered = test_catalog.query('ring_label >= 0')
+            # load the ring dataset directly - we only need the images and ring labels, it's a separate dataloader
+            # save the test split for later (much later)
+            train_catalog, label_cols = rings.rings_setup(root=self.path/'rings', download=False, train=True)
+            train_catalog['ring_label'] = (train_catalog['ring_fraction'] > 0.5).astype(int)
+            # sample a subset that we pretend the astronomer has already labelled (can make config arg if needed)
+            subset_for_byol_val = train_catalog.sample(10000, random_state=42)
+            # use 80% as labelled bank and 20% as targets to classify
+            ring_knn_bank, ring_knn_targets = train_test_split(subset_for_byol_val, test_size=0.2, random_state=42)
+            # convert to GalaxyDataset
             ring_knn_bank = galaxy_dataset.GalaxyDataset(
-                label_cols=['ring_label'], catalog=ring_test_filtered.sample(min(len(ring_test_filtered), 10000)),  transform=self.T_test
-            )
+                label_cols=['ring_label'], catalog=ring_knn_bank, transform=self.T_test)
+            ring_knn_targets = galaxy_dataset.GalaxyDataset(
+                label_cols=['ring_label'], catalog=ring_knn_targets, transform=self.T_test)
 
-            self.data["val_knn"] = ring_knn_targets
-            self.data["labelled"] = ring_knn_bank
 
-        elif self.config['val_dataset'] == 'tidal':
+            # ring_val_filtered = val_catalog.query('ring_label >= 0')
+            # ring_knn_targets =  galaxy_dataset.GalaxyDataset(
+            #     label_cols=['ring_label'], catalog=ring_val_filtered.sample(min(len(ring_val_filtered), 10000)), transform=self.T_test)
+
+            # # using test here is a slight cheat as I wouldn't really know the labels yet, but equally I am training on the train set already
+            # # kinda imperfect either way
+            # # maybe I should use train after all - TODO ponder
+            # # (changing now will mess with current experiments)
+            # ring_test_filtered = test_catalog.query('ring_label >= 0')
+            # ring_knn_bank = galaxy_dataset.GalaxyDataset(
+            #     label_cols=['ring_label'], catalog=ring_test_filtered.sample(min(len(ring_test_filtered), 10000)),  transform=self.T_test
+            # )
+
+            self.data["val_knn"]['rings'] = ring_knn_targets, ring_knn_bank
+
+        if 'tidal' in self.config['val_dataset']:
 
             _, (tidal_train_catalog, tidal_val_catalog, _, _) = tidal.get_tidal_catalogs(
                 self.path, self.config['debug'], download=True
@@ -104,12 +105,8 @@ class Mixed_DataModule(generic_galaxy.Galaxy_DataModule):
                 label_cols=['tidal_label'], catalog=tidal_train_catalog,  transform=self.T_test
             )
 
-            self.data["val_knn"] = tidal_knn_targets
-            self.data["labelled"] = tidal_knn_bank
+            self.data["val_knn"]['tidal'] = tidal_knn_targets, tidal_knn_bank
 
-        else:
-
-            raise ValueError('{} not recognised'.format(self.data["val_knn"]))
 
         # only used for knn feature bank (and so has no effect other than val metric)
         # also needs to be filtered to avoid missing labels

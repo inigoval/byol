@@ -58,18 +58,21 @@ class Galaxy_DataModule(Base_DataModule):
         # Re-initialise dataset with new mu and sig values
         self.data["train"] = galaxy_dataset.GalaxyDataset(
             catalog=pd.concat([train_catalog, unlabelled_catalog]), label_cols=training_label_cols, transform=self.T_train)
+
         # Initialise individual datasets with test transform (for evaluation)
         # these must always be classification problems with a int label, for knn to make sense
         # val used for knn input, searched within feature/target bank
-        self.data["val"] = galaxy_dataset.GalaxyDataset(
+        val_galaxies = galaxy_dataset.GalaxyDataset(
             label_cols=['label'], catalog=val_catalog, transform=self.T_test)
+        val_databank = galaxy_dataset.GalaxyDataset(
+            label_cols=['label'], catalog=train_catalog.sample(10000),  transform=self.T_test)
+        self.data["val_knn"] = {'generic': (val_galaxies, val_databank)}
+        # no val_supervised by default
+
         # test not currently used
         self.data["test"] = galaxy_dataset.GalaxyDataset(
             label_cols=['label'], catalog=test_catalog, transform=self.T_test)
         # labelled unpacked into feature_bank, target_bank, for knn eval
-        self.data["labelled"] = galaxy_dataset.GalaxyDataset(
-            label_cols=['label'], catalog=train_catalog.sample(10000),  transform=self.T_test)
-
         dataset_utils.check_dummy_metrics(val_catalog['label'])
         # logging.info('Catalog sizes: train/val={}, test={}, unlabelled={}'.format(
         #     len(train_and_val_catalog), len(test_catalog), len(unlabelled_catalog)))

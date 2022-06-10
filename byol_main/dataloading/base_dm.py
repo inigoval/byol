@@ -42,21 +42,35 @@ class Base_DataModule(pl.LightningDataModule):
         )
         return loader
 
-    def val_dataloader(self):
-        knn_loader = DataLoader(
-            self.data["val_knn"],
-            batch_size=self.config["data"]["val_batch_size"],
-            num_workers=self.config["num_workers"],
-            # num_workers=1,
-            prefetch_factor=self.config['prefetch_factor'],
-            persistent_workers=self.config["persistent_workers"],
-            pin_memory=self.config['pin_memory']
-        )
+    def val_dataloader(self):  # will be N knn dataloaders and then (optionally) 1 supervised val dataloader
+
+        # the first N dataloaders are for knn validation, and may include totally different galaxies to self.data['train]
+        # the last dataloader is galaxies on which to measure the broad-task validation loss, and should probably be drawn from the same distribution as self.data['train']
+
+        # self.data['val_knn'] = {'val_dataset_name': (val_galaxies, labelled_bank), ...)
+
+        knn_loaders = []
+
+        # dicts are ordered in python3.7
+        # _ is the labelled bank galaxies, loaded in evaluation.py
+        for knn_dataset_name, (val_galaxies, _) in self.data['val_knn'].items():
+            logging.info('Using knn dataset {}, {} non-bank labels'.format(knn_dataset_name, len(val_galaxies)))
+            knn_loader = DataLoader(
+                val_galaxies,
+                batch_size=self.config["data"]["val_batch_size"],
+                num_workers=self.config["num_workers"],
+                prefetch_factor=self.config['prefetch_factor'],
+                persistent_workers=self.config["persistent_workers"],
+                pin_memory=self.config['pin_memory']
+            )
+            knn_loaders += knn_loader
+
+
         if 'supervised' not in self.config['type']:
-            logging.info('Setting up datamodule with knn val dataloader only')
-            return knn_loader
+            logging.info('Setting up datamodule with knn val dataloaders only')
+            return knn_loaders
         else:  # e.g. type=byol_supervised
-            logging.info('Setting up datamodule with knn and supervised head val dataloaders')
+            logging.info('Setting up datamodule supervised head dataloader')
             suphead_loader = DataLoader(
                 self.data["val_supervised"],
                 batch_size=self.config["data"]["val_batch_size"],
@@ -66,9 +80,10 @@ class Base_DataModule(pl.LightningDataModule):
                 persistent_workers=self.config["persistent_workers"],
                 pin_memory=self.config['pin_memory']
             )
-        # validation_step will need additional dataloader_idx argument
-        # https://pytorch-lightning.readthedocs.io/en/stable/guides/data.html#multiple-validation-test-predict-dataloaders
-        return [knn_loader, suphead_loader]  
+            
+            # validation_step will need additional dataloader_idx argument
+            # https://pytorch-lightning.readthedocs.io/en/stable/guides/data.html#multiple-validation-test-predict-dataloaders
+            return knn_loaders + [suphead_loader]  
 
     def test_dataloader(self):
         loader = DataLoader(

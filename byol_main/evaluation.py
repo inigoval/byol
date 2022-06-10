@@ -109,10 +109,11 @@ def knn_predict(
 
 
 class Lightning_Eval(pl.LightningModule):
+    # for many knn eval datasets
     def __init__(self, config):
         super().__init__()
         self.config = config
-        self.knn_acc = tm.Accuracy(average="micro", threshold=0)
+        
 
     def on_train_start(self):
         self.config["data"]["mu"] = self.trainer.datamodule.mu
@@ -126,59 +127,90 @@ class Lightning_Eval(pl.LightningModule):
 
     def on_validation_start(self):
         self.setup_knn_validation()
+        if hasattr(self, self.supervised_head):
+            self.setup_supervised_validation()
 
     def setup_knn_validation(self):
         with torch.no_grad():
-            data_bank = self.trainer.datamodule.data[
-                "labelled"
-            ]  # will get split into feature_bank and target_bank
-            data_bank_loader = DataLoader(
-                data_bank, 200
-            )  # 200 is the batch size used for the unpacking below
-            feature_bank = []
-            target_bank = []
-            for data in data_bank_loader:
-                # Load data and move to correct device
-                (
-                    x,
-                    y,
-                ) = data  # supervised-style batch of (images, labels), with batch size from above
-                x = x.type_as(self.dummy_param)
-                y = y.type_as(self.dummy_param).long()
+            self.knn_eval_datasets = []
+            # deprecating self.trainer.datamodule.data["labelled"] in favor of both being part of val_knn
+            for knn_dataset_name, (_, val_databank) in self.data['val_knn'].items():
+                logging.info('Using knn dataset {}, {} bank labels'.format(knn_dataset_name, len(val_databank)))
+                # each KNN_Eval does the actual val work
+                self.knn_eval_datasets += KNN_Eval(knn_dataset_name, val_databank, self.config, self.dummy_param, self.forward)
 
-                # Encode data and normalize features (for kNN)
-                feature = self.forward(x).squeeze()  # (batch, features)  e.g. (200, 512)
-                feature = F.normalize(feature, dim=1)
-                feature_bank.append(
+    def setup_supervised_validation(self):
+        self.supervised_dataset = Supervised_Eval(self.represent, self.supervised_head, self.supervised_loss_func, self.dummy_param)
+
+    # will only work if datamodule has self.data['val_supervised'] key
+    # else will not be passed the extra dataloader_idx argument
+    def validation_step(self, batch, batch_idx, dataloader_idx):
+        if dataloader_idx < len(self.knn_eval_datasets):  # first N are assumed dataloaders for knn eval
+            self.knn_eval_datasets[dataloader_idx].validation_step(batch)  # knn validation
+        else:
+            assert hasattr(self.supervised_dataset)
+            self.supervised_dataset.validation_step(batch)
+
+
+    def forward(x):
+        raise NotImplementedError('Must be subclassed by e.g. BYOL, which implements .forward(x)')
+
+# for a single knn eval dataset
+class KNN_Eval(pl.LightningModule):   # lightning subclass purely for self.log
+
+    def __init__(self, name, data_bank, config, dummy_param, forward: callable):
+        
+        self.name = name
+        self.data_bank = data_bank
+        self.dummy_param = dummy_param
+        self.config = config
+        self.forward = forward  # explictly passed to __init__, composition-style
+
+        self.knn_acc = tm.Accuracy(average="micro", threshold=0)
+
+        self.setup_knn_features_and_targets()
+
+
+    def setup_knn_features_and_targets(self):
+        # TODO will have many databanks, each with different knn problem
+        data_bank_loader = DataLoader(
+                self.data_bank, 200
+            )  # 200 is the batch size used for the unpacking below
+        feature_bank = []
+        target_bank = []
+        for data in data_bank_loader:
+            # Load data and move to correct device
+            # (x, y,) = data  # supervised-style batch of (images, labels), with batch size from above
+            x, y = data  # should be equiv.?
+            x = x.type_as(self.dummy_param)
+            y = y.type_as(self.dummy_param).long()
+
+            # Encode data and normalize features (for kNN)
+            feature = self.forward(x).squeeze()  # (batch, features)  e.g. (200, 512)
+            feature = F.normalize(feature, dim=1)
+            feature_bank.append(
                     feature
                 )  # tensor of all features, within which to find nearest-neighbours. Each is (B, N_features), N_features being the output dim of self.forward e.g. BYOL
-                target_bank.append(y)  # tensor with labels of those features
+            target_bank.append(y)  # tensor with labels of those features
 
             # Save full feature bank for validation epoch
-            self.feature_bank = (
+        self.feature_bank = (
                 torch.cat(feature_bank, dim=0).t().contiguous()
             )  # (features, len(l datamodule)) due to the .t() transpose
-            self.target_bank = (
+        self.target_bank = (
                 torch.cat(target_bank, dim=0).t().contiguous()
             )  # either (label_dim, len) or just (len) depending on if labels should have singleton label_dim dimension
-            assert all(self.target_bank >= 0)
+        assert all(self.target_bank >= 0)
 
-    def validation_step(self, batch, batch_idx):
-        # this class isn't designed for supervised val loss from dataloader 1
-        # if error 'dataloader_idx' arg not expected, check config['type'] and base dm val setup
-        # is overriden by BYOL_Supervised so shouldn't happen
-        if hasattr(self, "feature_bank") and hasattr(self, "target_bank"):
-            self.knn_validation_step(batch)
-        # used as super() by BYOL_Supervised
 
-    def knn_validation_step(self, batch):
+    def validation_step(self, batch):
         # Load batch
         x, y = batch
-            # Extract + normalize features
-        feature = self.forward(x).squeeze()
+        # Extract + normalize features
+        feature = self.forward(x).squeeze()  # from init(forward), likely BYOL's forward 
         feature = F.normalize(feature, dim=1)
 
-            # Load feature bank and labels
+        # Load feature bank and labels
         feature_bank = self.feature_bank.type_as(x)
         target_bank = self.target_bank.type_as(y)
 
@@ -199,9 +231,41 @@ class Lightning_Eval(pl.LightningModule):
 
     def validation_epoch_end(self, outputs):
         if hasattr(self, "feature_bank") and hasattr(self, "target_bank"):
-            self.log("val/kNN_acc", self.knn_acc.compute() * 100)
+            self.log("val/kNN_acc/{}".format(self.name), self.knn_acc.compute() * 100)
             self.knn_acc.reset()
 
+class Supervised_Eval():
+
+    def __init__(self, represent, supervised_head, supervised_loss_func, dummy_param) -> None:
+        # this is getting a bit ugly because these get to Lightning_Eval's subclass via inheritance,
+        # but I'm trying to use composition here to have a small object that does one thing
+        # would work better to also get the above into Lightning_Eval via comp.
+        self.represent = represent
+        self.supervised_head = supervised_head
+        self.supervised_loss_func = supervised_loss_func
+        self.dummy_param = dummy_param
+
+    def validation_step(self, batch):
+        # get contrastive and supervised loss on validation set
+        x, labels = batch
+        # logging.info('x')
+        # logging.info(x)
+        x = x.type_as(self.dummy_param)
+        y = self.represent(x)  # not a great name - this is the representation, pre-projection
+        # logging.info('y')
+        # logging.info(y)
+
+        supervised_head_out = self.supervised_head(y)
+        # p = self.project(y)
+        # supervised_head_out = self.supervised_head(p)
+
+        # logging.info('supervised_head_out')
+        # logging.info(supervised_head_out)
+        supervised_loss = self.supervised_loss_func(supervised_head_out, labels)  
+        self.log("val/supervised_loss", supervised_loss, on_step=False, on_epoch=True) 
+
+
+        
 
 class Feature_Bank(Callback):
     """Code adapted from https://github.com/lightly-ai/lightly/blob/master/lightly/utils/benchmarking.py
