@@ -127,7 +127,7 @@ class Lightning_Eval(pl.LightningModule):
 
     def on_validation_start(self):
         self.setup_knn_validation()
-        if hasattr(self, self.supervised_head):
+        if hasattr(self, 'supervised_head'):
             self.setup_supervised_validation()
 
     def setup_knn_validation(self):
