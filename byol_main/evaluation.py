@@ -168,7 +168,8 @@ class KNN_Eval(pl.LightningModule):   # lightning subclass purely for self.log
         self.config = config
         self.forward = forward  # explictly passed to __init__, composition-style
 
-        self.knn_acc = tm.Accuracy(average="micro", threshold=0)
+        # https://torchmetrics.readthedocs.io/en/latest/pages/overview.html#metrics-and-devices
+        self.knn_acc = tm.Accuracy(average="micro", threshold=0).to(device='cuda:0')
 
         self.setup_knn_features_and_targets()
 
@@ -231,6 +232,8 @@ class KNN_Eval(pl.LightningModule):   # lightning subclass purely for self.log
             # assert top1.min() >= 0
             # seems to have an error moving top1 to cpu, or y to cuda, automatically via pl?
             # TODO could automatically check the device of knn_acc's current value?
+
+        logging.info((top1.device, y.device, self.knn_acc.device))
         self.knn_acc.update(top1.to(device='cuda:0'), y.to(device='cuda:0'))
 
     def validation_epoch_end(self, outputs):
