@@ -148,7 +148,7 @@ class Lightning_Eval(pl.LightningModule):
         if dataloader_idx < len(self.knn_eval_datasets):  # first N are assumed dataloaders for knn eval
             self.knn_eval_datasets[dataloader_idx].validation_step(batch)  # knn validation
         else:
-            assert hasattr(self.supervised_dataset)
+            assert hasattr(self, 'supervised_dataset')
             self.supervised_dataset.validation_step(batch)
 
 
@@ -233,7 +233,7 @@ class KNN_Eval(pl.LightningModule):   # lightning subclass purely for self.log
             # seems to have an error moving top1 to cpu, or y to cuda, automatically via pl?
             # TODO could automatically check the device of knn_acc's current value?
 
-        logging.info((top1.device, y.device, self.knn_acc.device))
+        # logging.info((top1.device, y.device, self.knn_acc.device))
         self.knn_acc.update(top1.to(device='cuda:0'), y.to(device='cuda:0'))
 
     def validation_epoch_end(self, outputs):
