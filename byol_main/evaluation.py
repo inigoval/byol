@@ -230,7 +230,8 @@ class KNN_Eval(pl.LightningModule):   # lightning subclass purely for self.log
             # Compute accuracy
             # assert top1.min() >= 0
             # seems to have an error moving top1 to cpu, or y to cuda, automatically via pl?
-        self.knn_acc.update(top1.to(device='cpu'), y)
+            # TODO could automatically check the device of knn_acc's current value?
+        self.knn_acc.update(top1.to(device='cuda:0'), y.to(device='cuda:0'))
 
     def validation_epoch_end(self, outputs):
         if hasattr(self, "feature_bank") and hasattr(self, "target_bank"):
