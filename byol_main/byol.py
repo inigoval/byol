@@ -175,7 +175,7 @@ class BYOL_Supervised(BYOL):
                 # divide by num labels > 0, to avoid reducing the mean with unlabelled data for which the loss is 0
                 # or, by dirichlet_loss.sum(axis=1) > 0
                 num_labelled_galaxies = (labels.sum(axis=1) > 0).sum()
-                logging.info((torch.sum(dirichlet_loss), num_labelled_galaxies, num_questions))
+                # logging.info((torch.sum(dirichlet_loss), num_labelled_galaxies, num_questions))
 
                 # currently too small by factor of num_unlabelled/num_labelled
                 # aka  loss * num_unlabelled/num_labelled  = goal loss
