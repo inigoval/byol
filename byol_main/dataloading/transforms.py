@@ -79,10 +79,11 @@ class MultiView(nn.Module):
 
         # TODO could get ugly
         elif self.config["dataset"] in ['gz2', 'decals_dr5', 'legs', 'rings', 'legs_and_rings']:
-            _gz2_view(self.config)  # now badly named TODO
+            return _gz2_view(self.config)  # now badly named TODO
 
         elif self.config["dataset"] == 'mixed':
-            return _zoobot_default_view(self.config)
+            # return _zoobot_default_view(self.config)
+            return _gz2_view(self.config)  # now badly named TODO
 
         else:
             raise ValueError(self.config["dataset"])
