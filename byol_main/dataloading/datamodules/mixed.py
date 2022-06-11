@@ -95,7 +95,7 @@ class Mixed_DataModule(generic_galaxy.Galaxy_DataModule):
         if 'tidal' in self.config['val_dataset']:
 
             _, (tidal_train_catalog, tidal_val_catalog, _, _) = tidal.get_tidal_catalogs(
-                self.path, self.config['debug'], download=True
+                self.path, self.config['debug'], download=True, balance=True
             )
             tidal_knn_targets =  galaxy_dataset.GalaxyDataset(
                 label_cols=['tidal_label'], catalog=tidal_val_catalog.query('tidal_label >= 0'), transform=self.T_test)
