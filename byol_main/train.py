@@ -32,8 +32,6 @@ class TorchTensorboardProfilerCallback(pl.Callback):
     pl_module.log_dict(outputs)  # also logging the loss, while we're here
 
 
-
-
 def run_contrastive_pretraining(config, wandb_logger, trainer_settings):
 
     pl.seed_everything(config["seed"])

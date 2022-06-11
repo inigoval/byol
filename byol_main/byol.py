@@ -1,3 +1,4 @@
+from re import L
 import torch
 import torch.nn as nn
 import lightly
@@ -168,8 +169,18 @@ class BYOL_Supervised(BYOL):
             )
             # my losses. code uses the wrong input convention (torch does preds, labels, but I did labels, preds) - adjust with lambda
             # sum is over questions as losses.multiquestion_loss gives loss like (batch, neg_log_prob_per_question)
-            def dirichlet_loss_aggregated_to_scalar(preds, labels):
+            def dirichlet_loss_aggregated_to_scalar(preds, labels, nan_safe=True):
+
+                if nan_safe:
+                    if torch.any(torch.isna(preds)):
+                        logging.warning('Found nan concentration predictions - skipping batch')
+                        return torch.zeros_like(preds).sum()  # using "like" for cuda placement
+                    elif torch.any(preds <= 0.):
+                        logging.warning('Found concentration predictions below 0 - skipping batch')
+                        return torch.zeros_like(preds).sum()  # using "like" for cuda placement
+
                 dirichlet_loss = losses.calculate_multiquestion_loss(labels, preds, supervised_head_params['question_index_groups'])
+                
                 # divide by labels.shape[1] to avoid a factor from num questions with sum/mean. Doesn't matter, just be consistent with zoobot
                 num_questions = labels.shape[1]
                 # divide by num labels > 0, to avoid reducing the mean with unlabelled data for which the loss is 0
@@ -196,7 +207,7 @@ class BYOL_Supervised(BYOL):
             # need to add supervised head parameters to optimizer
             + list(self.supervised_head.parameters())
         )
-
+        # TODO could use dif optimiser for sup head with dif learning rate, if desired
         return _optimizer(params, self.config)
 
 # I'm splitting self.project into two steps, self.represent then self.project, so I can use the rep without recalculating

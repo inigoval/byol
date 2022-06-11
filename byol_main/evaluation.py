@@ -151,6 +151,14 @@ class Lightning_Eval(pl.LightningModule):
             assert hasattr(self, 'supervised_dataset')
             self.supervised_dataset.validation_step(batch)
 
+    def validation_epoch_end(self, outputs) -> None:
+        for knn_eval in self.knn_eval_datasets:
+            knn_eval.validation_epoch_end()
+        # if hasattr(self, 'supervised_dataset'):
+        #     self.supervised_dataset.validation_epoch_end()
+        # not needed - can just self.log the loss without needing to reset e.g. accuracy metrics at epoch end
+        
+
 
     def forward(x):
         raise NotImplementedError('Must be subclassed by e.g. BYOL, which implements .forward(x)')
@@ -237,10 +245,11 @@ class KNN_Eval():   # lightning subclass purely for self.log
         # logging.info((top1.device, y.device, self.knn_acc.device))
         self.knn_acc.update(top1.to(device='cuda:0'), y.to(device='cuda:0'))
 
-    def validation_epoch_end(self, outputs):
-        if hasattr(self, "feature_bank") and hasattr(self, "target_bank"):
-            self.log("val/kNN_acc/{}".format(self.name), self.knn_acc.compute() * 100)
-            self.knn_acc.reset()
+    def validation_epoch_end(self, outputs=None):
+        # if hasattr(self, "feature_bank") and hasattr(self, "target_bank"):
+        # logging.info()
+        self.log("val/downstream_kNN_acc/{}".format(self.name), self.knn_acc.compute() * 100)
+        self.knn_acc.reset()
 
 class Supervised_Eval():
 
@@ -260,7 +269,7 @@ class Supervised_Eval():
         self.log = log
 
     def validation_step(self, batch):
-        # get contrastive and supervised loss on validation set
+        # get supervised loss on batch (from validation set)
         x, labels = batch
         # logging.info('x')
         # logging.info(x)
@@ -278,7 +287,11 @@ class Supervised_Eval():
         supervised_loss = self.supervised_loss_func(supervised_head_out, labels)  
         self.log("val/supervised_loss", supervised_loss, on_step=False, on_epoch=True) 
 
-
+    # def validation_epoch_end(self, outputs=None):
+    #     # if hasattr(self, "feature_bank") and hasattr(self, "target_bank"):
+    #     # logging.info()
+    #     self.log('val/supervised_loss', self.knn_acc.compute() * 100)
+    #     self.knn_acc.reset()
         
 
 class Feature_Bank(Callback):
