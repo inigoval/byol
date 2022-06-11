@@ -172,7 +172,7 @@ class BYOL_Supervised(BYOL):
             def dirichlet_loss_aggregated_to_scalar(preds, labels, nan_safe=True):
 
                 if nan_safe:
-                    if torch.any(torch.isna(preds)):
+                    if torch.any(torch.isnan(preds)):
                         logging.warning('Found nan concentration predictions - skipping batch')
                         return torch.zeros_like(preds).sum()  # using "like" for cuda placement
                     elif torch.any(preds <= 0.):
