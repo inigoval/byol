@@ -39,8 +39,9 @@ def run_contrastive_pretraining(config, wandb_logger, trainer_settings):
     # Save model for test evaluation
     # TODO might be better to use val/supervised_loss when available
     loss_to_monitor = 'train/loss'
-    if config['type'] == 'byol_supervised':
-        loss_to_monitor = 'val/supervised_loss'
+    if (config['type'] == 'byol_supervised') and (config['supervised_loss_weight'] > 0):
+        loss_to_monitor = 'val/supervised_loss/dataloader_idx_2'
+        
 
     logging.info('Loss to monitor for checkpoints: {}'.format(loss_to_monitor))
     checkpoint_mode = {
@@ -59,8 +60,10 @@ def run_contrastive_pretraining(config, wandb_logger, trainer_settings):
         auto_insert_metric_name=False,
         verbose=True,
         dirpath=experiment_dir / 'checkpoints',  # e.g. byol/files/(run_id)/checkpoints/12-344-18.134.ckpt. 
-        filename="{epoch}-{step}-{loss_to_monitor:.3f}",  # filename may not work here TODO
+        filename="{epoch}-{step}-{loss_to_monitor:.4f}",  # filename may not work here TODO
         save_weights_only=True,
+        monitor=loss_to_monitor,
+        save_top_k=3
     )
 
 
