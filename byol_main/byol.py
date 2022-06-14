@@ -248,6 +248,9 @@ class BYOL_Supervised(BYOL):
         if supervised_loss_weight > 1e5:
             # debug mode - ignore contrastive entirely
             loss = supervised_loss
+        elif supervised_loss_weight == 0:
+            # debug mode - ignore supervised entirely
+            loss = contrastive_loss
         else:
             # normalise supervised loss by contrastive loss
             # will have the gradients from supervised loss, but scaled to by similar to contrastive loss
