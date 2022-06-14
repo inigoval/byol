@@ -38,7 +38,7 @@ def run_contrastive_pretraining(config, wandb_logger, trainer_settings):
 
     # Save model for test evaluation
     # TODO might be better to use val/supervised_loss when available
-    loss_to_monitor = 'train/loss'
+    loss_to_monitor = 'train/loss_epoch'
     if (config['type'] == 'byol_supervised') and (config['supervised_loss_weight'] > 0):
         loss_to_monitor = 'val/supervised_loss/dataloader_idx_2'
         
