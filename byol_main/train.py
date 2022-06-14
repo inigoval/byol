@@ -62,7 +62,6 @@ def run_contrastive_pretraining(config, wandb_logger, trainer_settings):
         dirpath=experiment_dir / 'checkpoints',  # e.g. byol/files/(run_id)/checkpoints/12-344-18.134.ckpt. 
         filename="{epoch}-{step}-{loss_to_monitor:.4f}",  # filename may not work here TODO
         save_weights_only=True,
-        monitor=loss_to_monitor,
         save_top_k=3
     )
 
