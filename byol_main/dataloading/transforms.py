@@ -11,6 +11,8 @@ from albumentations.pytorch import ToTensorV2
 from byol_main.paths import Path_Handler
 import cv2
 
+from pytorch_galaxy_datasets import galaxy_datamodule
+
 
 class Circle_Crop(torch.nn.Module):
     """
@@ -49,7 +51,8 @@ class MultiView(nn.Module):
 
         # Define a view
         self.view = self._view()  # creates a callable transform
-        self.normalize = T.Normalize(mu, sig)
+        # self.normalize = T.Normalize(mu, sig)
+        self.normalize = lambda x: x  # TODO temporarily disable normalisation (see also SimpleView)
         self.n_views = n_views
 
     def __call__(self, x):
@@ -68,20 +71,19 @@ class MultiView(nn.Module):
         if self.config["dataset"] == "rgz":
             return _rgz_view(self.config)
 
-        elif self.config["dataset"] == "imagenette":
-            return _simclr_view(self.config)
-
-        elif self.config["dataset"] == "stl10":
-            return _simclr_view(self.config)
-
-        elif self.config["dataset"] == "cifar10":
+        elif self.config["dataset"] in ["imagenette", "stl10", "cifar10"]:
             return _simclr_view(self.config)
 
         elif self.config["dataset"] == "gzmnist":
             return _gzmnist_view(self.config)
 
-        elif self.config["dataset"] == "gz2":
-            return _gz2_view(self.config)
+        # TODO could get ugly
+        elif self.config["dataset"] in ['gz2', 'decals_dr5', 'legs', 'rings', 'legs_and_rings']:
+            return _gz2_view(self.config)  # now badly named TODO
+
+        elif self.config["dataset"] == 'mixed':
+            # return _zoobot_default_view(self.config)
+            return _gz2_view(self.config)  # now badly named TODO
 
         else:
             raise ValueError(self.config["dataset"])
@@ -108,7 +110,8 @@ class SimpleView(nn.Module):
         augs.append(T.ToTensor())
         self.view = T.Compose(augs)
 
-        self.normalize = T.Normalize(mu, sig)
+        # self.normalize = T.Normalize(mu, sig)
+        self.normalize = lambda x: x  # TODO temporarily disable normalisation (see also MultiView)
 
     def __call__(self, x):
         # Use rotation if training
@@ -249,11 +252,17 @@ def _gzmnist_view(config):
 
 
 def _gz2_view(config):
-    # currently the same as gzmnist except for the ToPIL transform
+    # currently the same as gzmnist except for the resizing and ToPIL transform
     s = config["s"]
-    input_height = config["data"]["input_height"]
-    r_downscale = config["data"]["downscale_height"]
-    downscale_height = 424 * r_downscale
+    # images are loaded from disk at whatever size (424, in practice). Not a parameter
+    # images are then downscaled to `downscale_height`, calculated according to the final desired input size * "precrop_size_ratio"
+    # finally, images are random-cropped to input_height and sent to model
+    # e.g. image loaded at 424, resized to downscale_height=300 (424 * precrop_size_ratio=0.75), then random-cropped to input_height=224
+    precrop_size_ratio = config["data"]["precrop_size_ratio"]
+    assert precrop_size_ratio >= 1. # >1 implies image is still bigger than model input height after resizing, leaving room to random-crop
+    input_height = config["data"]["input_height"]  # i.e. after RandomResizedCrop, when input to model
+
+    downscale_height = int(min(424, input_height * precrop_size_ratio))
 
     # Gaussian blurring, kernel 10% of image size (SimCLR paper)
     p_blur = config["p_blur"]
@@ -283,6 +292,17 @@ def _gz2_view(config):
         ]
     )
 
+    return view
+
+
+def _zoobot_default_view(config):
+    transforms = galaxy_datamodule.default_torchvision_transforms(
+        greyscale=False,
+        resize_size=config['data']['input_height'], 
+        crop_scale_bounds=(0.7, 0.8),
+        crop_ratio_bounds=(0.9, 1.1),
+    )
+    view = T.Compose(transforms)
     return view
 
 

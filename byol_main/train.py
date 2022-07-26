@@ -1,16 +1,19 @@
 import wandb
 import pytorch_lightning as pl
 import logging
+import os
 
 from pytorch_lightning.callbacks import LearningRateMonitor
+from pytorch_lightning.profiler import AdvancedProfiler, PyTorchProfiler
 
+from byol_main.byol import BYOL, BYOL_Supervised, Update_M
 from paths import Path_Handler
 from byol_main.dataloading.datamodules import Imagenette_DataModule, Imagenette_DataModule_Eval
 from byol_main.dataloading.datamodules import GalaxyMNIST_DataModule, GalaxyMNIST_DataModule_Eval
 from byol_main.dataloading.datamodules import GZ2_DataModule, GZ2_DataModule_Eval
 from byol_main.dataloading import RGZ_DataModule, RGZ_DataModule_Eval, RGZ_DataModule_Supervised
 from byol_main.dataloading.datamodules import CIFAR10_DataModule, CIFAR10_DataModule_Eval
-from byol_main.byol import BYOL, Update_M
+from byol_main.dataloading.datamodules import datasets
 from byol_main.nnclr import NNCLR
 from byol_main.evaluation import linear_net, Feature_Bank, Epoch_Averaged_Test, Count_Similarity
 from byol_main.config import load_config, update_config
@@ -22,123 +25,119 @@ from supervised import Supervised
 
 if __name__ == "__main__":
 
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(levelname)s: %(message)s",
+# TODO put elsewhere
+# https://colab.research.google.com/github/wandb/examples/blob/master/colabs/pytorch-lightning/Profile_PyTorch_Code.ipynb#scrollTo=qRoUXZdtJIUD
+class TorchTensorboardProfilerCallback(pl.Callback):
+  """Quick-and-dirty Callback for invoking TensorboardProfiler during training.
+  
+  For greater robustness, extend the pl.profiler.profilers.BaseProfiler. See
+  https://pytorch-lightning.readthedocs.io/en/stable/advanced/profiler.html"""
+
+  def __init__(self, profiler):
+    super().__init__()
+    self.profiler = profiler 
+
+  def on_train_batch_end(self, trainer, pl_module, outputs, *args, **kwargs):
+    self.profiler.step()
+    pl_module.log_dict(outputs)  # also logging the loss, while we're here
+
+
+def run_contrastive_pretraining(config, wandb_logger, trainer_settings):
+
+    pl.seed_everything(config["seed"])
+
+    # Save model for test evaluation
+    # TODO might be better to use val/supervised_loss when available
+    loss_to_monitor = 'train/loss_epoch'
+    if (config['type'] == 'byol_supervised') and (config['supervised_loss_weight'] > 0):
+        loss_to_monitor = 'val/supervised_loss/dataloader_idx_2'
+        
+
+    logging.info('Loss to monitor for checkpoints: {}'.format(loss_to_monitor))
+    checkpoint_mode = {
+        "min_loss": {"mode": "min", "monitor": loss_to_monitor},
+        "last": {"monitor": None},
+    }
+
+    experiment_dir = config['files'] / config['run_id']
+    if not os.path.isdir(experiment_dir):
+        os.mkdir(experiment_dir)
+
+    pretrain_checkpoint = pl.callbacks.ModelCheckpoint(
+        **checkpoint_mode[config["checkpoint_mode"]],
+        every_n_epochs=1,
+        save_on_train_epoch_end=True,
+        auto_insert_metric_name=False,
+        verbose=True,
+        dirpath=experiment_dir / 'checkpoints',  # e.g. byol/files/(run_id)/checkpoints/12-344-18.134.ckpt. 
+        filename="{epoch}-{step}-{loss_to_monitor:.4f}",  # filename may not work here TODO
+        save_weights_only=True,
+        save_top_k=3
     )
 
-    config = load_config()
-    update_config(config)
 
-    for i in range(config["n_iterations"]):
-        config["seed"] += 1
-
-        pl.seed_everything(config["seed"])
-
-        paths = Path_Handler()
-        path_dict = paths._dict()
-
-        # Save model for test evaluation#
-        checkpoint_mode = {
-            "min_loss": {"mode": "min", "monitor": "train/loss"},
-            "last": {"monitor": None},
-        }
-        pretrain_checkpoint = pl.callbacks.ModelCheckpoint(
-            **checkpoint_mode[config["checkpoint_mode"]],
-            every_n_epochs=1,
-            save_on_train_epoch_end=True,
-            auto_insert_metric_name=False,
-            verbose=True,
-            # dirpath="wandb/",
-            filename="{train/loss:.3f}",
-            save_weights_only=True,
-            # save_top_k=config["topk"],
-        )
-
-        # Initialise wandb logger, change this if you want to use a different logger #
-        wandb_logger = pl.loggers.WandbLogger(
-            project=config["project_name"],
-            save_dir=path_dict["files"],
-            # reinit=True,
-            config=config,
-        )
-
-        # Load data and record hyperparameters #
-        if config["type"] == "supervised":
-            datasets = {
-                # "imagenette": {
-                #     "pretrain": Imagenette_DataModule,
-                #     "linear": Imagenette_DataModule_Eval,
-                # },
-                # "gzmnist": {
-                #     "pretrain": GalaxyMNIST_DataModule,
-                #     "linear": GalaxyMNIST_DataModule_Eval,
-                # },
-                # "gz2": {
-                #     "pretrain": GZ2_DataModule,
-                #     "linear": GZ2_DataModule_Eval,
-                # },
-                "rgz": {
-                    "pretrain": RGZ_DataModule_Supervised,
-                    "linear": RGZ_DataModule_Eval,
-                }
-                # "stl10": {
-                #     "pretrain": STL10_DataModule,
-                #     "linear": STL10_DataModule_Eval,
-                # },
-                # "cifar10": {
-                #     "pretrain": CIFAR10_DataModule,
-                #     "linear": CIFAR10_DataModule_Eval,
-                # },
-            }
-        else:
-            datasets = {
-                "imagenette": {
-                    "pretrain": Imagenette_DataModule,
-                    "linear": Imagenette_DataModule_Eval,
-                },
-                "gzmnist": {
-                    "pretrain": GalaxyMNIST_DataModule,
-                    "linear": GalaxyMNIST_DataModule_Eval,
-                },
-                "gz2": {
-                    "pretrain": GZ2_DataModule,
-                    "linear": GZ2_DataModule_Eval,
-                },
-                "rgz": {
-                    "pretrain": RGZ_DataModule,
-                    "linear": RGZ_DataModule_Eval,
-                },
-                # "stl10": {
-                #     "pretrain": STL10_DataModule,
-                #     "linear": STL10_DataModule_Eval,
-                # },
-                "cifar10": {
-                    "pretrain": CIFAR10_DataModule,
-                    "linear": CIFAR10_DataModule_Eval,
-                },
-            }
+    pretrain_data = datasets[config["dataset"]]["pretrain"](config)
+    # pretrain_data.prepare_data()
+    # pretrain_data.setup()
 
         pretrain_data = datasets[config["dataset"]]["pretrain"](config)
 
-        # Record mean and standard deviation used in normalisation for inference #
-        # config["data"]["mu"] = pretrain_data.mu
-        # config["data"]["sig"] = pretrain_data.sig
-        # config["data"]["n_steps"] = len(pretrain_data.train_dataloader())
+    # from torch.profiler import tensorboard_trace_handler
+    # import torch
+    # import glob
 
-        # List of callbacks
-        callbacks = [
-            pretrain_checkpoint,
-            LearningRateMonitor(),
-            Epoch_Averaged_Test(),
-            # Count_Similarity(),
-        ]
+    # # default scheduler
+    # profiler = torch.profiler.profile(on_trace_ready=tensorboard_trace_handler(str(experiment_dir)), with_stack=True)
 
-        if config["type"] == "byol_rr":
-            callbacks.append(Count_Masks())
+    # with profiler:
+    #     profiler_callback = TorchTensorboardProfilerCallback(profiler)
 
-        if config["early_stopping"]:
-            callbacks.append(pl.callbacks.EarlyStopping(monitor="train/loss", mode="min", patience=4))
+
+    # List of callbacks
+    callbacks = [pretrain_checkpoint]
+    if wandb_logger is not None:
+        # only supported with a logger
+        callbacks += [LearningRateMonitor(logging_interval='step')]  # change to step, may be slow
+        # if config['profiler'] == 'kineto':
+
+        # callbacks += [profiler_callback]
+            
+
+    if config['profiler'] == 'advanced':
+        logging.info('Using advanced profiler')
+        profiler = AdvancedProfiler(dirpath=experiment_dir, filename='advanced_profile')  # .txt
+    elif config['profiler'] == 'pytorch':
+        logging.info('Using pytorch profiler')
+        profiler = PyTorchProfiler(dirpath=experiment_dir, filename='pytorch_profile', row_limit=-1)  # .txt
+    else:
+        logging.info('No profiler used')
+        profiler=None
+
+    import torch
+    logging.info('Threads: {}'.format(torch.get_num_threads()))
+
+    pre_trainer = pl.Trainer(
+        # gpus=1,
+        **trainer_settings[config["compute"]],
+        fast_dev_run=config["debug"],
+        max_epochs=config["model"]["n_epochs"],  # note that this will affect momentum of BYOL ensemble!
+        logger=wandb_logger,
+        deterministic=True,
+        callbacks=callbacks,
+        precision=config["precision"],
+        #    check_val_every_n_epoch=3,
+        log_every_n_steps=200,
+        profiler=profiler,
+        # max_steps = 200  # TODO temp
+    )
+
+    # Initialise model #
+    models = {
+        "byol": BYOL, 
+        "byol_supervised": BYOL_Supervised,
+        "nnclr": NNCLR
+    }
+    model = models[config["type"]](config)
 
         trainer_settings = {
             "slurm": {"gpus": 1, "num_nodes": 1},
@@ -167,8 +166,14 @@ if __name__ == "__main__":
             "nnclr": NNCLR,
         }
         _model = models[config["type"]]
+    # profile_art = wandb.Artifact(f"trace-{wandb.run.id}", type="profile")
+    # profile_art.add_file(glob.glob(str(experiment_dir / "*.pt.trace.json"))[0], "trace.pt.trace.json")
+    # wandb.run.log_artifact(profile_art)
 
-        model = _model(config)
+    if not config['debug']:
+        log_examples(wandb_logger, pretrain_data.data["train"])
+
+    print(model.config["data"]["mu"])
 
         config["model"]["output_dim"] = config["model"]["features"]
 
@@ -176,66 +181,89 @@ if __name__ == "__main__":
         pre_trainer.fit(model, pretrain_data)
         pre_trainer.test(model, dataloaders=pretrain_data)
 
-        # log_examples(wandb_logger, pretrain_data.data["train"])
+    return pretrain_checkpoint, model
 
-        # Run test loop #
-        # knn_acc = 0
-        # y_masked = []
-        # for ckpt_path in pre_trainer.checkpoint_callback.best_k_models:
-        #     knn_acc += pre_trainer.test(ckpt_path=ckpt_path)
-        #     model = _model.load_from_checkpoint(ckpt_path)
-        #     # y_masked.append(count_masks(model, pretrain_data.train_dataloader()))
 
-        # y_masked = torch.cat(y_masked)
+def run_linear_evaluation_protocol(config, wandb_logger, pretrain_checkpoint, trainer_settings, model):
 
-        # Save model in wandb #
-        if not config["debug"]:
-            wandb.save(pretrain_checkpoint.best_model_path)
+    # Extract and load best encoder from pretraining
+    if config["debug"] is True:
+        encoder = model.backbone  # don't bother loading a checkpoint
+    else:
+        # load the best model from pretraining
+        # (as measured according to config['checkpoint_mode'], likely lowest train loss)
+        best_model_path = pretrain_checkpoint.best_model_path
+        # TODO this currently ignores the model selected via config['type']
+        pretrained_model = BYOL.load_from_checkpoint(best_model_path)
+        encoder = pretrained_model.backbone
 
-        ##################################################
-        ############### EVAL #############################
-        ##################################################
+    # Freeze encoder weights
+    logging.info('Switching model encoder to frozen eval mode')
+    freeze_model(encoder)
+    encoder.eval()
 
-        ##################################################
-        ########## LINEAR EVALUATION PROTOCOL ############
-        ##################################################
+    # Switch data-loader to linear evaluation mode
+    eval_data = datasets[config["dataset"]]["linear"](encoder, config)
 
-        if config["linear_eval"]:
+    linear_trainer = pl.Trainer(
+        **trainer_settings[config["compute"]],
+        fast_dev_run=config["debug"],
+        max_epochs=config["linear"]["n_epochs"],
+        logger=wandb_logger,
+        deterministic=True,
+        # always full precision, never distributed. May need a batch size adjustment.
+    )
 
             # Extract and load best encoder from pretraining
             if config["debug"] is False:
                 best_model_path = pretrain_checkpoint.best_model_path
                 model = _model.load_from_checkpoint(best_model_path)
 
-            encoder = model.backbone
 
-            # Freeze encoder weights
-            freeze_model(encoder)
-            encoder.eval()
+def main():
 
-            logging.info("Training complete - switching to eval mode")
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s: %(message)s",
+    )
 
-            # Load eval data
-            eval_data = datasets[config["dataset"]]["linear"](encoder, config)
+    config = load_config()
+    # update_config(config)
 
-            linear_checkpoint = pl.callbacks.ModelCheckpoint(
-                monitor="linear_eval/val_acc",
-                mode="max",
-                every_n_epochs=1,
-                verbose=True,
-            )
+    wandb.init()
+    config['run_id'] = str(wandb.run.id)
 
-            linear_trainer = pl.Trainer(
-                **trainer_settings[config["compute"]],
-                fast_dev_run=config["debug"],
-                max_epochs=config["linear"]["n_epochs"],
-                logger=wandb_logger,
-                deterministic=True,
-                # always full precision, never distributed. May need a batch size adjustment.
-            )
 
-            linear_model = linear_net(config)
-            linear_trainer.fit(linear_model, eval_data)
-            # linear_trainer.test(linear_model, dataloaders=eval_data, ckpt_path="best")
+    # TODO could probably be directly included in config rather than config['compute'] indexing this
+    trainer_settings = {
+        "slurm": {"gpus": 1, "num_nodes": 1},
+        "gpu": {"devices": 1, "accelerator": "gpu"},
+    }
 
-        wandb_logger.experiment.finish()
+    # Initialise wandb logger, change this if you want to use a different logger #
+    # paths = Path_Handler()
+    # path_dict = paths._dict()
+    # wandb_save_dir = path_dict["files"] / 'wandb'  # e.g. (repo aka byol)/files
+    # independent of model checkpoint loc
+
+    # structure will be e.g.
+    # config['files'] / l5ikqywp / checkpoints / {}.ckpt
+    # config['files'] / l5ikqywp / run-20220513_122412-l5ikqywp / (wandb stuff)
+
+    wandb_logger = pl.loggers.WandbLogger(
+        project=config["project_name"],
+        save_dir=config['files'] / config['run_id'],  # and will then add e.g. run-20220513_122412-l5ikqywp automatically
+        reinit=True,
+        config=config,
+    )
+
+    pretrain_checkpoint, model = run_contrastive_pretraining(config, wandb_logger, trainer_settings)
+
+    run_linear_evaluation_protocol(config, wandb_logger, pretrain_checkpoint, trainer_settings, model)
+
+    wandb_logger.experiment.finish()
+
+
+if __name__ == "__main__":
+
+    main()

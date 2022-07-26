@@ -1,6 +1,6 @@
-from dataloading.base_dm import Base_DataModule_Eval, Base_DataModule
+from byol_main.dataloading.base_dm import Base_DataModule_Eval, Base_DataModule
 from torchvision.datasets import CIFAR10
-from dataloading.utils import _get_cifar10_norms
+from byol_main.dataloading.utils import _get_cifar10_norms
 
 
 class CIFAR10_DataModule(Base_DataModule):

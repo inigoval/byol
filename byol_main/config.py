@@ -1,5 +1,5 @@
 import yaml
-from paths import Path_Handler
+from byol_main.paths import Path_Handler
 
 # Define paths
 paths = Path_Handler()

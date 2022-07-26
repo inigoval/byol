@@ -2,8 +2,8 @@ import torch.utils.data as D
 import numpy as np
 
 from dataloading.base_dm import Base_DataModule_Eval, Base_DataModule, Base_DataModule_Supervised
-from dataloading.utils import rgz_cut, size_cut, mb_cut
 from dataloading.datasets import RGZ20k
+from dataloading.utils import rgz_cut, size_cut, mb_cut
 from astroaugmentations.datasets.MiraBest_F import MBFRFull, MBFRConfident, MBFRUncertain
 from sklearn.model_selection import train_test_split
 

@@ -166,6 +166,7 @@ def knn_weight(
 
 
 class Lightning_Eval(pl.LightningModule):
+    # for many knn eval datasets
     def __init__(self, config):
         super().__init__()
         self.config = config
@@ -191,17 +192,69 @@ class Lightning_Eval(pl.LightningModule):
         # self.log("train/sig", self.trainer.datamodule.sig)
 
         # logger = self.logger.experiment
+        if not self.config['debug']:
+            log_examples(self.logger, self.trainer.datamodule.data["train"])
 
         if not self.config["debug"]:
             log_examples(self.logger, self.trainer.datamodule.data["train"])
 
-    def on_validation_start(self):
+    def setup_knn_validation(self):
         with torch.no_grad():
-            data_bank = self.trainer.datamodule.data[
-                "labelled"
-            ]  # will get split into feature_bank and target_bank
-            data_bank_loader = DataLoader(
-                data_bank, 200
+            self.knn_eval_datasets = []
+            # deprecating self.trainer.datamodule.data["labelled"] in favor of both being part of val_knn
+            for knn_dataset_name, (_, val_databank) in self.trainer.datamodule.data['val_knn'].items():
+                logging.info('Using knn dataset {}, {} bank labels'.format(knn_dataset_name, len(val_databank)))
+                # each KNN_Eval does the actual val work
+                self.knn_eval_datasets.append(KNN_Eval(knn_dataset_name, val_databank, self.config, self.dummy_param, self.forward, self.log))
+
+    def setup_supervised_validation(self):
+        self.supervised_dataset = Supervised_Eval(self.represent, self.supervised_head, self.supervised_loss_func, self.dummy_param, self.log)
+
+    # will only work if datamodule has self.data['val_supervised'] key
+    # else will not be passed the extra dataloader_idx argument
+    def validation_step(self, batch, batch_idx, dataloader_idx):
+        if dataloader_idx < len(self.knn_eval_datasets):  # first N are assumed dataloaders for knn eval
+            self.knn_eval_datasets[dataloader_idx].validation_step(batch)  # knn validation
+        else:
+            assert hasattr(self, 'supervised_dataset')
+            self.supervised_dataset.validation_step(batch)
+
+    def validation_epoch_end(self, outputs) -> None:
+        for knn_eval in self.knn_eval_datasets:
+            knn_eval.validation_epoch_end()
+        # if hasattr(self, 'supervised_dataset'):
+        #     self.supervised_dataset.validation_epoch_end()
+        # not needed - can just self.log the loss without needing to reset e.g. accuracy metrics at epoch end
+        
+
+
+    def forward(x):
+        raise NotImplementedError('Must be subclassed by e.g. BYOL, which implements .forward(x)')
+
+# for a single knn eval dataset
+class KNN_Eval():   # lightning subclass purely for self.log
+
+    def __init__(self, name, data_bank, config, dummy_param, forward: callable, log: callable):
+
+        # super().__init__()
+        
+        self.name = name
+        self.data_bank = data_bank
+        self.dummy_param = dummy_param
+        self.config = config
+        self.forward = forward  # explictly passed to __init__, composition-style
+        self.log = log
+
+        # https://torchmetrics.readthedocs.io/en/latest/pages/overview.html#metrics-and-devices
+        self.knn_acc = tm.Accuracy(average="micro", threshold=0).to(device='cuda:0')
+
+        self.setup_knn_features_and_targets()
+
+
+    def setup_knn_features_and_targets(self):
+        # TODO will have many databanks, each with different knn problem
+        data_bank_loader = DataLoader(
+                self.data_bank, 200
             )  # 200 is the batch size used for the unpacking below
             feature_bank = []
             target_bank = []
@@ -225,19 +278,19 @@ class Lightning_Eval(pl.LightningModule):
             self.target_bank = torch.cat(target_bank, dim=0).t().contiguous()
             assert all(self.target_bank >= 0)
 
-    def validation_step(self, batch, batch_idx):
-        if hasattr(self, "feature_bank") and hasattr(self, "target_bank"):
-            # Load batch
-            x, y = batch
-            # Extract + normalize features
-            feature = self.forward(x).squeeze()
-            feature = F.normalize(feature, dim=1)
 
-            # Load feature bank and labels
-            feature_bank = self.feature_bank.type_as(x)
-            target_bank = self.target_bank.type_as(y)
+    def validation_step(self, batch):
+        # Load batch
+        x, y = batch
+        # Extract + normalize features
+        feature = self.forward(x).squeeze()  # from init(forward), likely BYOL's forward 
+        feature = F.normalize(feature, dim=1)
 
-            pred_labels = knn_predict(
+        # Load feature bank and labels (with same dtypes as x, y)
+        feature_bank = self.feature_bank.type_as(x)
+        target_bank = self.target_bank.type_as(y)
+
+        pred_labels = knn_predict(
                 feature,  # feature to search for
                 feature_bank,  # feature bank to identify NN within
                 target_bank,  # labels of those features in feature_bank, same index
@@ -247,7 +300,7 @@ class Lightning_Eval(pl.LightningModule):
                 leave_first_out=self.config["knn"]["leave_first_out"],
             )
 
-            top1 = pred_labels[:, 0]
+        top1 = pred_labels[:, 0]
 
             # Compute accuracy
             # assert top1.min() >= 0
@@ -415,11 +468,12 @@ class linear_net(pl.LightningModule):
 
         self.train_acc = tm.Accuracy(average="micro", top_k=1, threshold=0)
         self.val_acc = tm.Accuracy(average="micro", top_k=1, threshold=0)
+        self.test_acc = tm.Accuracy(average="micro", top_k=1, threshold=0)
 
         self.dummy_param = nn.Parameter(torch.empty(0))
 
         paths = Path_Handler()
-        self.paths = paths.dict
+        self.paths = paths._dict()
 
     def forward(self, x):
         """Return prediction"""
@@ -458,6 +512,23 @@ class linear_net(pl.LightningModule):
         self.val_acc(logits, y)
         self.log("linear_eval/val_acc", self.val_acc, on_step=False, on_epoch=True)
 
+    # renamed duplicate of self.validation_step
+    def test_step(self, batch, batch_idx):
+        x, y = batch
+        x = x.type_as(self.dummy_param)
+
+        x = x.view(x.shape[0], -1)
+        logits = self.forward(x)
+        # y_pred = logits.softmax(dim=-1)
+
+        loss = self.ce_loss(logits, y)
+        self.log("linear_eval/test_loss", loss)
+
+        # predictions = torch.argmax(logits, dim=1).int()
+        # acc = tmF.accuracy(y_pred, y)
+        self.test_acc(logits, y)
+        self.log("linear_eval/test_acc", self.test_acc, on_step=False, on_epoch=True)
+
     def configure_optimizers(self):
         lr = self.config["linear"]["lr"]
         mom = self.config["linear"]["momentum"]
@@ -484,25 +555,26 @@ class linear_net(pl.LightningModule):
         return opt
 
 
-class pca_net(nn.Module):
-    def __init__(self, config):
-        super(pca_net, self).__init__()
-        self.config = config
-        self.pca = IncrementalPCA(config["pca"]["n_dim"])
+# currently not used
+# class pca_net(nn.Module):
+#     def __init__(self, config):
+#         super(pca_net, self).__init__()
+#         self.config = config
+#         self.pca = IncrementalPCA(config["pca"]["n_dim"])
 
-    def forward(self, x):
-        x = x.view(x.shape[0], -1)
-        x = self.pca.transform(x)
-        return torch.from_numpy(x).float()
+#     def forward(self, x):
+#         x = x.view(x.shape[0], -1)
+#         x = self.pca.transform(x)
+#         return torch.from_numpy(x).float()
 
-    def fit(self, loader):
-        print("Fitting PCA")
-        for epoch in tqdm(np.arange(self.config["pca"]["n_epochs"])):
-            print(f"Epoch {epoch}")
-            for x, _ in tqdm(loader):
-                x = x.view(x.shape[0], -1)
-                x = x.cpu().detach().numpy()
-                self.pca.partial_fit(x)
+#     def fit(self, loader):
+#         print("Fitting PCA")
+#         for epoch in tqdm(np.arange(self.config["pca"]["n_epochs"])):
+#             print(f"Epoch {epoch}")
+#             for x, _ in tqdm(loader):
+#                 x = x.view(x.shape[0], -1)
+#                 x = x.cpu().detach().numpy()
+#                 self.pca.partial_fit(x)
 
 
 class Count_Similarity(Callback):

@@ -1,3 +1,5 @@
+import logging
+
 import yaml
 import torch.nn as nn
 import torch.nn.functional as F
@@ -87,11 +89,16 @@ def freeze_model(model):
 
 def _optimizer(params, config):
     lr = config["lr"]
+    
+    # sgd only
     mom = config["momentum"]
     w_decay = config["weight_decay"]
 
+    betas = (config.get('beta_1', 0.9), config.get('beta_2', 0.999))
+
+    # for adam, lr is the step size and is modified by exp. moving av. of prev. gradients
     opts = {
-        "adam": lambda p: torch.optim.Adam(p, lr=lr),
+        "adam": lambda p: torch.optim.Adam(p, lr=lr, betas=betas),
         "sgd": lambda p: torch.optim.SGD(
             p,
             lr=lr,
@@ -100,16 +107,19 @@ def _optimizer(params, config):
         ),
     }
 
+    if config['opt'] == 'adam' and config['lr'] > 0.01:
+        logging.warning('Learning rate {} may be too high for adam'.format(config['lr']))
+
     opt = opts[config["opt"]](params)
 
     # Apply LARS wrapper if option is chosen
     if config["lars"]:
         opt = LARSWrapper(opt, eta=config["trust_coef"])
 
+    # pick scheduler
     if config["scheduler"] == "cosine":
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(opt, config["model"]["n_epochs"])
         return [opt], [scheduler]
-
     elif config["scheduler"] == "warmupcosine":
         scheduler = LinearWarmupCosineAnnealingLR(
             opt,
@@ -117,9 +127,10 @@ def _optimizer(params, config):
             max_epochs=config["train"]["n_epochs"],
         )
         return [opt], [scheduler]
-
-    elif config["scheduler"] == "None":
+    elif config["scheduler"].lower() == "none":
         return opt
+    else:
+        raise ValueError(config['scheduler'])
 
 
 def embed(data, encoder, batch_size=1000):
