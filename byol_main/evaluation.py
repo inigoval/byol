@@ -1,23 +1,26 @@
 import logging
 
 import pytorch_lightning as pl
-import umap
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchmetrics.functional as tmF
 import torchmetrics as tm
 import wandb
+import numpy as np
+import matplotlib.pyplot as plt
 
 from tqdm import tqdm
 from sklearn.decomposition import IncrementalPCA
 from pytorch_lightning.callbacks import Callback
 from torch.utils.data import DataLoader
+from statistics import mean
+from sklearn.preprocessing import MinMaxScaler
 
 from dataloading.utils import dset2tens
 from paths import Path_Handler
 from networks.models import MLPHead, LogisticRegression
-from utilities import log_examples
+from utilities import log_examples, fig2img
 
 
 def knn_predict(
@@ -27,6 +30,7 @@ def knn_predict(
     num_classes: int,
     knn_k: int = 200,
     knn_t: float = 0.1,
+    leave_first_out=False,
 ) -> torch.Tensor:
     """Code copied from https://github.com/lightly-ai/lightly/blob/master/lightly/utils/benchmarking.py
 
@@ -71,9 +75,12 @@ def knn_predict(
     )  # (B, D) matrix. mult (D, N) gives (B, N) (as feature dim got summed over to got cos sim)
 
     # [B, K]
-    sim_weight, sim_idx = sim_matrix.topk(
-        k=knn_k, dim=-1
-    )  # this will be slow if feature_bank is large (e.g. 100k datapoints)
+    # this will be slow if feature_bank is large (e.g. 100k datapoints)
+    if leave_first_out is True:
+        sim_weight, sim_idx = sim_matrix.topk(k=knn_k + 1, dim=-1)
+        sim_weight, sim_idx = sim_weight[:, 1:], sim_idx[:, 1:]
+    elif leave_first_out is False:
+        sim_weight, sim_idx = sim_matrix.topk(k=knn_k, dim=-1)
 
     # [B, K]
     # target_bank is (1, N) (due to .t() in init)
@@ -103,11 +110,70 @@ def knn_predict(
     return pred_labels
 
 
+def knn_weight(
+    feature: torch.Tensor,
+    feature_bank: torch.Tensor,
+    knn_k: int = 5,
+    knn_t: float = 0.1,
+) -> torch.Tensor:
+    """Code modified from https://github.com/lightly-ai/lightly/blob/master/lightly/utils/benchmarking.py
+
+    Run kNN predictions on features based on a feature bank
+    This method is commonly used to monitor performance of self-supervised
+    learning methods.
+    The default parameters are the ones
+    used in https://arxiv.org/pdf/1805.01978v1.pdf.
+    Args:
+        feature:
+            Tensor of shape [N, D] for which you want predictions
+        feature_bank:
+            Tensor of a database of features used for kNN, of shape [D, N] where N is len(l datamodule)
+        target_bank:
+            Labels for the features in our feature_bank, of shape ()
+        num_classes:
+            Number of classes (e.g. `10` for CIFAR-10)
+        knn_k:
+            Number of k neighbors used for kNN
+        knn_t:
+            Temperature parameter to reweights similarities for kNN
+    Returns:
+        A tensor containing the kNN predictions
+    Examples:
+        >>> images, targets, _ = batch
+        >>> feature = backbone(images).squeeze()
+        >>> # we recommend to normalize the features
+        >>> feature = F.normalize(feature, dim=1)
+        >>> pred_labels = knn_predict(
+        >>>     feature,
+        >>>     feature_bank,
+        >>> )
+    """
+
+    # compute cos similarity between each feature vector and feature bank ---> [B, N]
+    # (B, D) matrix. mult (D, N) gives (B, N) (as feature dim got summed over to got cos sim)
+    sim_matrix = torch.mm(feature.squeeze(), feature_bank.squeeze())
+
+    # [B, K]
+    sim_weight, sim_idx = sim_matrix.topk(k=knn_k, dim=-1)
+    # this will be slow if feature_bank is large (e.g. 100k datapoints)
+    sim_weight = sim_weight.squeeze()
+
+    # we do a reweighting of the similarities
+    # sim_weight = (sim_weight / knn_t).exp().squeeze().type_as(feature_bank)
+    sim_weight = (sim_weight / knn_t).exp()
+
+    return torch.mean(sim_weight, dim=-1, keepdim=False)
+
+
 class Lightning_Eval(pl.LightningModule):
     def __init__(self, config):
         super().__init__()
         self.config = config
-        self.knn_acc = tm.Accuracy(average="micro", threshold=0)
+        self.knn_acc_val = tm.Accuracy(average="micro", threshold=0)
+        self.knn_acc_test = {
+            "conf": tm.Accuracy(average="micro", threshold=0),
+            "unc": tm.Accuracy(average="micro", threshold=0),
+        }
 
     def on_train_start(self):
         self.config["data"]["mu"] = self.trainer.datamodule.mu
@@ -148,18 +214,15 @@ class Lightning_Eval(pl.LightningModule):
                 # Encode data and normalize features (for kNN)
                 feature = self.forward(x).squeeze()  # (batch, features)  e.g. (200, 512)
                 feature = F.normalize(feature, dim=1)
-                feature_bank.append(
-                    feature
-                )  # tensor of all features, within which to find nearest-neighbours. Each is (B, N_features), N_features being the output dim of self.forward e.g. BYOL
+                # tensor of all features, within which to find nearest-neighbours. Each is (B, N_features), N_features being the output dim of self.forward e.g. BYOL
+                feature_bank.append(feature)
                 target_bank.append(y)  # tensor with labels of those features
 
             # Save full feature bank for validation epoch
-            self.feature_bank = (
-                torch.cat(feature_bank, dim=0).t().contiguous()
-            )  # (features, len(l datamodule)) due to the .t() transpose
-            self.target_bank = (
-                torch.cat(target_bank, dim=0).t().contiguous()
-            )  # either (label_dim, len) or just (len) depending on if labels should have singleton label_dim dimension
+            # (features, len(l datamodule)) due to the .t() transpose
+            self.feature_bank = torch.cat(feature_bank, dim=0).t().contiguous()
+            # either (label_dim, len) or just (len) depending on if labels should have singleton label_dim dimension
+            self.target_bank = torch.cat(target_bank, dim=0).t().contiguous()
             assert all(self.target_bank >= 0)
 
     def validation_step(self, batch, batch_idx):
@@ -181,18 +244,55 @@ class Lightning_Eval(pl.LightningModule):
                 self.config["data"]["classes"],
                 knn_k=self.config["knn"]["neighbors"],
                 knn_t=self.config["knn"]["temperature"],
+                leave_first_out=self.config["knn"]["leave_first_out"],
             )
 
             top1 = pred_labels[:, 0]
 
             # Compute accuracy
             # assert top1.min() >= 0
-            self.knn_acc.update(top1, y)
+            self.knn_acc_val.update(top1, y)
 
     def validation_epoch_end(self, outputs):
         if hasattr(self, "feature_bank") and hasattr(self, "target_bank"):
-            self.log("val/kNN_acc", self.knn_acc.compute() * 100)
-            self.knn_acc.reset()
+            self.log("val/kNN_acc", self.knn_acc_val.compute() * 100)
+            self.knn_acc_val.reset()
+
+    def test_step(self, batch, batch_idx):
+        return
+
+    #     def test_step(self, batch, batch_idx):
+    #         if hasattr(self, "feature_bank") and hasattr(self, "target_bank"):
+    #             x, y = batch
+    #             # Extract + normalize features
+    #             feature = self.forward(x).squeeze()
+    #             feature = F.normalize(feature, dim=1)
+
+    #             # Load feature bank and labels
+    #             feature_bank = self.feature_bank.type_as(x)
+    #             target_bank = self.target_bank.type_as(y)
+
+    #             pred_labels = knn_predict(
+    #                 feature,  # feature to search for
+    #                 feature_bank,  # feature bank to identify NN within
+    #                 target_bank,  # labels of those features in feature_bank, same index
+    #                 self.config["data"]["classes"],
+    #                 knn_k=self.config["knn"]["neighbors"],
+    #                 knn_t=self.config["knn"]["temperature"],
+    #                 leave_first_out=self.config["knn"]["leave_first_out"],
+    #             )
+
+    #             top1 = pred_labels[:, 0]
+
+    #             # Compute accuracy
+    #             # assert top1.min() >= 0
+    #             self.knn_acc_test.update(top1, y)
+
+    # def test_epoch_end(self, outputs):
+    #     if hasattr(self, "feature_bank") and hasattr(self, "target_bank"):
+    #         self.log("test/kNN_acc", self.knn_acc_test.compute() * 100)
+    #         self.knn_acc_test.reset()
+    #         # return self.knn_acc_test.compute() * 100
 
 
 class Feature_Bank(Callback):
@@ -226,6 +326,81 @@ class Feature_Bank(Callback):
             # Save full feature bank for validation epoch
             pl_module.feature_bank = torch.cat(feature_bank, dim=0).t().contiguous()
             pl_module.target_bank = torch.cat(target_bank, dim=0).t().contiguous()
+
+
+class Epoch_Averaged_Test(Callback):
+    """Code adapted from https://github.com/lightly-ai/lightly/blob/master/lightly/utils/benchmarking.py
+
+    Calculates a feature bank for validation"""
+
+    def __init__(self):
+        super().__init__()
+        self.acc = {"conf": [], "unc": []}
+        self.knn_acc = {
+            "conf": tm.Accuracy(average="micro", threshold=0),
+            "unc": tm.Accuracy(average="micro", threshold=0),
+        }
+
+    def on_validation_epoch_end(self, trainer, pl_module):
+        config = pl_module.config
+        if (
+            hasattr(pl_module, "feature_bank")
+            and hasattr(pl_module, "target_bank")
+            and pl_module.current_epoch >= config["model"]["n_epochs"] - config["topk"] - 1
+        ):
+
+            for label, data in pl_module.trainer.datamodule.data["test_rgz"].items():
+                loader = DataLoader(
+                    data,
+                    200,
+                    num_workers=config["num_workers"],
+                    prefetch_factor=20,
+                    persistent_workers=config["persistent_workers"],
+                )
+
+                for batch in loader:
+                    x, y = batch
+
+                    x = x.type_as(pl_module.dummy_param)
+                    y = y.type_as(pl_module.dummy_param).long()
+
+                    # Extract + normalize features
+                    feature = pl_module.forward(x).squeeze()
+                    feature = F.normalize(feature, dim=1)
+
+                    # Load feature bank and labels
+                    feature_bank = pl_module.feature_bank.type_as(x)
+                    target_bank = pl_module.target_bank.type_as(y)
+
+                    pred_labels = knn_predict(
+                        feature,  # feature to search for
+                        feature_bank,  # feature bank to identify NN within
+                        target_bank,  # labels of those features in feature_bank, same index
+                        pl_module.config["data"]["classes"],
+                        knn_k=pl_module.config["knn"]["neighbors"],
+                        knn_t=pl_module.config["knn"]["temperature"],
+                        leave_first_out=False,
+                    )
+
+                    top1 = pred_labels[:, 0].cpu().detach()
+
+                    # Compute accuracy
+                    # assert top1.min() >= 0
+                    self.knn_acc[label].update(top1, y.cpu().detach())
+
+                acc = self.knn_acc[label].compute()
+                pl_module.log(f"test/kNN_acc_{label}", acc)
+                self.acc[label].append(acc.item())
+
+    def on_test_epoch_start(self, trainer, pl_module):
+        if (
+            hasattr(pl_module, "feature_bank")
+            and hasattr(pl_module, "target_bank")
+            and not pl_module.config["debug"]
+        ):
+            for key, value in self.acc.items():
+                pl_module.log(f"test/kNN_acc_agg_{key}", mean(value))
+            # pl_module.log("test/kNN_acc_agg", pl_module.knn_acc_test.compute())
 
 
 class linear_net(pl.LightningModule):
@@ -328,3 +503,46 @@ class pca_net(nn.Module):
                 x = x.view(x.shape[0], -1)
                 x = x.cpu().detach().numpy()
                 self.pca.partial_fit(x)
+
+
+class Count_Similarity(Callback):
+    """Code adapted from https://github.com/lightly-ai/lightly/blob/master/lightly/utils/benchmarking.py
+
+    Calculates a feature bank for validation"""
+
+    def __init__(self):
+        super().__init__()
+
+    def on_validation_epoch_start(self, trainer, pl_module):
+        epoch = trainer.current_epoch
+        if epoch % 10 == 0:
+            train_loader = pl_module.trainer.datamodule.train_dataloader()
+
+            for batch in train_loader:
+                (x, _), y = batch
+
+                x = x.type_as(pl_module.dummy_param)
+                y = y.type_as(pl_module.dummy_param).long()
+
+                n_batch = len(y)
+                r = pl_module.backbone_momentum(x.type_as(pl_module.dummy_param)).squeeze()
+                r = F.normalize(r, dim=1)
+                knn_k = np.clip(20, 1, n_batch - 1)
+                sim_weights = knn_weight(r, r.t(), knn_k=knn_k).view(-1, 1).cpu().detach().numpy()
+
+            # hist = np.histogram(sim_weights.cpu().detach().numpy(), bins=np.arange(13, 45))
+            scaler = MinMaxScaler()
+            sim_weights = scaler.fit_transform(sim_weights)
+
+            fig, ax = plt.subplots(figsize=(13.0, 13.0))
+            ax.hist(np.ravel(sim_weights), bins=10)
+            ax.set_xlabel("Similarity")
+            ax.set_ylabel("Count")
+            img = fig2img(fig)
+            pl_module.logger.log_image(key="similarity histogram", images=[img])
+
+            # y_masked = [[value] for value in y_masked.tolist()]
+            # table = wandb.Table(data=y_masked, columns=["arcsecond extension"])
+            # self.logger.log({'masked arcsec histogram': wandb.plot.histogram(table, 'arcsecond extension', title:
+            # pl_module.logger.log({f"arcsec masks epoch {epoch}": wandb.Histogram(np_histogram=hist)})
+            # wandb.log({f"arcsec masks epoch {epoch}": wandb.Histogram(np_histogram=hist)})

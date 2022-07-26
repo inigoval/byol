@@ -99,7 +99,7 @@ class SimpleView(nn.Module):
         # if config['dataset'] == 'gz2':  # is a tensor, needs to be a PIL to later call T.ToTensor
         #     augs.append(T.ToPILImage())
         # if config["data"]["rotate"]:
-        # augs.append(T.RandomRotation(180))
+        #     augs.append(T.RandomRotation(180))
 
         augs.append(T.Resize(config["data"]["input_height"]))
 
@@ -147,6 +147,35 @@ class ReduceView(nn.Module):
         x = self.pre_normalize(x)
         x = torch.unsqueeze(x, 0)
         x = self.reduce(x).view(-1, 1, 1)
+        x = self.normalize(x)
+        return x
+
+    def update_normalization(self, mu, sig):
+        self.normalize = T.Normalize(mu, sig)
+
+
+class SupervisedView(nn.Module):
+    def __init__(self, config, mu=(0,), sig=(1,)):
+        super().__init__()
+        self.config = config
+
+        augs = []
+
+        if config["data"]["rotate"]:
+            augs.append(T.RandomRotation(180))
+
+        augs.append(T.Resize(config["data"]["input_height"]))
+
+        if config["center_crop_size"]:
+            augs.append(T.CenterCrop(config["center_crop_size"]))
+        augs.append(T.ToTensor())
+        self.view = T.Compose(augs)
+
+        self.normalize = T.Normalize(mu, sig)
+
+    def __call__(self, x):
+        # Use rotation if training
+        x = self.view(x)
         x = self.normalize(x)
         return x
 

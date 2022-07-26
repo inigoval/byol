@@ -122,6 +122,15 @@ def _optimizer(params, config):
         return opt
 
 
+def embed(data, encoder, batch_size=1000):
+    embedding = []
+    for batch in DataLoader(data, batch_size=batch_size):
+        x, _ = batch
+        embedding.append(encoder(x))
+
+    return torch.cat(embedding)
+
+
 def log_examples(wandb_logger, dset, n=18):
     save_list = []
     count = 0

@@ -2,7 +2,7 @@ preset: null
 model:
     architecture: 'resnet18' 
     features: 100     # Number of encoded features (null just uses original resnet output)
-    n_epochs: 1500
+    n_epochs: 1000
     downscale: True
 
 projection_head:
@@ -13,14 +13,20 @@ data:
     color_channels: 1
     classes: 2
     rotate: True
-    conf_test: 0.99
-    unc_test: 0.99
+
+    # conf_test: 0.3
+    # unc_test: -1
+    # conf_val: 1
+    # unc_val: 0
+    test_frac: 0.3 
+    val_frac: 0.99
+
     rgz: True
     input_height: 128 # Keep this at 128 and adjust center_crop_size
     val_batch_size: 500
 
 linear:
-    n_epochs: 100
+    n_epochs: 5
     opt: 'adam'
     lr: 0.2
     batch_size: 25
@@ -31,14 +37,15 @@ linear:
 knn:
   neighbors: 20
   temperature: 0.1
+  leave_first_out: True
 
 ## DATA ## 
-cut_threshold: 10
+cut_threshold: 15
 
 ## AUGMENTATIONS ##
 aug_type: 'simclr' # ['simclr', 'astroaug']
 blur_kernel: 3 # Odd non-integer number
-center_crop_size: 70
+center_crop_size: 85
 random_crop_scale: !!python/tuple [0.8, 1]
 # blur_sig: !!python/tuple [0.1, 2.0]
 p_blur: 0.05
@@ -66,5 +73,5 @@ m_decay: False
 
 
 # redundancy_reduction
-r_batch: 0.5
+r_batch: 0.3
 n_knn: 5

@@ -62,11 +62,11 @@ def random_subset(dset, size):
     return D.Subset(dset, subset_idx)
 
 
-def size_cut(threshold, dset, inplace=True):
+def size_cut(dset, threshold, inplace=True):
     """Cut the RGZ DR1 dataset based on angular size"""
     length = len(dset)
     idx = np.argwhere(dset.sizes > threshold)
-    if inplace == True:
+    if inplace is True:
         dset.data = dset.data[idx, ...]
         dset.names = dset.names[idx, ...]
         dset.rgzid = dset.rgzid[idx, ...]
@@ -75,12 +75,16 @@ def size_cut(threshold, dset, inplace=True):
     else:
         return idx
     print(f"RGZ dataset cut from {length} to {len(dset)} samples")
+
+
+def remove_duplicates(dset):
+    """Remove duplicate samples from a dataset"""
 
 
 def mb_cut(dset, inplace=True):
     length = len(dset)
     idx = np.argwhere(dset.mbflg == 0)
-    if inplace == True:
+    if inplace is True:
         dset.data = dset.data[idx, ...]
         dset.names = dset.names[idx, ...]
         dset.rgzid = dset.rgzid[idx, ...]
@@ -91,26 +95,35 @@ def mb_cut(dset, inplace=True):
     print(f"RGZ dataset cut from {length} to {len(dset)} samples")
 
 
-def rgz_cut(rgz_dset, threshold, mb_cut=True):
+def rgz_cut(rgz_dset, threshold, mb_cut=True, remove_duplicates=False):
     """Cut rgz data-set based on angular size and whether data-point is contained in MiraBest"""
 
-    n_i = len(rgz_dset)
-    idx_bool = rgz_dset.sizes > threshold
+    n = len(rgz_dset)
+    idx_bool = np.ones(n, dtype=bool)
+    idx = np.arange(n)
 
-    n_cut = n_i - np.count_nonzero(idx_bool)
-    print(f"Removing {n_cut} samples below angular size threshold.")
+    if remove_duplicates:
+        idx_bool = np.zeros(n, dtype=bool)
+        _, idx_unique = np.unique(rgz_dset.data, axis=0, return_index=True)
+        idx_bool[idx_unique] = True
+
+        print(f"Removed {n - np.count_nonzero(idx_bool)} duplicate samples")
+        n = np.count_nonzero(idx_bool)
+
+    idx_bool *= rgz_dset.sizes > threshold
+    print(f"Removing {n - np.count_nonzero(idx_bool)} samples below angular size threshold.")
+    n = np.count_nonzero(idx_bool)
 
     if mb_cut:
         idx_bool *= rgz_dset.mbflg == 0
 
         # Print number of MB samples removed
-        n_mb = np.count_nonzero(rgz_dset.mbflg == 1)
-        print(f"Removed {n_mb} MiraBest samples from RGZ")
+        print(f"Removed {n - np.count_nonzero(idx_bool)} MiraBest samples from RGZ")
 
     idx = np.argwhere(idx_bool)
 
     subset = D.Subset(rgz_dset, idx)
-    print(f"RGZ dataset cut from {n_i} to {len(subset)} samples")
+    print(f"RGZ dataset cut from {n} to {len(subset)} samples")
     return subset
 
 
@@ -163,6 +176,7 @@ def compute_mu_sig_images(dset, batch_size=0):
         # Calculate mean
         mu = torch.zeros(n_channels)
         for x, _ in loader:
+            print(x.shape, _.shape)
             for c in np.arange(n_channels):
                 x_c = x[:, c, :, :]
                 weight = x.shape[0] / n_dset

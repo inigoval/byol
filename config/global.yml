@@ -1,12 +1,16 @@
 type: 'byol'
-project_name: 'byol_data_redundancy'
+project_name: 'icml-byol'
 dataset: 'rgz' # ['imagenette', 'rgz', 'gzmnist', 'gz2', 'stl10', 'cifar10']
 compute: 'slurm'
-seed: 69
+seed: 0
+n_iterations: 5
 debug: False
 num_workers: 8 # per gpu
 prefetch_factor: 30
 checkpoint_mode: 'last'
+early_stopping: False
 knn_eval: True
+linear_eval: False
+topk: 5
 precision: 16 # [16, 32, 'bf16']
 persistent_workers: False # default is False

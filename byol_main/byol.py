@@ -13,10 +13,8 @@ from pytorch_lightning.callbacks import Callback
 from evaluation import Lightning_Eval
 from networks.models import _get_backbone
 
-
-class BYOL(
-    Lightning_Eval
-):  # Lightning_Eval superclass adds validation step options for kNN evaluation
+# Lightning_Eval superclass adds validation step options for kNN evaluation
+class BYOL(Lightning_Eval):
     def __init__(self, config):
         super().__init__(config)
         self.save_hyperparameters()  # save hyperparameters for easy inference

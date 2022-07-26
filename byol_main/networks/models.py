@@ -34,10 +34,14 @@ class LogisticRegression(torch.nn.Module):
 
 
 def _get_backbone(config):
-    net = _get_net(config)  # e.g. resnet
-    c_out = list(net.children())[-1].in_features  # output dim of e.g. resnet, once the classification layer is removed (below)
+    # get backbone architecture (e.g. resnet)
+    net = _get_net(config)
 
-    net = torch.nn.Sequential(*list(net.children())[:-1])  # i.e. remove the last layer of resnet (aka the classification layer) as default-defined
+    # output dim of e.g. resnet, once the classification layer is removed (below)
+    c_out = list(net.children())[-1].in_features
+
+    # i.e. remove the last layer of resnet (aka the classification layer) as default-defined
+    net = torch.nn.Sequential(*list(net.children())[:-1])
 
     # Change first layer for color channels B/W images
     n_c = config["data"]["color_channels"]
@@ -69,7 +73,7 @@ def _get_net(config):
         "wide_resnet50_2": M.wide_resnet50_2,
         "wide_resnet101_2": M.wide_resnet101_2,
         "efficientnetb7": M.efficientnet_b7,
-        "efficientnetb0": M.efficientnet_b0  # not tested, could be v useful re zoobot
+        "efficientnetb0": M.efficientnet_b0,  # not tested, could be v useful re zoobot
     }
 
     return networks[config["model"]["architecture"]]()
