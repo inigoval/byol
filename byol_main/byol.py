@@ -104,6 +104,9 @@ class BYOL(Lightning_Eval):
             n_epochs = self.config["model"]["n_epochs"]
             self.m = 1 - (1 - self.m) * (cos(pi * epoch / n_epochs) + 1) / 2
 
+    @property
+    def device(self):
+        return next(self.parameters()).device()
 
 
 class Update_M(Callback):
