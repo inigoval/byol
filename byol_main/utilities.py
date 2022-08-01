@@ -89,12 +89,12 @@ def freeze_model(model):
 
 def _optimizer(params, config):
     lr = config["lr"]
-    
+
     # sgd only
     mom = config["momentum"]
     w_decay = config["weight_decay"]
 
-    betas = (config.get('beta_1', 0.9), config.get('beta_2', 0.999))
+    betas = (config.get("beta_1", 0.9), config.get("beta_2", 0.999))
 
     # for adam, lr is the step size and is modified by exp. moving av. of prev. gradients
     opts = {
@@ -107,8 +107,8 @@ def _optimizer(params, config):
         ),
     }
 
-    if config['opt'] == 'adam' and config['lr'] > 0.01:
-        logging.warning('Learning rate {} may be too high for adam'.format(config['lr']))
+    if config["opt"] == "adam" and config["lr"] > 0.01:
+        logging.warning("Learning rate {} may be too high for adam".format(config["lr"]))
 
     opt = opts[config["opt"]](params)
 
@@ -130,16 +130,27 @@ def _optimizer(params, config):
     elif config["scheduler"].lower() == "none":
         return opt
     else:
-        raise ValueError(config['scheduler'])
+        raise ValueError(config["scheduler"])
 
 
-def embed(data, encoder, batch_size=1000):
-    embedding = []
-    for batch in DataLoader(data, batch_size=batch_size):
-        x, _ = batch
-        embedding.append(encoder(x))
+def embed(self, encoder, data, batch_size=200):
+    train_loader = DataLoader(data, batch_size)
+    feature_bank = []
+    target_bank = []
+    for data in train_loader:
+        # Load data and move to correct device
+        x, y = data
+        x = x.to(encoder.parameters().device)
+        y = y.to(encoder.parameters().device)
 
-    return torch.cat(embedding)
+        feature_bank.append(encoder(x).squeeze())
+        target_bank.append(y)
+
+    # Save full feature bank for validation epoch
+    feature_bank = torch.cat(feature_bank)
+    target_bank = torch.cat(target_bank)
+
+    return feature_bank, target_bank
 
 
 def log_examples(wandb_logger, dset, n=18):

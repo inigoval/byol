@@ -238,6 +238,8 @@ def compute_mu_sig_features(dset, batch_size=0):
         return torch.mean(x).item(), torch.std(x).item()
 
 
+
+
 def _get_imagenet_norms():
     return {"mu": (0.485, 0.456, 0.406), "sig": (0.229, 0.224, 0.225)}
 
