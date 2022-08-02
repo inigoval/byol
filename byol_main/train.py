@@ -2,6 +2,7 @@ import wandb
 import pytorch_lightning as pl
 import logging
 import os
+import Path
 
 from pytorch_lightning.callbacks import LearningRateMonitor
 from pytorch_lightning.profiler import AdvancedProfiler, PyTorchProfiler
@@ -59,9 +60,8 @@ def run_contrastive_pretraining(config, wandb_logger, trainer_settings):
         "last": {"monitor": None},
     }
 
-    experiment_dir = config['files'] / config['run_id']
-    if not os.path.isdir(experiment_dir):
-        os.mkdir(experiment_dir)
+    experiment_dir = config["files"] / config["run_id"]
+    create_path(experiment_dir)
 
     pretrain_checkpoint = pl.callbacks.ModelCheckpoint(
         **checkpoint_mode[config["checkpoint_mode"]],
