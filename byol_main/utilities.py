@@ -88,11 +88,11 @@ def freeze_model(model):
 
 
 def _optimizer(params, config):
-    lr = config["lr"]
+    lr = config["optimizer"]["lr"]
 
     # sgd only
-    mom = config["momentum"]
-    w_decay = config["weight_decay"]
+    mom = config["optimizer"]["momentum"]
+    w_decay = config["optimizer"]["weight_decay"]
 
     betas = (config.get("beta_1", 0.9), config.get("beta_2", 0.999))
 
@@ -107,41 +107,41 @@ def _optimizer(params, config):
         ),
     }
 
-    if config["opt"] == "adam" and config["lr"] > 0.01:
+    if config["optimizer"]["type"] == "adam" and config["optimizer"]["lr"] > 0.01:
         logging.warning("Learning rate {} may be too high for adam".format(config["lr"]))
 
-    opt = opts[config["opt"]](params)
+    opt = opts[config["optimizer"]["type"]](params)
 
     # Apply LARS wrapper if option is chosen
-    if config["lars"]:
+    if config["optimizer"]["lars"]:
         opt = LARSWrapper(opt, eta=config["trust_coef"])
 
     # pick scheduler
-    if config["scheduler"] == "cosine":
+    if config["scheduler"]["type"] == "cosine":
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(opt, config["model"]["n_epochs"])
         return [opt], [scheduler]
-    elif config["scheduler"] == "warmupcosine":
+    elif config["scheduler"]["type"] == "warmupcosine":
         scheduler = LinearWarmupCosineAnnealingLR(
             opt,
-            config["warmup_epochs"],
+            config["scheduler"]["warmup_epochs"],
             max_epochs=config["train"]["n_epochs"],
         )
         return [opt], [scheduler]
-    elif config["scheduler"].lower() == "none":
+    elif config["scheduler"]["type"].lower() == "none":
         return opt
     else:
-        raise ValueError(config["scheduler"])
+        raise ValueError(config["scheduler"]["type"])
 
 
-def embed(self, encoder, data, batch_size=200):
+def embed(encoder, data, batch_size=200):
     train_loader = DataLoader(data, batch_size)
     feature_bank = []
     target_bank = []
     for data in train_loader:
         # Load data and move to correct device
         x, y = data
-        x = x.to(encoder.parameters().device)
-        y = y.to(encoder.parameters().device)
+        x = x.to(next(encoder.parameters()).device)
+        y = y.to(next(encoder.parameters()).device)
 
         feature_bank.append(encoder(x).squeeze())
         target_bank.append(y)
