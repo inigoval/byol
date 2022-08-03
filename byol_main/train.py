@@ -61,52 +61,54 @@ def run_contrastive_pretraining(config, wandb_logger, trainer_settings):
         save_on_train_epoch_end=True,
         auto_insert_metric_name=False,
         verbose=True,
-        dirpath=experiment_dir / 'checkpoints',  # e.g. byol/files/(run_id)/checkpoints/12-344-18.134.ckpt. 
+        dirpath=experiment_dir / "checkpoints",
+        # e.g. byol/files/(run_id)/checkpoints/12-344-18.134.ckpt.
         filename="{epoch}-{step}-{loss_to_monitor:.4f}",  # filename may not work here TODO
         save_weights_only=True,
-        save_top_k=3
+        # save_top_k=3,
     )
 
+    logging.info(f"checkpoint monitoring: {checkpoint_mode[config['checkpoint_mode']]}")
 
-    pretrain_data = datasets[config["dataset"]]["pretrain"](config)
-    # pretrain_data.prepare_data()
-    # pretrain_data.setup()
+    pretrain_data = datasets[config["dataset"]](config)
+    pretrain_data.prepare_data()
+    pretrain_data.setup()
+    logging.info(f"mean: {pretrain_data.mu}, sigma: {pretrain_data.sig}")
 
-        pretrain_data = datasets[config["dataset"]]["pretrain"](config)
-
-    # from torch.profiler import tensorboard_trace_handler
-    # import torch
-    # import glob
-
-    # # default scheduler
-    # profiler = torch.profiler.profile(on_trace_ready=tensorboard_trace_handler(str(experiment_dir)), with_stack=True)
-
-    # with profiler:
-    #     profiler_callback = TorchTensorboardProfilerCallback(profiler)
-
-
-    # List of callbacks
+    ## Initialise callbacks ##
     callbacks = [pretrain_checkpoint]
+
+    # add linear evaluation
+    if config["linear_eval"]:
+        for val_data in pretrain_data.data["eval"]:
+            callbacks.append(Linear_Eval(val_data))
+
+    # add knn evaluation
+    if config["knn_eval"]:
+        for val_data in pretrain_data.data["eval"]:
+            callbacks.append(KNN_Eval(val_data))
+
+    # add learning rate monitor, only supported with a logger
     if wandb_logger is not None:
-        # only supported with a logger
-        callbacks += [LearningRateMonitor(logging_interval='step')]  # change to step, may be slow
-        # if config['profiler'] == 'kineto':
+        # change to step, may be slow
+        callbacks += [LearningRateMonitor(logging_interval="step")]
 
-        # callbacks += [profiler_callback]
-            
+    # if config['profiler'] == 'kineto':
+    # callbacks += [profiler_callback]
 
-    if config['profiler'] == 'advanced':
-        logging.info('Using advanced profiler')
-        profiler = AdvancedProfiler(dirpath=experiment_dir, filename='advanced_profile')  # .txt
-    elif config['profiler'] == 'pytorch':
-        logging.info('Using pytorch profiler')
-        profiler = PyTorchProfiler(dirpath=experiment_dir, filename='pytorch_profile', row_limit=-1)  # .txt
+    ## Add profiler ##
+    if config["profiler"] == "advanced":
+        logging.info("Using advanced profiler")
+        profiler = AdvancedProfiler(dirpath=experiment_dir, filename="advanced_profile")  # .txt
+    elif config["profiler"] == "pytorch":
+        logging.info("Using pytorch profiler")
+        # .txt
+        profiler = PyTorchProfiler(dirpath=experiment_dir, filename="pytorch_profile", row_limit=-1)
     else:
-        logging.info('No profiler used')
-        profiler=None
+        logging.info("No profiler used")
+        profiler = None
 
-    import torch
-    logging.info('Threads: {}'.format(torch.get_num_threads()))
+    logging.info(f"Threads: {torch.get_num_threads()}")
 
     pre_trainer = pl.Trainer(
         # gpus=1,

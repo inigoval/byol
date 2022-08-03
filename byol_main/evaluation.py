@@ -16,11 +16,12 @@ from pytorch_lightning.callbacks import Callback
 from torch.utils.data import DataLoader
 from statistics import mean
 from sklearn.preprocessing import MinMaxScaler
+from sklearn.linear_model import RidgeClassifier
 
 from dataloading.utils import dset2tens
 from paths import Path_Handler
 from networks.models import MLPHead, LogisticRegression
-from utilities import log_examples, fig2img
+from utilities import log_examples, fig2img, embed
 
 
 def knn_predict(
@@ -170,215 +171,158 @@ class Lightning_Eval(pl.LightningModule):
     def __init__(self, config):
         super().__init__()
         self.config = config
-        self.knn_acc_val = tm.Accuracy(average="micro", threshold=0)
-        self.knn_acc_test = {
-            "conf": tm.Accuracy(average="micro", threshold=0),
-            "unc": tm.Accuracy(average="micro", threshold=0),
-        }
 
     def on_train_start(self):
         self.config["data"]["mu"] = self.trainer.datamodule.mu
         self.config["data"]["sig"] = self.trainer.datamodule.sig
 
+        ## Log size of data-sets ##
         data = self.trainer.datamodule.data
-        self.logger.log_hyperparams(
-            {
-                "n_val": len(data["val"]),
-                "n_test": len(data["test"]),
-                "n_train": len(data["train"]),
-            }
-        )
+        logging_params = {"n_train": len(data["train"])}
+        for eval_data in data["eval"]:
+            name = eval_data["name"]
+            for key, value in eval_data.items():
+                logging_params[f"{name}_n_{key}"] = len(value)
+
+        self.logger.log_hyperparams(logging_params)
         # self.log("train/mu", self.trainer.datamodule.mu)
         # self.log("train/sig", self.trainer.datamodule.sig)
 
         # logger = self.logger.experiment
-        if not self.config['debug']:
-            log_examples(self.logger, self.trainer.datamodule.data["train"])
 
         if not self.config["debug"]:
             log_examples(self.logger, self.trainer.datamodule.data["train"])
 
-    def setup_knn_validation(self):
-        with torch.no_grad():
-            self.knn_eval_datasets = []
-            # deprecating self.trainer.datamodule.data["labelled"] in favor of both being part of val_knn
-            for knn_dataset_name, (_, val_databank) in self.trainer.datamodule.data['val_knn'].items():
-                logging.info('Using knn dataset {}, {} bank labels'.format(knn_dataset_name, len(val_databank)))
-                # each KNN_Eval does the actual val work
-                self.knn_eval_datasets.append(KNN_Eval(knn_dataset_name, val_databank, self.config, self.dummy_param, self.forward, self.log))
+    def validation_step(self, batch, batch_idx):
+        return
 
-    def setup_supervised_validation(self):
-        self.supervised_dataset = Supervised_Eval(self.represent, self.supervised_head, self.supervised_loss_func, self.dummy_param, self.log)
+    def test_step(self, batch, batch_idx):
+        return
 
-    # will only work if datamodule has self.data['val_supervised'] key
-    # else will not be passed the extra dataloader_idx argument
-    def validation_step(self, batch, batch_idx, dataloader_idx):
-        if dataloader_idx < len(self.knn_eval_datasets):  # first N are assumed dataloaders for knn eval
-            self.knn_eval_datasets[dataloader_idx].validation_step(batch)  # knn validation
-        else:
-            assert hasattr(self, 'supervised_dataset')
-            self.supervised_dataset.validation_step(batch)
-
-    def validation_epoch_end(self, outputs) -> None:
-        for knn_eval in self.knn_eval_datasets:
-            knn_eval.validation_epoch_end()
-        # if hasattr(self, 'supervised_dataset'):
-        #     self.supervised_dataset.validation_epoch_end()
-        # not needed - can just self.log the loss without needing to reset e.g. accuracy metrics at epoch end
-        
-
-
-    def forward(x):
-        raise NotImplementedError('Must be subclassed by e.g. BYOL, which implements .forward(x)')
 
 # for a single knn eval dataset
-class KNN_Eval():   # lightning subclass purely for self.log
-
-    def __init__(self, name, data_bank, config, dummy_param, forward: callable, log: callable):
+class Data_Eval:
+    # lightning subclass purely for self.log
+    def __init__(self, name, config, dummy_param, forward: callable, log: callable):
 
         # super().__init__()
-        
+
         self.name = name
-        self.data_bank = data_bank
         self.dummy_param = dummy_param
         self.config = config
         self.forward = forward  # explictly passed to __init__, composition-style
         self.log = log
 
         # https://torchmetrics.readthedocs.io/en/latest/pages/overview.html#metrics-and-devices
-        self.knn_acc = tm.Accuracy(average="micro", threshold=0).to(device='cuda:0')
+        self.acc = tm.Accuracy(average="micro", threshold=0).to(self.dummy_param.device)
 
-        self.setup_knn_features_and_targets()
-
-
-    def setup_knn_features_and_targets(self):
-        # TODO will have many databanks, each with different knn problem
-        data_bank_loader = DataLoader(
-                self.data_bank, 200
-            )  # 200 is the batch size used for the unpacking below
-            feature_bank = []
-            target_bank = []
-            for data in data_bank_loader:
-                # Load data and move to correct device
-                (x, y) = data  # supervised-style batch of (images, labels), with batch size from above
-                x = x.type_as(self.dummy_param)
-                y = y.type_as(self.dummy_param).long()
-
-                # Encode data and normalize features (for kNN)
-                feature = self.forward(x).squeeze()  # (batch, features)  e.g. (200, 512)
-                feature = F.normalize(feature, dim=1)
-                # tensor of all features, within which to find nearest-neighbours. Each is (B, N_features), N_features being the output dim of self.forward e.g. BYOL
-                feature_bank.append(feature)
-                target_bank.append(y)  # tensor with labels of those features
-
-            # Save full feature bank for validation epoch
-            # (features, len(l datamodule)) due to the .t() transpose
-            self.feature_bank = torch.cat(feature_bank, dim=0).t().contiguous()
-            # either (label_dim, len) or just (len) depending on if labels should have singleton label_dim dimension
-            self.target_bank = torch.cat(target_bank, dim=0).t().contiguous()
-            assert all(self.target_bank >= 0)
-
-
-    def validation_step(self, batch):
-        # Load batch
-        x, y = batch
-        # Extract + normalize features
-        feature = self.forward(x).squeeze()  # from init(forward), likely BYOL's forward 
-        feature = F.normalize(feature, dim=1)
-
-        # Load feature bank and labels (with same dtypes as x, y)
-        feature_bank = self.feature_bank.type_as(x)
-        target_bank = self.target_bank.type_as(y)
-
-        pred_labels = knn_predict(
-                feature,  # feature to search for
-                feature_bank,  # feature bank to identify NN within
-                target_bank,  # labels of those features in feature_bank, same index
-                self.config["data"]["classes"],
-                knn_k=self.config["knn"]["neighbors"],
-                knn_t=self.config["knn"]["temperature"],
-                leave_first_out=self.config["knn"]["leave_first_out"],
-            )
-
-        top1 = pred_labels[:, 0]
-
-            # Compute accuracy
-            # assert top1.min() >= 0
-            self.knn_acc_val.update(top1, y)
-
-    def validation_epoch_end(self, outputs):
-        if hasattr(self, "feature_bank") and hasattr(self, "target_bank"):
-            self.log("val/kNN_acc", self.knn_acc_val.compute() * 100)
-            self.knn_acc_val.reset()
-
-    def test_step(self, batch, batch_idx):
+    def setup(self):
         return
 
-    #     def test_step(self, batch, batch_idx):
-    #         if hasattr(self, "feature_bank") and hasattr(self, "target_bank"):
-    #             x, y = batch
-    #             # Extract + normalize features
-    #             feature = self.forward(x).squeeze()
-    #             feature = F.normalize(feature, dim=1)
-
-    #             # Load feature bank and labels
-    #             feature_bank = self.feature_bank.type_as(x)
-    #             target_bank = self.target_bank.type_as(y)
-
-    #             pred_labels = knn_predict(
-    #                 feature,  # feature to search for
-    #                 feature_bank,  # feature bank to identify NN within
-    #                 target_bank,  # labels of those features in feature_bank, same index
-    #                 self.config["data"]["classes"],
-    #                 knn_k=self.config["knn"]["neighbors"],
-    #                 knn_t=self.config["knn"]["temperature"],
-    #                 leave_first_out=self.config["knn"]["leave_first_out"],
-    #             )
-
-    #             top1 = pred_labels[:, 0]
-
-    #             # Compute accuracy
-    #             # assert top1.min() >= 0
-    #             self.knn_acc_test.update(top1, y)
-
-    # def test_epoch_end(self, outputs):
-    #     if hasattr(self, "feature_bank") and hasattr(self, "target_bank"):
-    #         self.log("test/kNN_acc", self.knn_acc_test.compute() * 100)
-    #         self.knn_acc_test.reset()
-    #         # return self.knn_acc_test.compute() * 100
+    def record(self):
+        return
 
 
-class Feature_Bank(Callback):
-    """Code adapted from https://github.com/lightly-ai/lightly/blob/master/lightly/utils/benchmarking.py
+class Linear_Eval(Callback):
+    """
+    Callback to perform linear evaluation at the end of each epoch.
 
-    Calculates a feature bank for validation"""
+    Attributes:
+        data: Data dictionary containing 'train', 'val', 'test' and 'name' keys.
+        clf: Linear classification model.
 
-    def __init__(self):
+    """
+
+    def __init__(self, data):
+        """
+        Args:
+            data: Data dictionary containing 'train', 'val', 'test' and 'name' keys.
+        """
         super().__init__()
 
-    def on_validation_epoch_start(self, trainer, pl_module):
+        self.data = data
+        self.clf = RidgeClassifier(normalize=True)
+
+    def on_train_epoch_end(self, trainer, pl_module):
         with torch.no_grad():
-            encoder = pl_module.backbone
+            X_train, y_train = embed(pl_module.backbone, self.data["train"])
+            X_train, y_train = X_train.detach().cpu().numpy(), y_train.detach().cpu().numpy()
+            self.clf.fit(X_train, y_train)
 
-            data_bank = pl_module.trainer.datamodule.data["labelled"]
-            data_bank_loader = DataLoader(data_bank, 200)
-            feature_bank = []
-            target_bank = []
-            for data in data_bank_loader:
-                # Load data and move to correct device
-                x, y = data
-                x = x.type_as(pl_module.dummy_param)
-                y = y.type_as(pl_module.dummy_param).long()
+    def on_validation_epoch_end(self, trainer, pl_module):
+        X_val, y_val = embed(pl_module.backbone, self.data["val"])
+        X_val, y_val = X_val.detach().cpu().numpy(), y_val.detach().cpu().numpy()
+        acc = self.clf.score(X_val, y_val)
+        print(acc)
+        pl_module.log(f"eval_{self.data['name']}/lin_val_acc", acc)
 
-                # Encode data and normalize features (for kNN)
-                feature = encoder(x).squeeze()
+    def on_test_end(self, trainer, pl_module):
+        X_test, y_test = embed(pl_module.backbone, self.data["test"])
+        X_test, y_test = X_test.detach().cpu().numpy(), y_test.detach().cpu().numpy()
+        acc = self.clf.score(X_test, y_test)
+        pl_module.log(f"eval_{self.data['name']}/lin_test_acc", acc)
+
+
+class KNN_Eval(Callback):
+    # lightning subclass purely for self.log
+    def __init__(self, data):
+        super().__init__()
+        self.data = data
+
+    def on_validation_epoch_start(self, trainer, pl_module):
+        feature_bank = []
+        target_bank = []
+        # 200 is the batch size used for the unpacking below
+        for data in DataLoader(self.data["train"], 200):
+            # Load data and move to correct device
+            (x, y) = data  # supervised-style batch of (images, labels), with batch size from above
+            x = x.type_as(pl_module.dummy_param)
+            y = y.type_as(pl_module.dummy_param).long()
+
+            # Encode data and normalize features (for kNN)
+            feature = self.forward(x).squeeze()  # (batch, features)  e.g. (200, 512)
+            feature = F.normalize(feature, dim=1)
+            # tensor of all features, within which to find nearest-neighbours. Each is (B, N_features), N_features being the output dim of self.forward e.g. BYOL
+            feature_bank.append(feature)
+            target_bank.append(y)  # tensor with labels of those features
+
+        # Save full feature bank for validation epoch
+        # (features, len(l datamodule)) due to the .t() transpose
+        self.feature_bank = torch.cat(feature_bank, dim=0).t().contiguous()
+        # either (label_dim, len) or just (len) depending on if labels should have singleton label_dim dimension
+        self.target_bank = torch.cat(target_bank, dim=0).t().contiguous()
+        assert all(self.target_bank >= 0)
+
+    def on_validation_epoch_end(self, batch):
+        if hasattr(self, "feature_bank") and hasattr(self, "target_bank"):
+            # Load batch
+            for x, y in DataLoader(self.data["train"], 200):
+                # Extract + normalize features
+                feature = self.forward(x).squeeze()  # from init(forward), likely BYOL's forward
                 feature = F.normalize(feature, dim=1)
-                feature_bank.append(feature)
-                target_bank.append(y)
 
-            # Save full feature bank for validation epoch
-            pl_module.feature_bank = torch.cat(feature_bank, dim=0).t().contiguous()
-            pl_module.target_bank = torch.cat(target_bank, dim=0).t().contiguous()
+                # Load feature bank and labels (with same dtypes as x, y)
+                feature_bank = self.feature_bank.type_as(x)
+                target_bank = self.target_bank.type_as(y)
+
+                pred_labels = knn_predict(
+                    feature,  # feature to search for
+                    feature_bank,  # feature bank to identify NN within
+                    target_bank,  # labels of those features in feature_bank, same index
+                    self.config["data"]["classes"],
+                    knn_k=self.config["knn"]["neighbors"],
+                    knn_t=self.config["knn"]["temperature"],
+                    leave_first_out=self.config["knn"]["leave_first_out"],
+                )
+
+                top1 = pred_labels[:, 0]
+
+                # Compute accuracy
+                # assert top1.min() >= 0
+                self.acc.update(top1, y)
+
+        self.log("val/kNN_acc", self.knn_acc_val.compute() * 100)
+        self.acc.reset()
 
 
 class Epoch_Averaged_Test(Callback):
@@ -454,6 +398,50 @@ class Epoch_Averaged_Test(Callback):
             for key, value in self.acc.items():
                 pl_module.log(f"test/kNN_acc_agg_{key}", mean(value))
             # pl_module.log("test/kNN_acc_agg", pl_module.knn_acc_test.compute())
+
+
+class Supervised_Eval(Data_Eval):
+    def __init__(
+        self,
+        name,
+        config,
+        dummy_param,
+        forward: callable,
+        log: callable,
+        supervised_head,
+        supervised_loss_func,
+    ) -> None:
+        # this is getting a bit ugly because these get to Lightning_Eval's subclass via inheritance,
+        # but I'm trying to use composition here to have a small object that does one thing
+        # would work better to also get the above into Lightning_Eval via comp.
+        # or would work better to refactor the supervised pieces into one bit of code
+
+        super().__init__(name, config, dummy_param, forward, log)
+
+        self.supervised_head = supervised_head
+        self.supervised_loss_func = supervised_loss_func
+
+    def step(self, batch):
+        # get supervised loss on batch (from validation set)
+        x, labels = batch
+        # logging.info('x')
+        # logging.info(x)
+        x = x.type_as(self.dummy_param)
+
+        # not a great name - this is the representation, pre-projection logging.info('y')
+        y = self.forward(x)
+        # logging.info(y)
+
+        supervised_head_out = self.supervised_head(y)
+        # p = self.project(y)
+        # supervised_head_out = self.supervised_head(p)
+
+        # logging.info('supervised_head_out')
+        # logging.info(supervised_head_out)
+        supervised_loss = self.supervised_loss_func(supervised_head_out, labels)
+
+        # TODO Will this work properly since it's not in a lightning module? (logging epoch aggregation)
+        self.log("val/supervised_loss", supervised_loss, on_step=False, on_epoch=True)
 
 
 class linear_net(pl.LightningModule):
