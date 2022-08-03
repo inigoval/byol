@@ -24,7 +24,7 @@ def load_config():
 
     # if loading a benchmark, use load the specific config
     preset = dataset_config["preset"]
-    if preset:
+    if preset != "none":
         path = path_dict["config"] / type / f"{dataset}-{preset}.yml"
         with open(path, "r") as ymlconfig:
             dataset_config = yaml.load(ymlconfig, Loader=yaml.FullLoader)
