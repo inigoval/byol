@@ -18,7 +18,7 @@ from zoobot.pytorch.training import losses
 from byol_main.evaluation import Lightning_Eval
 from byol_main.networks.models import _get_backbone
 
-# Lightning_Eval superclass adds validation step options for kNN evaluation
+
 class BYOL(Lightning_Eval):
     def __init__(self, config):
         super().__init__(config)
