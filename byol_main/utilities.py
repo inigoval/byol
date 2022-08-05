@@ -133,7 +133,7 @@ def _optimizer(params, config):
         raise ValueError(config["scheduler"]["type"])
 
 
-def embed(encoder, data, batch_size=200):
+def embed_dataset(encoder, data, batch_size=200):
     train_loader = DataLoader(data, batch_size)
     feature_bank = []
     target_bank = []
