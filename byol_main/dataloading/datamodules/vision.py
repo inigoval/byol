@@ -102,7 +102,7 @@ class STL10_DataModule(Base_DataModule):
         STL10(root=self.path, split="test", download=True)
 
     def setup(self):
-        self.data["train"] = STL10(root=self.path, split="unlabeled", transform=self.T_train)
+        self.data["train"] = STL10(root=self.path, split="train+unlabeled", transform=self.T_train)
         self.data["val_train"] = STL10(root=self.path, split="train", transform=self.T_test)
         self.data["test_train"] = STL10(root=self.path, split="train", transform=self.T_test)
 
@@ -113,4 +113,6 @@ class STL10_DataModule(Base_DataModule):
         ]
 
         self.test_names = ["stl10_test"]
-        self.data["test"] = [("stl10_test", STL10(root=self.path, split="test", transform=self.T_test))]
+        self.data["test"] = [
+            ("stl10_test", STL10(root=self.path, split="test", transform=self.T_test)),
+        ]
