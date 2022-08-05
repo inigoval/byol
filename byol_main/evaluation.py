@@ -21,7 +21,7 @@ from sklearn.linear_model import RidgeClassifier
 from dataloading.utils import dset2tens
 from paths import Path_Handler
 from networks.models import MLPHead, LogisticRegression
-from utilities import log_examples, fig2img, embed
+from utilities import log_examples, fig2img, embed_dataset
 
 
 def knn_predict(
