@@ -36,19 +36,33 @@ class Base_DataModule(pl.LightningDataModule):
             self.data["train"],
             batch_size=self.config["data"]["pretrain_batch_size"],
             shuffle=True,
-            num_workers=self.config["num_workers"],
-            # num_workers=1,
-            prefetch_factor=self.config["prefetch_factor"],
-            pin_memory=self.config["pin_memory"],
-            persistent_workers=self.config["persistent_workers"],
+            **self.config["dataloading"],
         )
         return loader
 
     def val_dataloader(self):
-        return
+        loaders = [
+            DataLoader(
+                data,
+                batch_size=self.config["val_batch_size"],
+                shuffle=False,
+                **self.config["dataloading"],
+            )
+            for _, data in self.data["val"]
+        ]
+        return loaders
 
     def test_dataloader(self):
-        return
+        loaders = [
+            DataLoader(
+                data,
+                batch_size=self.config["val_batch_size"],
+                shuffle=False,
+                **self.config["dataloading"],
+            )
+            for _, data in self.data["test"]
+        ]
+        return loaders
 
     def update_transforms(self, D_train):
         # if mu (and sig, implicitly) has been explicitly set, trust it is correct
@@ -89,13 +103,14 @@ class STL10_DataModule(Base_DataModule):
 
     def setup(self):
         self.data["train"] = STL10(root=self.path, split="unlabeled", transform=self.T_train)
+        self.data["val_train"] = STL10(root=self.path, split="train", transform=self.T_test)
+        self.data["test_train"] = STL10(root=self.path, split="train", transform=self.T_test)
 
-        # list of dictionaries
-        self.data["eval"] = [
-            {
-                "name": "stl10_test",
-                "train": STL10(root=self.path, split="train", transform=self.T_test),
-                "val": STL10(root=self.path, split="test", transform=self.T_test),
-                "test": STL10(root=self.path, split="test", transform=self.T_test),
-            },
+        # list of datasets
+        self.val_names = ["stl10_test"]
+        self.data["val"] = [
+            ("stl10_val", STL10(root=self.path, split="test", transform=self.T_test)),
         ]
+
+        self.test_names = ["stl10_test"]
+        self.data["test"] = [("stl10_test", STL10(root=self.path, split="test", transform=self.T_test))]

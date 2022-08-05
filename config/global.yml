@@ -5,16 +5,20 @@ compute: 'slurm'
 seed: 0
 n_iterations: 1
 debug: False
-num_workers: 8  # often overriden
-prefetch_factor: 10
-persistent_workers: False  # torch default is False
-pin_memory: True
 checkpoint_mode: 'last'
 early_stopping: False
-knn_eval: False
-linear_eval: True
 precision: 16 # [16, 32, 'bf16'], often overriden
 topk: 5
 precision: 16 # [16, 32, 'bf16']
 persistent_workers: False # default is False
 profiler: 'none'
+val_batch_size: 500 # validation batch size
+
+dataloading:
+  num_workers: 8  # often overriden
+  prefetch_factor: 10
+  persistent_workers: False  # torch default is False
+  pin_memory: True
+
+knn_eval: False
+linear_eval: True
