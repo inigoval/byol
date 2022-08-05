@@ -1,26 +1,26 @@
 import wandb
 import pytorch_lightning as pl
 import logging
-import os
 import torch
 
 from pytorch_lightning.callbacks import LearningRateMonitor
 from pytorch_lightning.profiler import AdvancedProfiler, PyTorchProfiler
 
-from byol_main.byol import BYOL, BYOL_Supervised
+from byol_main.byol import BYOL
 from byol_main.nnclr import NNCLR
-from byol_main.evaluation import Linear_Eval, KNN_Eval
 from byol_main.config import load_config
 from byol_main.utilities import log_examples
 from dataloading.datamodules import datasets
 from paths import Path_Handler, create_path
 
-from byol_rr import BYOL_RR, count_masks, Count_Masks
+from byol_rr import BYOL_RR
 from byol_pretext import BYOL_Pretext
 from supervised import Supervised
 
 # TODO put elsewhere
 # https://colab.research.google.com/github/wandb/examples/blob/master/colabs/pytorch-lightning/Profile_PyTorch_Code.ipynb#scrollTo=qRoUXZdtJIUD
+
+
 class TorchTensorboardProfilerCallback(pl.Callback):
     """Quick-and-dirty Callback for invoking TensorboardProfiler during training.
 
@@ -52,9 +52,11 @@ def run_contrastive_pretraining(config, wandb_logger, trainer_settings):
         "last": {"monitor": None},
     }
 
+    ## Creates experiment path if it doesn't exist already ##
     experiment_dir = config["files"] / config["run_id"]
     create_path(experiment_dir)
 
+    ## Initialise checkpoint ##
     pretrain_checkpoint = pl.callbacks.ModelCheckpoint(
         **checkpoint_mode[config["checkpoint_mode"]],
         every_n_epochs=1,
@@ -67,9 +69,9 @@ def run_contrastive_pretraining(config, wandb_logger, trainer_settings):
         save_weights_only=True,
         # save_top_k=3,
     )
-
     logging.info(f"checkpoint monitoring: {checkpoint_mode[config['checkpoint_mode']]}")
 
+    ## Initialise data and run set up ##
     pretrain_data = datasets[config["dataset"]](config)
     pretrain_data.prepare_data()
     pretrain_data.setup()
@@ -77,16 +79,6 @@ def run_contrastive_pretraining(config, wandb_logger, trainer_settings):
 
     ## Initialise callbacks ##
     callbacks = [pretrain_checkpoint]
-
-    # add linear evaluation
-    if config["linear_eval"]:
-        for val_data in pretrain_data.data["eval"]:
-            callbacks.append(Linear_Eval(val_data))
-
-    # add knn evaluation
-    if config["knn_eval"]:
-        for val_data in pretrain_data.data["eval"]:
-            callbacks.append(KNN_Eval(val_data))
 
     # add learning rate monitor, only supported with a logger
     if wandb_logger is not None:
@@ -110,6 +102,7 @@ def run_contrastive_pretraining(config, wandb_logger, trainer_settings):
 
     logging.info(f"Threads: {torch.get_num_threads()}")
 
+    ## Initialise pytorch lightning trainer ##
     pre_trainer = pl.Trainer(
         # gpus=1,
         **trainer_settings[config["compute"]],
@@ -125,10 +118,6 @@ def run_contrastive_pretraining(config, wandb_logger, trainer_settings):
         # max_steps = 200  # TODO temp
     )
 
-    trainer_settings = {
-        "slurm": {"gpus": 1, "num_nodes": 1},
-        "gpu": {"devices": 1, "accelerator": "gpu"},
-    }
     # Initialise model #
     models = {
         "byol_pretext": BYOL_Pretext,
@@ -145,6 +134,7 @@ def run_contrastive_pretraining(config, wandb_logger, trainer_settings):
 
     config["model"]["output_dim"] = config["model"]["features"]
 
+    ## Record some data-points and their augmentations if not in debugging mode ##
     if not config["debug"]:
         log_examples(wandb_logger, pretrain_data.data["train"])
 
@@ -162,12 +152,13 @@ def main():
         format="%(asctime)s %(levelname)s: %(message)s",
     )
 
+    ## Load up config from yml files ##
     config = load_config()
 
     wandb.init(project=config["project_name"])
     config["run_id"] = str(wandb.run.id)
 
-    # TODO could probably be directly included in config rather than config['compute'] indexing this
+    # TODO could probably be directly included in config rather than config['compute'] indexing this - this way you only need to change one setting in the config for swapping between slurm and direct on gpu
     trainer_settings = {
         "slurm": {"gpus": 1, "num_nodes": 1},
         "gpu": {"devices": 1, "accelerator": "gpu"},
@@ -195,9 +186,8 @@ def main():
 
     config["files"] = path_dict["files"]
 
+    ## Run pretraining ##
     pretrain_checkpoint, model = run_contrastive_pretraining(config, wandb_logger, trainer_settings)
-
-    # run_linear_evaluation_protocol(config, wandb_logger, pretrain_checkpoint, trainer_settings, model)
 
     wandb_logger.experiment.finish()
 
