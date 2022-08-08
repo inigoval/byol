@@ -78,10 +78,10 @@ class MultiView(nn.Module):
             return _gzmnist_view(self.config)
 
         # TODO could get ugly
-        elif self.config["dataset"] in ['gz2', 'decals_dr5', 'legs', 'rings', 'legs_and_rings']:
+        elif self.config["dataset"] in ["gz2", "decals_dr5", "legs", "rings", "legs_and_rings"]:
             return _gz2_view(self.config)  # now badly named TODO
 
-        elif self.config["dataset"] == 'mixed':
+        elif self.config["dataset"] == "mixed":
             # return _zoobot_default_view(self.config)
             return _gz2_view(self.config)  # now badly named TODO
 
@@ -105,8 +105,9 @@ class SimpleView(nn.Module):
 
         augs.append(T.Resize(config["data"]["input_height"]))
 
-        if config["center_crop_size"]:
+        if config["augmentations"]["center_crop_size"]:
             augs.append(T.CenterCrop(config["center_crop_size"]))
+
         augs.append(T.ToTensor())
         self.view = T.Compose(augs)
 
@@ -189,7 +190,7 @@ class SupervisedView(nn.Module):
 def _simclr_view(config):
     # Returns a SIMCLR view
 
-    s = config["s"]
+    s = config["augmentations"]["s"]
     input_height = config["data"]["input_height"]
 
     color_jitter = T.ColorJitter(0.8 * s, 0.8 * s, 0.8 * s, 0.2 * s)
@@ -201,11 +202,9 @@ def _simclr_view(config):
     # Define a view
     view = T.Compose(
         [
-            # T.Resize(input_height),
-            # T.CenterCrop(input_height),
             T.RandomResizedCrop(input_height, scale=(0.08, 1)),
             T.RandomHorizontalFlip(),
-            T.RandomVerticalFlip(),
+            # T.RandomVerticalFlip(),
             T.RandomApply([color_jitter], p=0.8),
             T.RandomGrayscale(p=0.2),
             blur,
@@ -217,7 +216,7 @@ def _simclr_view(config):
 
 
 def _gzmnist_view(config):
-    s = config["s"]
+    s = config["augmentations"]["s"]
     input_height = config["data"]["input_height"]  # TODO adjust for 128pix
 
     # Gaussian blurring, kernel 10% of image size (SimCLR paper)
@@ -253,13 +252,15 @@ def _gzmnist_view(config):
 
 def _gz2_view(config):
     # currently the same as gzmnist except for the resizing and ToPIL transform
-    s = config["s"]
+    s = config["augmentations"]["s"]
     # images are loaded from disk at whatever size (424, in practice). Not a parameter
     # images are then downscaled to `downscale_height`, calculated according to the final desired input size * "precrop_size_ratio"
     # finally, images are random-cropped to input_height and sent to model
     # e.g. image loaded at 424, resized to downscale_height=300 (424 * precrop_size_ratio=0.75), then random-cropped to input_height=224
     precrop_size_ratio = config["data"]["precrop_size_ratio"]
-    assert precrop_size_ratio >= 1. # >1 implies image is still bigger than model input height after resizing, leaving room to random-crop
+    assert (
+        precrop_size_ratio >= 1.0
+    )  # >1 implies image is still bigger than model input height after resizing, leaving room to random-crop
     input_height = config["data"]["input_height"]  # i.e. after RandomResizedCrop, when input to model
 
     downscale_height = int(min(424, input_height * precrop_size_ratio))
@@ -298,7 +299,7 @@ def _gz2_view(config):
 def _zoobot_default_view(config):
     transforms = galaxy_datamodule.default_torchvision_transforms(
         greyscale=False,
-        resize_size=config['data']['input_height'], 
+        resize_size=config["data"]["input_height"],
         crop_scale_bounds=(0.7, 0.8),
         crop_ratio_bounds=(0.9, 1.1),
     )
@@ -324,7 +325,7 @@ def _rgz_view(config):
         random_crop = config["random_crop_scale"]
 
         # Color jitter
-        s = config["s"]
+        s = config["augmentations"]["s"]
         color_jitter = T.ColorJitter(0.8 * s, 0.8 * s, 0.8 * s, 0)
 
         # Define a view

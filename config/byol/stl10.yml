@@ -2,7 +2,7 @@ preset: 'none'
 
 model:
     architecture: 'resnet18' 
-    features: 100     # Number of encoded features (None just uses original resnet output)
+    features: 512     # Number of encoded features (null just uses original resnet output)
     n_epochs: 100 
     downscale: False
 
@@ -14,11 +14,8 @@ data:
     color_channels: 3
     classes: 10
     rotate: False
-    test_frac: 0.3 
-    val_frac: 1
     input_height: 96
-    pretrain_batch_size: 256
-    val_batch_size: 500
+    pretrain_batch_size: 64
 
 linear:
     n_epochs: 30
@@ -39,19 +36,13 @@ optimizer:
 
 scheduler:
   type: 'cosine' # ['none', 'cosine', 'warmupcosine']
-  warmup_epochs: 10  # Only used in linear warmup cosine annealing
+  warmup_epochs: 10  # Only used in linear warmup cosine annealing, if scheduler type is 'warmupcosine'
 
 augmentations:
-  s: 0.5
-  center_crop_size: 80
-
-## AUGMENTATIONS ##
-s: 0.5
-center_crop_size: 80
-
-## Optimiser ## 
+  s: 1
+  center_crop_size: null
 
 
 ## BYOL ## 
-m: 0.99
+m: 0.996
 m_decay: False
