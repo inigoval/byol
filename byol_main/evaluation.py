@@ -176,14 +176,11 @@ class Lightning_Eval(pl.LightningModule):
         self.config["data"]["mu"] = self.trainer.datamodule.mu
         self.config["data"]["sig"] = self.trainer.datamodule.sig
 
-        self.val_names = self.trainer.datamodule.val_names
-        self.test_names = self.trainer.datamodule.test_names
-
         ## Log size of data-sets ##
         logging_params = {"n_train": len(self.trainer.datamodule.data["train"])}
 
-        for name, data in self.trainer.datamodule.data["val"]:
-            logging_params[f"{name}_n"] = len(data)
+        for data in self.trainer.datamodule.data["val"]:
+            logging_params[f"{data['name']}_n"] = len(data["val"])
 
         # for name, data in self.trainer.datamodule.data["test"]:
         #     logging_params[f"{name}_n"] = len(data)
@@ -203,26 +200,33 @@ class Lightning_Eval(pl.LightningModule):
         self.val_list = []
 
         ## Prepare for linear evaluation ##
-        for idx, name in enumerate(self.val_names):
+        # Cycle through validation data-sets
+        for idx, data in enumerate(self.trainer.datamodule.data["val"]):
             if self.config["linear_eval"]:
-                self.val_list.append((Linear_Eval(name, idx)))
+                # Initialise linear eval data-set and run setup with training data
+                lin_eval = Linear_Eval(data["name"], idx)
+                lin_eval.setup(self, data["train"])
 
-            if self.config["knn_eval"]:
-                self.val_list.append((KNN_Eval(name, idx)))
+                # Add to list of evaluations
+                self.val_list.append(lin_eval)
 
-        for val in self.val_list:
-            val.setup(self, self.trainer.datamodule.data["val_train"])
+            # if self.config["knn_eval"]:
+            #     self.val_list.append((KNN_Eval(name, idx)))
 
     def validation_step(self, batch, batch_idx, dataloader_idx=0):
-        for idx, name in enumerate(zip(self.val_names, self.val_list)):
+        x, y = batch
+        # Loop through validation data-sets
+        for idx, data in enumerate(self.val_list):
             if dataloader_idx == idx:
+                # Filter out validation sets that require different data-loader
                 val_list_filtered = [val for val in self.val_list if val.dataloader_idx == idx]
-                x, y = batch
 
+                # Run validation step for filtered data-sets
                 for val in val_list_filtered:
                     val.step(self, x, y)
 
     def on_validation_epoch_end(self):
+        # Complete validation for all data-sets
         for val in self.val_list:
             val.end(self, stage="val")
 

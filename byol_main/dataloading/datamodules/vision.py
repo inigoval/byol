@@ -43,12 +43,12 @@ class Base_DataModule(pl.LightningDataModule):
     def val_dataloader(self):
         loaders = [
             DataLoader(
-                data,
+                data["val"],
                 batch_size=self.config["val_batch_size"],
                 shuffle=False,
                 **self.config["dataloading"],
             )
-            for _, data in self.data["val"]
+            for data in self.data["val"]
         ]
         return loaders
 
@@ -107,9 +107,17 @@ class STL10_DataModule(Base_DataModule):
         self.data["test_train"] = STL10(root=self.path, split="train", transform=self.T_test)
 
         # list of datasets
-        self.val_names = ["stl10_test"]
+        # self.val_names = ["stl10_test"]
+        # self.data["val"] = [
+        #     ("stl10_val", STL10(root=self.path, split="test", transform=self.T_test)),
+        # ]
+
         self.data["val"] = [
-            ("stl10_val", STL10(root=self.path, split="test", transform=self.T_test)),
+            {
+                "name": "stl10_val",
+                "train": STL10(root=self.path, split="train", transform=self.T_test),
+                "val": STL10(root=self.path, split="test", transform=self.T_test),
+            },
         ]
 
         self.test_names = ["stl10_test"]
