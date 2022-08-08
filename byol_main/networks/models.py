@@ -37,9 +37,9 @@ class LogisticRegression(torch.nn.Module):
 
 def _get_backbone(config):
 
-    logging.info(config['model']['architecture'])
+    logging.info(config["model"]["architecture"])
 
-    if config['model']['architecture'] == 'zoobot':
+    if config["model"]["architecture"] == "zoobot":
 
         from zoobot.pytorch.estimators import define_model, efficientnet_standard
 
@@ -49,7 +49,7 @@ def _get_backbone(config):
             include_top=False,
             channels=config["data"]["color_channels"],
             get_architecture=efficientnet_standard.efficientnet_b0,
-            representation_dim=1280
+            representation_dim=1280,
         )
         return backbone
 
@@ -57,27 +57,31 @@ def _get_backbone(config):
 
     net = _get_net(config)  # e.g. resnet
 
-    if 'resnet' in config["model"]["architecture"]:
+    if "resnet" in config["model"]["architecture"]:
         # c_out = channels out
-        c_out = list(net.children())[-1].in_features  # output dim of e.g. resnet, once the classification layer is removed (below)
-    elif 'efficientnet' in config["model"]["architecture"]:
-        c_out = list(net.children())[-1][1].in_features  # sequential is -1, then 1 is linear (0 being dropout)
+        c_out = list(net.children())[
+            -1
+        ].in_features  # output dim of e.g. resnet, once the classification layer is removed (below)
+    elif "efficientnet" in config["model"]["architecture"]:
+        c_out = list(net.children())[-1][
+            1
+        ].in_features  # sequential is -1, then 1 is linear (0 being dropout)
 
     # i.e. remove the last layer (aka the classification layer) as default-defined
     # for resnet, is linear. for effnet, is sequential([dropout, linear]). Same thing.
     # net now ends with adaptivepool in both cases
-    net = torch.nn.Sequential(*list(net.children())[:-1])  
+    net = torch.nn.Sequential(*list(net.children())[:-1])
 
     # Change first layer for color channels B/W images
     n_c = config["data"]["color_channels"]
     if n_c != 3:
-        logging.warning('Adapting network for greyscale images, may not match Zoobot')
+        logging.warning("Adapting network for greyscale images, may not match Zoobot")
         # c_out, k, s, p = net[0].out_channels, net[0].kernel_size, net[0].stride, net[0].padding
         # net[0] = nn.Conv2d(n_c, c_out, kernel_size=k, stride=s, padding=p, bias=False)
         net[0] = nn.Conv2d(n_c, 64, kernel_size=7, stride=2, padding=2, bias=False)
 
     if config["model"]["downscale"]:
-        logging.warning('Adapting network with downscaling, may not match Zoobot')
+        logging.warning("Adapting network with downscaling, may not match Zoobot")
         net[0] = nn.Conv2d(n_c, 64, kernel_size=3, stride=1, padding=1, bias=False)
 
     features = config["model"]["features"]  # e.g. 512
@@ -85,7 +89,11 @@ def _get_backbone(config):
 
     # if 'resnet' in config["model"]["architecture"]:
     if features != c_out:
-        logging.warning('Requested num. features {} does not equal backbone output {} - adding 1x1 conv layer with {} features'.format(features, c_out, features))
+        logging.warning(
+            "Requested num. features {} does not equal backbone output {} - adding 1x1 conv layer with {} features".format(
+                features, c_out, features
+            )
+        )
         backbone = nn.Sequential(
             *list(net.children())[:-1],  # also remove adaptive pool (both cases)
             nn.Conv2d(c_out, features, 1),  # another conv layer, to `features` channels with 1x1 kernel
@@ -93,7 +101,6 @@ def _get_backbone(config):
         )
     else:
         backbone = net
-
 
     return backbone
 

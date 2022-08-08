@@ -213,11 +213,11 @@ class Lightning_Eval(pl.LightningModule):
         for val in self.val_list:
             val.setup(self, self.trainer.datamodule.data["val_train"])
 
-    def validation_step(self, batch, batch_idx, dataloader_idx):
-        x, y = batch
+    def validation_step(self, batch, batch_idx, dataloader_idx=0):
         for idx, name in enumerate(zip(self.val_names, self.val_list)):
             if dataloader_idx == idx:
                 val_list_filtered = [val for val in self.val_list if val.dataloader_idx == idx]
+                x, y = batch
 
                 for val in val_list_filtered:
                     val.step(self, x, y)
@@ -280,12 +280,13 @@ class Linear_Eval(Data_Eval):
         self.acc.reset()
 
     def step(self, pl_module, X, y):
-        X = pl_module.backbone(X).squeeze()
-        preds = pl_module.lin_clf.predict(X.detach().cpu().numpy())
-        self.acc.update(torch.tensor(preds), y.detach().cpu())
+        X = pl_module(X).squeeze()
+        X, y = X.detach().cpu().numpy(), y.detach().cpu()
+        preds = pl_module.lin_clf.predict(X)
+        self.acc.update(torch.tensor(preds), y)
 
     def end(self, pl_module, stage):
-        pl_module.log(f"{stage}/{self.name}/lin_acc", self.acc.compute())
+        pl_module.log(f"{stage}/{self.name}/lin_test_acc", self.acc.compute())
 
 
 class KNN_Eval(Callback):
@@ -350,72 +351,7 @@ class KNN_Eval(Callback):
         self.acc.reset()
 
 
-####################
-### UNUSED STUFF ###
-####################
-
-
-class Feature_Bank(Callback):
-    """
-    Code adapted from https://github.com/lightly-ai/lightly/blob/master/lightly/utils/benchmarking.py
-
-    Callback to save a feature bank for kNN validation.
-    """
-
-    def __init__(self):
-        super().__init__()
-
-    def on_validation_epoch_start(self, trainer, pl_module):
-        with torch.no_grad():
-            encoder = pl_module.backbone
-
-            data_bank = pl_module.trainer.datamodule.data["labelled"]
-            data_bank_loader = DataLoader(data_bank, 200)
-            feature_bank = []
-            target_bank = []
-            for data in data_bank_loader:
-                # Load data and move to correct device
-                x, y = data
-                x = x.type_as(pl_module.dummy_param)
-                y = y.type_as(pl_module.dummy_param).long()
-
-                # Encode data and normalize features (for kNN)
-                feature = encoder(x).squeeze()
-                feature = F.normalize(feature, dim=1)
-                feature_bank.append(feature)
-                target_bank.append(y)
-
-            # Save full feature bank for validation epoch
-            pl_module.feature_bank = torch.cat(feature_bank, dim=0).t().contiguous()
-            pl_module.target_bank = torch.cat(target_bank, dim=0).t().contiguous()
-
-
-class Train_Linear_Eval(Callback):
-    """
-    Callback to train linear model at the end of epoch.
-
-    Attributes:
-        train_data: Dataset to use for training.
-        clf: Linear classification model.
-
-    """
-
-    def __init__(self, data):
-        """
-        Args:
-            data: Data dictionary containing 'train', 'val', 'test' and 'name' keys.
-        """
-        super().__init__()
-
-        self.train_data = data
-
-    def on_train_epoch_end(self, trainer, pl_module):
-        with torch.no_grad():
-            clf = RidgeClassifier(normalize=True)
-            X_train, y_train = embed_dataset(pl_module.backbone, self.train_data)
-            X_train, y_train = X_train.detach().cpu().numpy(), y_train.detach().cpu().numpy()
-            clf.fit(X_train, y_train)
-            pl_module.lin_clf = clf
+### UNUSED ###
 
 
 class Epoch_Averaged_Test(Callback):
@@ -535,6 +471,69 @@ class Supervised_Eval(Data_Eval):
 
         # TODO Will this work properly since it's not in a lightning module? (logging epoch aggregation)
         self.log("val/supervised_loss", supervised_loss, on_step=False, on_epoch=True)
+
+
+class Feature_Bank(Callback):
+    """
+    Code adapted from https://github.com/lightly-ai/lightly/blob/master/lightly/utils/benchmarking.py
+
+    Callback to save a feature bank for kNN validation.
+    """
+
+    def __init__(self):
+        super().__init__()
+
+    def on_validation_epoch_start(self, trainer, pl_module):
+        with torch.no_grad():
+            encoder = pl_module.backbone
+
+            data_bank = pl_module.trainer.datamodule.data["labelled"]
+            data_bank_loader = DataLoader(data_bank, 200)
+            feature_bank = []
+            target_bank = []
+            for data in data_bank_loader:
+                # Load data and move to correct device
+                x, y = data
+                x = x.type_as(pl_module.dummy_param)
+                y = y.type_as(pl_module.dummy_param).long()
+
+                # Encode data and normalize features (for kNN)
+                feature = encoder(x).squeeze()
+                feature = F.normalize(feature, dim=1)
+                feature_bank.append(feature)
+                target_bank.append(y)
+
+            # Save full feature bank for validation epoch
+            pl_module.feature_bank = torch.cat(feature_bank, dim=0).t().contiguous()
+            pl_module.target_bank = torch.cat(target_bank, dim=0).t().contiguous()
+
+
+class Train_Linear_Eval(Callback):
+    """
+    Callback to train linear model at the end of epoch.
+
+    Attributes:
+        train_data: Dataset to use for training.
+        clf: Linear classification model.
+
+    """
+
+    def __init__(self, train_data):
+        """
+        Args:
+            data: Data dictionary containing 'train', 'val', 'test' and 'name' keys.
+        """
+        super().__init__()
+
+        self.train_data = train_data
+
+    def on_train_epoch_end(self, trainer, pl_module):
+        with torch.no_grad():
+            clf = RidgeClassifier(normalize=True)
+            X_train, y_train = embed_dataset(pl_module.backbone, self.train_data)
+            X_train, y_train = X_train.detach().cpu().numpy(), y_train.detach().cpu().numpy()
+            clf.fit(X_train, y_train)
+            pl_module.lin_clf = clf
 
 
 class linear_net(pl.LightningModule):
