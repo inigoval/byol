@@ -135,13 +135,14 @@ def _optimizer(params, config):
 
 def embed_dataset(encoder, data, batch_size=200):
     train_loader = DataLoader(data, batch_size)
+    device = next(encoder.parameters()).device
     feature_bank = []
     target_bank = []
     for data in train_loader:
         # Load data and move to correct device
         x, y = data
-        x = x.to(next(encoder.parameters()).device)
-        y = y.to(next(encoder.parameters()).device)
+        x = x.to(device)
+        y = y.to(device)
 
         feature_bank.append(encoder(x).squeeze())
         target_bank.append(y)
