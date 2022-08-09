@@ -32,35 +32,16 @@ class Base_DataModule(pl.LightningDataModule):
         return
 
     def train_dataloader(self):
-        loader = DataLoader(
-            self.data["train"],
-            batch_size=self.config["data"]["pretrain_batch_size"],
-            shuffle=True,
-            **self.config["dataloading"],
-        )
+        loader = DataLoader(self.data["train"], **self.config["train_dataloader"])
         return loader
 
     def val_dataloader(self):
-        loaders = [
-            DataLoader(
-                data["val"],
-                batch_size=self.config["val_batch_size"],
-                shuffle=False,
-                **self.config["dataloading"],
-            )
-            for data in self.data["val"]
-        ]
+        loaders = [DataLoader(data["val"], **self.config["val_dataloader"]) for data in self.data["val"]]
         return loaders
 
     def test_dataloader(self):
         loaders = [
-            DataLoader(
-                data,
-                batch_size=self.config["val_batch_size"],
-                shuffle=False,
-                **self.config["dataloading"],
-            )
-            for _, data in self.data["test"]
+            DataLoader(data["test"], **self.config["val_dataloader"]) for _, data in self.data["test"]
         ]
         return loaders
 

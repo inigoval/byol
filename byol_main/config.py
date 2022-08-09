@@ -1,4 +1,7 @@
 import yaml
+
+from torch.optim import Adam, SGD
+
 from byol_main.paths import Path_Handler
 
 # Define paths
@@ -37,3 +40,34 @@ def load_config():
 
 def update_config(config):
     """Update config with values requiring initialisation of config"""
+
+    # Create unpackable dictionary for logistic regression model
+    optimizers = {"adam": Adam, "sgd": SGD}
+    config["logreg"] = {
+        "input_dim": config["model"]["features"],
+        "num_classes": config["data"]["classes"],
+        "learning_rate": config["linear"]["lr"],
+        "optimizer": optimizers[config["linear"]["opt"]],
+        "l1_strength": config["linear"]["l1_strength"],
+        "l2_strength": config["linear"]["l2_strength"],
+    }
+
+    # Create unpackable dictionary for training dataloaders
+    config["train_dataloader"] = {
+        "shuffle": False,
+        "batch_size": config["data"]["pretrain_batch_size"],
+        "num_workers": config["dataloading"]["num_workers"],
+        "prefetch_factor": config["dataloading"]["prefetch_factor"],
+        "persistent_workers": config["dataloading"]["persistent_workers"],
+        "pin_memory": config["dataloading"]["pin_memory"],
+    }
+
+    # Create unpackable dictionary for validation dataloaders
+    config["val_dataloader"] = {
+        "shuffle": False,
+        "batch_size": config["dataloading"]["val_batch_size"],
+        "num_workers": config["dataloading"]["num_workers"],
+        "prefetch_factor": config["dataloading"]["prefetch_factor"],
+        "persistent_workers": config["dataloading"]["persistent_workers"],
+        "pin_memory": config["dataloading"]["pin_memory"],
+    }
