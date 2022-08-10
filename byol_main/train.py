@@ -8,7 +8,7 @@ from pytorch_lightning.profiler import AdvancedProfiler, PyTorchProfiler
 
 from byol_main.byol import BYOL
 from byol_main.nnclr import NNCLR
-from byol_main.config import load_config
+from byol_main.config import load_config, update_config
 from byol_main.utilities import log_examples
 from dataloading.datamodules import datasets
 from paths import Path_Handler, create_path
@@ -154,15 +154,10 @@ def main():
 
     ## Load up config from yml files ##
     config = load_config()
+    update_config(config)
 
     wandb.init(project=config["project_name"])
     config["run_id"] = str(wandb.run.id)
-
-    # TODO could probably be directly included in config rather than config['compute'] indexing this - this way you only need to change one setting in the config for swapping between slurm and direct on gpu
-    trainer_settings = {
-        "slurm": {"gpus": 1, "num_nodes": 1},
-        "gpu": {"devices": 1, "accelerator": "gpu"},
-    }
 
     # Initialise wandb logger, change this if you want to use a different logger #
     # paths = Path_Handler()

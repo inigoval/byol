@@ -52,6 +52,16 @@ def update_config(config):
         "l2_strength": config["linear"]["l2_strength"],
     }
 
+    # Create unpackable dictionary for logreg training dataloader
+    config["logreg_dataloader"] = {
+        "batch_size": config["linear"]["batch_size"],
+        "shuffle": True,
+        "num_workers": config["dataloading"]["num_workers"],
+        "prefetch_factor": config["dataloading"]["prefetch_factor"],
+        "persistent_workers": config["dataloading"]["persistent_workers"],
+        "pin_memory": config["dataloading"]["pin_memory"],
+    }
+
     # Create unpackable dictionary for training dataloaders
     config["train_dataloader"] = {
         "shuffle": False,
