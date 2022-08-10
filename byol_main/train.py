@@ -36,7 +36,7 @@ class TorchTensorboardProfilerCallback(pl.Callback):
         pl_module.log_dict(outputs)  # also logging the loss, while we're here
 
 
-def run_contrastive_pretraining(config, wandb_logger, trainer_settings):
+def run_contrastive_pretraining(config, wandb_logger):
 
     pl.seed_everything(config["seed"])
 
@@ -101,6 +101,14 @@ def run_contrastive_pretraining(config, wandb_logger, trainer_settings):
         profiler = None
 
     logging.info(f"Threads: {torch.get_num_threads()}")
+
+    # TODO could probably be directly included in config rather than config['compute'] indexing this
+    # This has been written like this so that you only need to change one setting in the config for swapping between slurm and direct on gpu
+    trainer_settings = {
+        "slurm": {"gpus": 1, "num_nodes": 1},
+        "gpu": {"devices": 1, "accelerator": "gpu"},
+    }
+    config["trainer_settings"] = trainer_settings[config["compute"]]
 
     ## Initialise pytorch lightning trainer ##
     pre_trainer = pl.Trainer(
@@ -182,7 +190,7 @@ def main():
     config["files"] = path_dict["files"]
 
     ## Run pretraining ##
-    pretrain_checkpoint, model = run_contrastive_pretraining(config, wandb_logger, trainer_settings)
+    pretrain_checkpoint, model = run_contrastive_pretraining(config, wandb_logger)
 
     wandb_logger.experiment.finish()
 
