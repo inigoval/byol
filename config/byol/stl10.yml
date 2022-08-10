@@ -21,10 +21,11 @@ linear:
     n_epochs: 30
     opt: 'adam'
     lr: 0.0003
-    batch_size: 512
-    momentum: 0
-    weight_decay: 0
+    batch_size: 300
     scheduler: 'cosine'
+    l1_strength: 0.0
+    l2_strength: 1
+    n_eval_epochs: 5 
 
 optimizer:
   type: 'sgd'

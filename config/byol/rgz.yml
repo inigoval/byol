@@ -1,4 +1,5 @@
 preset: 'optimal'
+
 model:
     architecture: 'resnet18' 
     features: 100     # Number of encoded features (null just uses original resnet output)

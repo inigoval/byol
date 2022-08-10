@@ -6,17 +6,19 @@ dataset: 'stl10' # ['imagenette', 'rgz', 'gzmnist', 'gz2', 'stl10', 'cifar10']
 
 dataloading:
   num_workers: 8  # often overriden
-  prefetch_factor: 10
+  prefetch_factor: 30
   persistent_workers: False  # torch default is False
   pin_memory: True
+  val_batch_size: 500 # validation batch size
 
-knn_eval: False
-linear_eval: True
-checkpoint_mode: 'last'
-early_stopping: False
-n_iterations: 1
-topk: 5
-val_batch_size: 500 # validation batch size
+evaluation:
+  knn_eval: False
+  linear_eval: True
+  n_eval_epochs: 5 
+  checkpoint_mode: 'last'
+  early_stopping: False
+  n_iterations: 1
+  topk: 5
 
 compute: 'slurm'
 precision: 16 # [16, 32, 'bf16'], often overriden
