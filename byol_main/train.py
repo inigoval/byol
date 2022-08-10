@@ -120,7 +120,7 @@ def run_contrastive_pretraining(config, wandb_logger):
         deterministic=True,
         callbacks=callbacks,
         precision=config["precision"],
-        #    check_val_every_n_epoch=3,
+        check_val_every_n_epoch=config["evaluation"]["check_val_every_n_epoch"],
         log_every_n_steps=200,
         profiler=profiler,
         # max_steps = 200  # TODO temp

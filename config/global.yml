@@ -19,6 +19,7 @@ evaluation:
   early_stopping: False
   n_iterations: 1
   topk: 5
+  check_val_every_n_epoch: 5
 
 compute: 'slurm'
 precision: 16 # [16, 32, 'bf16'], often overriden
