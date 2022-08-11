@@ -293,68 +293,6 @@ class Linear_Eval(Data_Eval):
         pl_module.log(f"{stage}/{self.name}/linear_acc", self.acc.compute())
 
 
-class KNN_Eval(Callback):
-    # lightning subclass purely for self.log
-    def __init__(self, data):
-        super().__init__()
-        self.data = data
-
-    def on_validation_epoch_start(self, trainer, pl_module):
-        feature_bank = []
-        target_bank = []
-        # 200 is the batch size used for the unpacking below
-        for data in DataLoader(self.data["train"], 200):
-            # Load data and move to correct device
-            (x, y) = data  # supervised-style batch of (images, labels), with batch size from above
-            x = x.type_as(pl_module.dummy_param)
-            y = y.type_as(pl_module.dummy_param).long()
-
-            # Encode data and normalize features (for kNN)
-            feature = self.forward(x).squeeze()  # (batch, features)  e.g. (200, 512)
-            feature = F.normalize(feature, dim=1)
-            # tensor of all features, within which to find nearest-neighbours. Each is (B, N_features), N_features being the output dim of self.forward e.g. BYOL
-            feature_bank.append(feature)
-            target_bank.append(y)  # tensor with labels of those features
-
-        # Save full feature bank for validation epoch
-        # (features, len(l datamodule)) due to the .t() transpose
-        self.feature_bank = torch.cat(feature_bank, dim=0).t().contiguous()
-        # either (label_dim, len) or just (len) depending on if labels should have singleton label_dim dimension
-        self.target_bank = torch.cat(target_bank, dim=0).t().contiguous()
-        assert all(self.target_bank >= 0)
-
-    def on_validation_epoch_end(self, batch):
-        if hasattr(self, "feature_bank") and hasattr(self, "target_bank"):
-            # Load batch
-            for x, y in DataLoader(self.data["train"], 200):
-                # Extract + normalize features
-                feature = self.forward(x).squeeze()  # from init(forward), likely BYOL's forward
-                feature = F.normalize(feature, dim=1)
-
-                # Load feature bank and labels (with same dtypes as x, y)
-                feature_bank = self.feature_bank.type_as(x)
-                target_bank = self.target_bank.type_as(y)
-
-                pred_labels = knn_predict(
-                    feature,  # feature to search for
-                    feature_bank,  # feature bank to identify NN within
-                    target_bank,  # labels of those features in feature_bank, same index
-                    self.config["data"]["classes"],
-                    knn_k=self.config["knn"]["neighbors"],
-                    knn_t=self.config["knn"]["temperature"],
-                    leave_first_out=self.config["knn"]["leave_first_out"],
-                )
-
-                top1 = pred_labels[:, 0]
-
-                # Compute accuracy
-                # assert top1.min() >= 0
-                self.acc.update(top1, y)
-
-        self.log("val/kNN_acc", self.knn_acc_val.compute() * 100)
-        self.acc.reset()
-
-
 ### UNUSED ###
 
 
