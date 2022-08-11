@@ -275,22 +275,22 @@ class Linear_Eval(Data_Eval):
     def setup(self, pl_module, data):
 
         with torch.no_grad():
-            clf = RidgeClassifier(normalize=True)
+            model = RidgeClassifier(normalize=True)
             X_train, y_train = embed_dataset(pl_module.backbone, data)
             X_train, y_train = X_train.detach().cpu().numpy(), y_train.detach().cpu().numpy()
-            clf.fit(X_train, y_train)
-            pl_module.lin_clf = clf
+            model.fit(X_train, y_train)
+            self.model = model
 
         self.acc.reset()
 
     def step(self, pl_module, X, y):
         X = pl_module(X).squeeze()
         X, y = X.detach().cpu().numpy(), y.detach().cpu()
-        preds = pl_module.lin_clf.predict(X)
+        preds = self.model.predict(X)
         self.acc.update(torch.tensor(preds), y)
 
     def end(self, pl_module, stage):
-        pl_module.log(f"{stage}/{self.name}/lin_test_acc", self.acc.compute())
+        pl_module.log(f"{stage}/{self.name}/linear_acc", self.acc.compute())
 
 
 class KNN_Eval(Callback):
