@@ -13,8 +13,10 @@ from pytorch_lightning.callbacks import Callback
 import torch.nn.functional as F
 import torch.nn as nn
 
-from evaluation import Lightning_Eval, knn_predict
+from evaluation import Lightning_Eval
 from networks.models import _get_backbone, _get_net
+
+## Needs to be rewritten ##
 
 
 class Supervised(

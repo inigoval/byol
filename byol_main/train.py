@@ -7,14 +7,11 @@ from pytorch_lightning.callbacks import LearningRateMonitor
 from pytorch_lightning.profiler import AdvancedProfiler, PyTorchProfiler
 
 from byol_main.byol import BYOL
-from byol_main.nnclr import NNCLR
 from byol_main.config import load_config, update_config
 from byol_main.utilities import log_examples
 from dataloading.datamodules import datasets
 from paths import Path_Handler, create_path
 
-from byol_rr import BYOL_RR
-from byol_pretext import BYOL_Pretext
 from supervised import Supervised
 
 # TODO put elsewhere
@@ -128,11 +125,8 @@ def run_contrastive_pretraining(config, wandb_logger):
 
     # Initialise model #
     models = {
-        "byol_pretext": BYOL_Pretext,
-        "byol_rr": BYOL_RR,
         "byol": BYOL,
         "supervised": Supervised,
-        "nnclr": NNCLR,
     }
     model = models[config["type"]](config)
 

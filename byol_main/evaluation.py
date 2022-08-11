@@ -1,27 +1,12 @@
 import logging
-
 import pytorch_lightning as pl
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import torchmetrics.functional as tmF
 import torchmetrics as tm
-import wandb
-import numpy as np
-import matplotlib.pyplot as plt
 
-from tqdm import tqdm
-from sklearn.decomposition import IncrementalPCA
-from pytorch_lightning.callbacks import Callback
-from torch.utils.data import DataLoader
-from statistics import mean
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import RidgeClassifier
 
-from dataloading.utils import dset2tens
-from paths import Path_Handler
-from networks.models import MLPHead, LogisticRegression
-from utilities import log_examples, fig2img, embed_dataset
+from utilities import log_examples, embed_dataset
 
 
 class Lightning_Eval(pl.LightningModule):
