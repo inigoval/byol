@@ -13,7 +13,8 @@ dataloading:
 
 evaluation:
   knn_eval: False
-  linear_eval: True
+  linear_eval: False
+  ridge_eval: True
   n_eval_epochs: 1
   checkpoint_mode: 'last'
   early_stopping: False

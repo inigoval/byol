@@ -45,13 +45,21 @@ class Lightning_Eval(pl.LightningModule):
         ## Prepare for linear evaluation ##
         # Cycle through validation data-sets
         for idx, data in enumerate(self.trainer.datamodule.data["val"]):
-            if self.config["evaluation"]["linear_eval"]:
+            #     if self.config["evaluation"]["linear_eval"]:
+            #         # Initialise linear eval data-set and run setup with training data
+            #         lin_eval = Linear_Eval(data["name"], idx)
+            #         lin_eval.setup(self, data["train"])
+
+            # Add to list of evaluations
+            # self.val_list.append(lin_eval)
+
+            if self.config["evaluation"]["ridge_eval"]:
                 # Initialise linear eval data-set and run setup with training data
-                lin_eval = Linear_Eval(data["name"], idx)
-                lin_eval.setup(self, data["train"])
+                ridge_eval = Ridge_Eval(data["name"], idx)
+                ridge_eval.setup(self, data["train"])
 
                 # Add to list of evaluations
-                self.val_list.append(lin_eval)
+                self.val_list.append(ridge_eval)
 
             # if self.config["knn_eval"]:
             #     self.val_list.append((KNN_Eval(name, idx)))
@@ -97,7 +105,7 @@ class Data_Eval:
         return
 
 
-class Linear_Eval(Data_Eval):
+class Ridge_Eval(Data_Eval):
     """
     Callback to perform linear evaluation at the end of each epoch.
 
@@ -118,10 +126,13 @@ class Linear_Eval(Data_Eval):
     def setup(self, pl_module, data):
 
         with torch.no_grad():
-            model = RidgeClassifier(normalize=True)
-            X_train, y_train = embed_dataset(pl_module.backbone, data)
-            X_train, y_train = X_train.detach().cpu().numpy(), y_train.detach().cpu().numpy()
-            model.fit(X_train, y_train)
+            model = RidgeClassifier()
+            X, y = embed_dataset(pl_module.backbone, data)
+            X, y = X.detach().cpu().numpy(), y.detach().cpu().numpy()
+            self.scaler = StandardScaler()
+            self.scaler.fit(X)
+            X = self.scaler.transform(X)
+            model.fit(X, y)
             self.model = model
 
         self.acc.reset()
@@ -129,6 +140,7 @@ class Linear_Eval(Data_Eval):
     def step(self, pl_module, X, y):
         X = pl_module(X).squeeze()
         X, y = X.detach().cpu().numpy(), y.detach().cpu()
+        X = self.scaler.transform(X)
         preds = self.model.predict(X)
         self.acc.update(torch.tensor(preds), y)
 
