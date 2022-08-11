@@ -58,7 +58,7 @@ def run_contrastive_pretraining(config, wandb_logger):
 
     ## Initialise checkpoint ##
     pretrain_checkpoint = pl.callbacks.ModelCheckpoint(
-        **checkpoint_mode[config["checkpoint_mode"]],
+        **checkpoint_mode[config["evaluation"]["checkpoint_mode"]],
         every_n_epochs=1,
         save_on_train_epoch_end=True,
         auto_insert_metric_name=False,
@@ -69,7 +69,7 @@ def run_contrastive_pretraining(config, wandb_logger):
         save_weights_only=True,
         # save_top_k=3,
     )
-    logging.info(f"checkpoint monitoring: {checkpoint_mode[config['checkpoint_mode']]}")
+    logging.info(f"checkpoint monitoring: {checkpoint_mode[config['evaluation']['checkpoint_mode']]}")
 
     ## Initialise data and run set up ##
     pretrain_data = datasets[config["dataset"]](config)

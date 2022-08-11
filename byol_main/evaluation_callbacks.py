@@ -21,7 +21,7 @@ from sklearn.linear_model import RidgeClassifier
 from dataloading.utils import dset2tens
 from paths import Path_Handler
 from networks.models import MLPHead, LogisticRegression
-from utilities import log_examples, fig2img, embed_dataset
+from utilities import log_examples, fig2img, embed
 
 
 def knn_predict(
@@ -172,18 +172,17 @@ class Lightning_Eval(pl.LightningModule):
         super().__init__()
         self.config = config
 
-    def on_fit_start(self):
+    def on_train_start(self):
         self.config["data"]["mu"] = self.trainer.datamodule.mu
         self.config["data"]["sig"] = self.trainer.datamodule.sig
 
         ## Log size of data-sets ##
-        logging_params = {"n_train": len(self.trainer.datamodule.data["train"])}
-
-        for data in self.trainer.datamodule.data["val"]:
-            logging_params[f"{data['name']}_n"] = len(data["val"])
-
-        # for name, data in self.trainer.datamodule.data["test"]:
-        #     logging_params[f"{name}_n"] = len(data)
+        data = self.trainer.datamodule.data
+        logging_params = {"n_train": len(data["train"])}
+        for eval_data in data["eval"]:
+            name = eval_data["name"]
+            for key, value in eval_data.items():
+                logging_params[f"{name}_n_{key}"] = len(value)
 
         self.logger.log_hyperparams(logging_params)
         # self.log("train/mu", self.trainer.datamodule.mu)
@@ -194,67 +193,37 @@ class Lightning_Eval(pl.LightningModule):
         if not self.config["debug"]:
             log_examples(self.logger, self.trainer.datamodule.data["train"])
 
-    def on_validation_start(self):
-
-        ## List of evaluation classes and dataloader_idx to use ##
-        self.val_list = []
-
-        ## Prepare for linear evaluation ##
-        # Cycle through validation data-sets
-        for idx, data in enumerate(self.trainer.datamodule.data["val"]):
-            if self.config["evaluation"]["linear_eval"]:
-                # Initialise linear eval data-set and run setup with training data
-                lin_eval = Linear_Eval(data["name"], idx)
-                lin_eval.setup(self, data["train"])
-
-                # Add to list of evaluations
-                self.val_list.append(lin_eval)
-
-            # if self.config["knn_eval"]:
-            #     self.val_list.append((KNN_Eval(name, idx)))
-
-    def validation_step(self, batch, batch_idx, dataloader_idx=0):
-        x, y = batch
-        # Loop through validation data-sets
-        for idx, data in enumerate(self.val_list):
-            if dataloader_idx == idx:
-                # Filter out validation sets that require different data-loader
-                val_list_filtered = [val for val in self.val_list if val.dataloader_idx == idx]
-
-                # Run validation step for filtered data-sets
-                for val in val_list_filtered:
-                    val.step(self, x, y)
-
-    def on_validation_epoch_end(self):
-        # Complete validation for all data-sets
-        for val in self.val_list:
-            val.end(self, stage="val")
+    def validation_step(self, batch, batch_idx):
+        return
 
     def test_step(self, batch, batch_idx):
         return
 
 
+# for a single knn eval dataset
 class Data_Eval:
-    """
-    Parent class for evaluation classes.
-    """
+    # lightning subclass purely for self.log
+    def __init__(self, name, config, dummy_param, forward: callable, log: callable):
 
-    def __init__(self, dataset_name, dataloader_idx):
+        # super().__init__()
 
-        self.name = dataset_name
-        self.dataloader_idx = dataloader_idx
+        self.name = name
+        self.dummy_param = dummy_param
+        self.config = config
+        self.forward = forward  # explictly passed to __init__, composition-style
+        self.log = log
+
+        # https://torchmetrics.readthedocs.io/en/latest/pages/overview.html#metrics-and-devices
+        self.acc = tm.Accuracy(average="micro", threshold=0).to(self.dummy_param.device)
 
     def setup(self):
         return
 
-    def step(self, pl_module, x, y):
-        return
-
-    def end(self, pl_module, stage):
+    def record(self):
         return
 
 
-class Linear_Eval(Data_Eval):
+class Linear_Eval(Callback):
     """
     Callback to perform linear evaluation at the end of each epoch.
 
@@ -264,33 +233,34 @@ class Linear_Eval(Data_Eval):
 
     """
 
-    def __init__(self, dataset_name, dataloader_idx):
+    def __init__(self, data):
         """
         Args:
             data: Data dictionary containing 'train', 'val', 'test' and 'name' keys.
         """
-        super().__init__(dataset_name, dataloader_idx)
-        self.acc = tm.Accuracy(average="micro", threshold=0)
+        super().__init__()
 
-    def setup(self, pl_module, data):
+        self.data = data
+        self.clf = RidgeClassifier(normalize=True)
 
+    def on_train_epoch_end(self, trainer, pl_module):
         with torch.no_grad():
-            clf = RidgeClassifier(normalize=True)
-            X_train, y_train = embed_dataset(pl_module.backbone, data)
+            X_train, y_train = embed(pl_module.backbone, self.data["train"])
             X_train, y_train = X_train.detach().cpu().numpy(), y_train.detach().cpu().numpy()
-            clf.fit(X_train, y_train)
-            pl_module.lin_clf = clf
+            self.clf.fit(X_train, y_train)
 
-        self.acc.reset()
+    def on_validation_epoch_end(self, trainer, pl_module):
+        X_val, y_val = embed(pl_module.backbone, self.data["val"])
+        X_val, y_val = X_val.detach().cpu().numpy(), y_val.detach().cpu().numpy()
+        acc = self.clf.score(X_val, y_val)
+        print(acc)
+        pl_module.log(f"eval_{self.data['name']}/lin_val_acc", acc)
 
-    def step(self, pl_module, X, y):
-        X = pl_module(X).squeeze()
-        X, y = X.detach().cpu().numpy(), y.detach().cpu()
-        preds = pl_module.lin_clf.predict(X)
-        self.acc.update(torch.tensor(preds), y)
-
-    def end(self, pl_module, stage):
-        pl_module.log(f"{stage}/{self.name}/lin_test_acc", self.acc.compute())
+    def on_test_end(self, trainer, pl_module):
+        X_test, y_test = embed(pl_module.backbone, self.data["test"])
+        X_test, y_test = X_test.detach().cpu().numpy(), y_test.detach().cpu().numpy()
+        acc = self.clf.score(X_test, y_test)
+        pl_module.log(f"eval_{self.data['name']}/lin_test_acc", acc)
 
 
 class KNN_Eval(Callback):
@@ -353,9 +323,6 @@ class KNN_Eval(Callback):
 
         self.log("val/kNN_acc", self.knn_acc_val.compute() * 100)
         self.acc.reset()
-
-
-### UNUSED ###
 
 
 class Epoch_Averaged_Test(Callback):
@@ -475,69 +442,6 @@ class Supervised_Eval(Data_Eval):
 
         # TODO Will this work properly since it's not in a lightning module? (logging epoch aggregation)
         self.log("val/supervised_loss", supervised_loss, on_step=False, on_epoch=True)
-
-
-class Feature_Bank(Callback):
-    """
-    Code adapted from https://github.com/lightly-ai/lightly/blob/master/lightly/utils/benchmarking.py
-
-    Callback to save a feature bank for kNN validation.
-    """
-
-    def __init__(self):
-        super().__init__()
-
-    def on_validation_epoch_start(self, trainer, pl_module):
-        with torch.no_grad():
-            encoder = pl_module.backbone
-
-            data_bank = pl_module.trainer.datamodule.data["labelled"]
-            data_bank_loader = DataLoader(data_bank, 200)
-            feature_bank = []
-            target_bank = []
-            for data in data_bank_loader:
-                # Load data and move to correct device
-                x, y = data
-                x = x.type_as(pl_module.dummy_param)
-                y = y.type_as(pl_module.dummy_param).long()
-
-                # Encode data and normalize features (for kNN)
-                feature = encoder(x).squeeze()
-                feature = F.normalize(feature, dim=1)
-                feature_bank.append(feature)
-                target_bank.append(y)
-
-            # Save full feature bank for validation epoch
-            pl_module.feature_bank = torch.cat(feature_bank, dim=0).t().contiguous()
-            pl_module.target_bank = torch.cat(target_bank, dim=0).t().contiguous()
-
-
-class Train_Linear_Eval(Callback):
-    """
-    Callback to train linear model at the end of epoch.
-
-    Attributes:
-        train_data: Dataset to use for training.
-        clf: Linear classification model.
-
-    """
-
-    def __init__(self, train_data):
-        """
-        Args:
-            data: Data dictionary containing 'train', 'val', 'test' and 'name' keys.
-        """
-        super().__init__()
-
-        self.train_data = train_data
-
-    def on_train_epoch_end(self, trainer, pl_module):
-        with torch.no_grad():
-            clf = RidgeClassifier(normalize=True)
-            X_train, y_train = embed_dataset(pl_module.backbone, self.train_data)
-            X_train, y_train = X_train.detach().cpu().numpy(), y_train.detach().cpu().numpy()
-            clf.fit(X_train, y_train)
-            pl_module.lin_clf = clf
 
 
 class linear_net(pl.LightningModule):

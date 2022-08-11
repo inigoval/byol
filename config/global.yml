@@ -14,12 +14,12 @@ dataloading:
 evaluation:
   knn_eval: False
   linear_eval: True
-  n_eval_epochs: 5 
+  n_eval_epochs: 1
   checkpoint_mode: 'last'
   early_stopping: False
   n_iterations: 1
   topk: 5
-  check_val_every_n_epoch: 5
+  check_val_every_n_epoch: 1
 
 compute: 'slurm'
 precision: 16 # [16, 32, 'bf16'], often overriden

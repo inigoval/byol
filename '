@@ -1,27 +1,27 @@
-import logging
-
 import pytorch_lightning as pl
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torchmetrics.functional as tmF
 import torchmetrics as tm
-import wandb
 import numpy as np
 import matplotlib.pyplot as plt
+import logging
 
-from tqdm import tqdm
-from sklearn.decomposition import IncrementalPCA
+from typing import Any, Dict, List, Tuple, Type
+from torchmetrics.functional import accuracy
+from torch import Tensor
+from torch.nn.functional import softmax
 from pytorch_lightning.callbacks import Callback
 from torch.utils.data import DataLoader
 from statistics import mean
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.linear_model import RidgeClassifier
+from torch.optim import Adam
+from torch.optim.optimizer import Optimizer
+from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 
-from dataloading.utils import dset2tens
 from paths import Path_Handler
-from networks.models import MLPHead, LogisticRegression
-from utilities import log_examples, fig2img, embed_dataset
+from utilities import log_examples, fig2img, embed_dataset, freeze_model, unfreeze_model
 
 
 def knn_predict(
@@ -171,6 +171,7 @@ class Lightning_Eval(pl.LightningModule):
     def __init__(self, config):
         super().__init__()
         self.config = config
+        self.val_list = []
 
     def on_fit_start(self):
         self.config["data"]["mu"] = self.trainer.datamodule.mu
@@ -195,23 +196,22 @@ class Lightning_Eval(pl.LightningModule):
             log_examples(self.logger, self.trainer.datamodule.data["train"])
 
     def on_validation_start(self):
-
-        ## List of evaluation classes and dataloader_idx to use ##
+        ## Prepare for linear evaluation ##
         self.val_list = []
 
-        ## Prepare for linear evaluation ##
         # Cycle through validation data-sets
         for idx, data in enumerate(self.trainer.datamodule.data["val"]):
             if self.config["evaluation"]["linear_eval"]:
-                # Initialise linear eval data-set and run setup with training data
+                # Initialise linear eval data-set
                 lin_eval = Linear_Eval(data["name"], idx)
+                # Run setup with encoding forward step in transform via lambda function
                 lin_eval.setup(self, data["train"])
 
                 # Add to list of evaluations
                 self.val_list.append(lin_eval)
 
-            # if self.config["knn_eval"]:
-            #     self.val_list.append((KNN_Eval(name, idx)))
+        # if self.config['evaluation']["knn_eval"]:
+        #     self.val_list.append((KNN_Eval(name, idx)))
 
     def validation_step(self, batch, batch_idx, dataloader_idx=0):
         x, y = batch
@@ -273,24 +273,112 @@ class Linear_Eval(Data_Eval):
         self.acc = tm.Accuracy(average="micro", threshold=0)
 
     def setup(self, pl_module, data):
+        ## Train linear classifier ##
 
-        with torch.no_grad():
-            clf = RidgeClassifier(normalize=True)
-            X_train, y_train = embed_dataset(pl_module.backbone, data)
-            X_train, y_train = X_train.detach().cpu().numpy(), y_train.detach().cpu().numpy()
-            clf.fit(X_train, y_train)
-            pl_module.lin_clf = clf
+        # Define encoder, set to eval mode and freeze weights
+        # encoder = pl_module.backbone
+        # encoder.eval()
+        # freeze_model(encoder)
 
+        # Enable gradients to train linear model
+        torch.set_grad_enabled(True)
+
+        # Define data-loader with encoder forward step to embed data
+        train_dataloader = DataLoader(data, **pl_module.config["logreg_dataloader"])
+        model = LogisticRegression(**pl_module.config["logreg"]).to(pl_module.device)
+
+        for epoch in np.arange(pl_module.config["linear"]["n_epochs"]):
+            for data in train_dataloader:
+                x, y = data
+                x, y = x.to(pl_module.device), y.to(pl_module.device)
+                x = pl_module(x).squeeze()
+                model.training_step(x, y)
+
+        # Enable gradients to train linear model
+        torch.set_grad_enabled(False)
+
+        # Save model
+        model.eval()
+        self.model = model
+
+        # Unfreeze encoder and reset accuracy metric in case
+        # unfreeze_model(encoder)
         self.acc.reset()
 
     def step(self, pl_module, X, y):
-        X = pl_module(X).squeeze()
-        X, y = X.detach().cpu().numpy(), y.detach().cpu()
-        preds = pl_module.lin_clf.predict(X)
-        self.acc.update(torch.tensor(preds), y)
+        X = pl_module.backbone(X).squeeze()
+        preds = self.model(X)
+        self.acc.update(torch.tensor(preds).detach().cpu(), y.detach().cpu())
 
     def end(self, pl_module, stage):
         pl_module.log(f"{stage}/{self.name}/lin_test_acc", self.acc.compute())
+
+
+class LogisticRegression(nn.Module):
+    """Logistic regression model."""
+
+    def __init__(
+        self,
+        input_dim: int,
+        num_classes: int,
+        bias: bool = True,
+        learning_rate: float = 1e-4,
+        optimizer: Type[Optimizer] = Adam,
+        l1_strength: float = 0.0,
+        l2_strength: float = 0.0,
+        **kwargs: Any,
+    ) -> None:
+        """
+        Args:
+            input_dim: number of dimensions of the input (at least 1)
+            num_classes: number of class labels (binary: 2, multi-class: >2)
+            bias: specifies if a constant or intercept should be fitted (equivalent to fit_intercept in sklearn)
+            learning_rate: learning_rate for the optimizer
+            optimizer: the optimizer to use (default: ``Adam``)
+            l1_strength: L1 regularization strength (default: ``0.0``)
+            l2_strength: L2 regularization strength (default: ``0.0``)
+        """
+        super().__init__()
+        self.input_dim = input_dim
+        self.num_classes = num_classes
+        self.bias = bias
+        self.learning_rate = learning_rate
+        self.l1_strength = l1_strength
+        self.l2_strength = l2_strength
+
+        self.linear = nn.Linear(in_features=self.input_dim, out_features=self.num_classes, bias=bias)
+        self.optimizer = optimizer(self.linear.parameters(), lr=self.learning_rate)
+
+    def forward(self, x: Tensor) -> Tensor:
+        x = self.linear(x.squeeze())
+        y_hat = softmax(x)
+        return y_hat
+
+    def training_step(self, x: Tensor, y: Tensor):
+        # Encode & flatten
+        # x = self.encoder(x).squeeze()
+
+        y_hat = self.linear(x.squeeze())
+
+        # PyTorch cross_entropy function combines log_softmax and nll_loss in single function
+        loss = F.cross_entropy(y_hat, y, reduction="sum")
+
+        # L1 regularizer
+        if self.l1_strength > 0:
+            l1_reg = self.linear.weight.abs().sum()
+            loss += self.l1_strength * l1_reg
+
+        # L2 regularizer
+        if self.l2_strength > 0:
+            l2_reg = self.linear.weight.pow(2).sum()
+            loss += self.l2_strength * l2_reg
+
+        # Normalize loss by number of samples
+        loss /= x.size(0)
+
+        # Backpropagate and step optimizer
+        loss.backward()
+        self.optimizer.step()
 
 
 class KNN_Eval(Callback):
@@ -356,6 +444,44 @@ class KNN_Eval(Callback):
 
 
 ### UNUSED ###
+
+
+class Linear_Eval_sklearn(Data_Eval):
+    """
+    Callback to perform linear evaluation at the end of each epoch.
+
+    Attributes:
+        data: Data dictionary containing 'train', 'val', 'test' and 'name' keys.
+        clf: Linear classification model.
+
+    """
+
+    def __init__(self, dataset_name, dataloader_idx):
+        """
+        Args:
+            data: Data dictionary containing 'train', 'val', 'test' and 'name' keys.
+        """
+        super().__init__(dataset_name, dataloader_idx)
+        self.acc = tm.Accuracy(average="micro", threshold=0)
+
+    def setup(self, pl_module, data):
+        with torch.no_grad():
+            clf = RidgeClassifier(normalize=True)
+            X_train, y_train = embed_dataset(pl_module.backbone, data)
+            X_train, y_train = X_train.detach().cpu().numpy(), y_train.detach().cpu().numpy()
+            clf.fit(X_train, y_train)
+            pl_module.lin_clf = clf
+
+        self.acc.reset()
+
+    def step(self, pl_module, X, y):
+        X = pl_module(X).squeeze()
+        X, y = X.detach().cpu().numpy(), y.detach().cpu()
+        preds = pl_module.lin_clf.predict(X)
+        self.acc.update(torch.tensor(preds), y)
+
+    def end(self, pl_module, stage):
+        pl_module.log(f"{stage}/{self.name}/lin_test_acc", self.acc.compute())
 
 
 class Epoch_Averaged_Test(Callback):
@@ -510,34 +636,6 @@ class Feature_Bank(Callback):
             # Save full feature bank for validation epoch
             pl_module.feature_bank = torch.cat(feature_bank, dim=0).t().contiguous()
             pl_module.target_bank = torch.cat(target_bank, dim=0).t().contiguous()
-
-
-class Train_Linear_Eval(Callback):
-    """
-    Callback to train linear model at the end of epoch.
-
-    Attributes:
-        train_data: Dataset to use for training.
-        clf: Linear classification model.
-
-    """
-
-    def __init__(self, train_data):
-        """
-        Args:
-            data: Data dictionary containing 'train', 'val', 'test' and 'name' keys.
-        """
-        super().__init__()
-
-        self.train_data = train_data
-
-    def on_train_epoch_end(self, trainer, pl_module):
-        with torch.no_grad():
-            clf = RidgeClassifier(normalize=True)
-            X_train, y_train = embed_dataset(pl_module.backbone, self.train_data)
-            X_train, y_train = X_train.detach().cpu().numpy(), y_train.detach().cpu().numpy()
-            clf.fit(X_train, y_train)
-            pl_module.lin_clf = clf
 
 
 class linear_net(pl.LightningModule):
