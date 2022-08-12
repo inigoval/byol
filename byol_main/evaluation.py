@@ -2,11 +2,22 @@ import logging
 import pytorch_lightning as pl
 import torch
 import torchmetrics as tm
+import torch.nn.functional as F
+import torch.nn as nn
+import numpy as np
 
+from torch.utils.data import DataLoader
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import RidgeClassifier
+from torch.nn.functional import softmax
+from typing import Any, Dict, List, Tuple, Type
+from torch import Tensor
+from torch.optim import Adam
+from torch.optim.optimizer import Optimizer
+from torchvision.transforms import Normalize
 
-from utilities import log_examples, embed_dataset
+from torchvision.transforms import Normalize
+from utilities import log_examples, embed_dataset, freeze_model, unfreeze_model, compute_encoded_mu_sig
 
 
 class Lightning_Eval(pl.LightningModule):
@@ -45,13 +56,13 @@ class Lightning_Eval(pl.LightningModule):
         ## Prepare for linear evaluation ##
         # Cycle through validation data-sets
         for idx, data in enumerate(self.trainer.datamodule.data["val"]):
-            #     if self.config["evaluation"]["linear_eval"]:
-            #         # Initialise linear eval data-set and run setup with training data
-            #         lin_eval = Linear_Eval(data["name"], idx)
-            #         lin_eval.setup(self, data["train"])
+            if self.config["evaluation"]["linear_eval"]:
+                # Initialise linear eval data-set and run setup with training data
+                lin_eval = Linear_Eval(data["name"], idx)
+                lin_eval.setup(self, data["train"])
 
-            # Add to list of evaluations
-            # self.val_list.append(lin_eval)
+                # Add to list of evaluations
+                self.val_list.append(lin_eval)
 
             if self.config["evaluation"]["ridge_eval"]:
                 # Initialise linear eval data-set and run setup with training data
@@ -145,4 +156,135 @@ class Ridge_Eval(Data_Eval):
         self.acc.update(torch.tensor(preds), y)
 
     def end(self, pl_module, stage):
+        pl_module.log(f"{stage}/{self.name}/ridge_acc", self.acc.compute())
+
+
+class Linear_Eval(Data_Eval):
+    """
+    Callback to perform linear evaluation at the end of each epoch.
+
+    Attributes:
+        data: Data dictionary containing 'train', 'val', 'test' and 'name' keys.
+        clf: Linear classification model.
+
+    """
+
+    def __init__(self, dataset_name, dataloader_idx):
+        """
+        Args:
+            data: Data dictionary containing 'train', 'val', 'test' and 'name' keys.
+        """
+        super().__init__(dataset_name, dataloader_idx)
+        self.acc = tm.Accuracy(average="micro", threshold=0)
+        self.normalize = Normalize(0, 1)
+
+    def setup(self, pl_module, data):
+        ## Train linear classifier ##
+
+        # Enable gradients to train linear model but freeze encoder
+        torch.set_grad_enabled(True)
+        freeze_model(pl_module.backbone)
+        pl_module.backbone.eval()
+
+        # Calculate mean and std in feature space and save normalization constants
+        mean, std = compute_encoded_mu_sig(data, pl_module)
+        self.normalize = Normalize(mean, std)
+
+        # Define data-loader and initialize logistic regression model
+        train_dataloader = DataLoader(data, **pl_module.config["logreg_dataloader"])
+        model = LogisticRegression(**pl_module.config["logreg"]).to(pl_module.device)
+
+        for epoch in np.arange(pl_module.config["linear"]["n_epochs"]):
+            for data in train_dataloader:
+                X, y = data
+                X, y = X.to(pl_module.device), y.to(pl_module.device)
+                X = pl_module(X)
+                X = self.normalize(X)
+                model.training_step(X, y)
+
+        # Disable gradients to train linear model
+        torch.set_grad_enabled(False)
+
+        # Save model
+        model.eval()
+        self.model = model
+        unfreeze_model(pl_module.backbone)
+
+        # Unfreeze encoder and reset accuracy metric in case
+        self.acc.reset()
+
+    def step(self, pl_module, X, y):
+        X = pl_module.backbone(X)
+        X = self.normalize(X)
+        preds = self.model(X).detach().cpu()
+        self.acc.update(preds, y.detach().cpu())
+
+    def end(self, pl_module, stage):
         pl_module.log(f"{stage}/{self.name}/linear_acc", self.acc.compute())
+
+
+class LogisticRegression(nn.Module):
+    """Logistic regression model."""
+
+    def __init__(
+        self,
+        input_dim: int,
+        num_classes: int,
+        bias: bool = True,
+        learning_rate: float = 1e-4,
+        optimizer: Type[Optimizer] = Adam,
+        l1_strength: float = 0.0,
+        l2_strength: float = 0.0,
+        **kwargs: Any,
+    ) -> None:
+        """
+        Args:
+            input_dim: number of dimensions of the input (at least 1)
+            num_classes: number of class labels (binary: 2, multi-class: >2)
+            bias: specifies if a constant or intercept should be fitted (equivalent to fit_intercept in sklearn)
+            learning_rate: learning_rate for the optimizer
+            optimizer: the optimizer to use (default: ``Adam``)
+            l1_strength: L1 regularization strength (default: ``0.0``)
+            l2_strength: L2 regularization strength (default: ``0.0``)
+        """
+        super().__init__()
+        self.input_dim = input_dim
+        self.num_classes = num_classes
+        self.bias = bias
+        self.learning_rate = learning_rate
+        self.l1_strength = l1_strength
+        self.l2_strength = l2_strength
+
+        self.linear = nn.Linear(in_features=self.input_dim, out_features=self.num_classes, bias=bias)
+        self.optimizer = optimizer(self.linear.parameters(), lr=self.learning_rate)
+
+    def forward(self, x: Tensor) -> Tensor:
+        x = self.linear(x.squeeze())
+        y_hat = softmax(x, dim=-1)
+        return y_hat
+
+    def training_step(self, x: Tensor, y: Tensor):
+        # Encode & flatten
+        # x = self.encoder(x).squeeze()
+
+        y_hat = self.linear(x.squeeze())
+
+        # PyTorch cross_entropy function combines log_softmax and nll_loss in single function
+        loss = F.cross_entropy(y_hat, y, reduction="sum")
+
+        # L1 regularizer
+        if self.l1_strength > 0:
+            l1_reg = self.linear.weight.abs().sum()
+            loss += self.l1_strength * l1_reg
+
+        # L2 regularizer
+        if self.l2_strength > 0:
+            l2_reg = self.linear.weight.pow(2).sum()
+            loss += self.l2_strength * l2_reg
+
+        # Normalize loss by number of samples
+        loss /= x.size(0)
+
+        # Backpropagate and step optimizer
+        loss.backward()
+        self.optimizer.step()

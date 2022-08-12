@@ -77,11 +77,13 @@ def batch_eval(fn_dict, dset, batch_size=200):
 def freeze_model(model):
     for param in model.parameters():
         param.requires_grad = False
+    # model.eval()
 
 
 def unfreeze_model(model):
     for param in model.parameters():
         param.requires_grad = True
+    # model.train()
 
 
 def _optimizer(params, config):
@@ -184,6 +186,35 @@ def log_examples(wandb_logger, dset, n=18):
         count += 1
 
     wandb_logger.log_image(key="image_pairs", images=save_list)
+
+
+def compute_encoded_mu_sig(dset, pl_module, batch_size=250):
+    """
+    Compute the mean and standard deviation of the encoded features of the dataset
+    """
+    # Load samples in batches
+    n_dset = len(dset)
+    loader = DataLoader(dset, batch_size)
+    channels = pl_module.config["model"]["features"]
+
+    # Calculate mean
+    mu = 0
+    # print("Computing mean")
+    for x, _ in loader:
+        x = pl_module.backbone(x.to(pl_module.device).squeeze())
+        weight = x.shape[0] / n_dset
+        mu += weight * torch.mean(x)
+
+    # Calculate std
+    D_sq = 0
+    # print("Computing std")
+    for x, _ in loader:
+        x = pl_module.backbone(x.to(pl_module.device).squeeze())
+        D_sq += torch.sum(x - mu) ** 2
+    std = (D_sq / (n_dset * channels)) ** 0.5
+
+    # print(f"mean: {mu}, std: {std}")
+    return mu, std.item()
 
 
 """
