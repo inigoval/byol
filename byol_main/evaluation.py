@@ -298,8 +298,8 @@ class LogisticRegression(nn.Module):
         bias: bool = True,
         learning_rate: float = 1e-4,
         optimizer: Type[Optimizer] = Adam,
-        l1_strength: float = 0.0,
-        l2_strength: float = 0.0,
+        # l1_strength: float = 0.0,
+        # l2_strength: float = 0.0,
         **kwargs: Any,
     ) -> None:
         """
@@ -317,8 +317,8 @@ class LogisticRegression(nn.Module):
         self.num_classes = num_classes
         self.bias = bias
         self.learning_rate = learning_rate
-        self.l1_strength = l1_strength
-        self.l2_strength = l2_strength
+        # self.l1_strength = l1_strength
+        # self.l2_strength = l2_strength
 
         self.linear = nn.Linear(in_features=self.input_dim, out_features=self.num_classes, bias=bias)
         self.optimizer = optimizer(self.linear.parameters(), lr=self.learning_rate)
@@ -337,15 +337,15 @@ class LogisticRegression(nn.Module):
         # PyTorch cross_entropy function combines log_softmax and nll_loss in single function
         loss = F.cross_entropy(y_hat, y, reduction="sum")
 
-        # L1 regularizer
-        if self.l1_strength > 0:
-            l1_reg = self.linear.weight.abs().sum()
-            loss += self.l1_strength * l1_reg
+        # # L1 regularizer
+        # if self.l1_strength > 0:
+        #     l1_reg = self.linear.weight.abs().sum()
+        #     loss += self.l1_strength * l1_reg
 
-        # L2 regularizer
-        if self.l2_strength > 0:
-            l2_reg = self.linear.weight.pow(2).sum()
-            loss += self.l2_strength * l2_reg
+        # # L2 regularizer
+        # if self.l2_strength > 0:
+        #     l2_reg = self.linear.weight.pow(2).sum()
+        #     loss += self.l2_strength * l2_reg
 
         # Normalize loss by number of samples
         loss /= x.size(0)

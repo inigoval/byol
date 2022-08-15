@@ -48,36 +48,38 @@ def update_config(config):
         "num_classes": config["data"]["classes"],
         "learning_rate": config["linear"]["lr"],
         "optimizer": optimizers[config["linear"]["opt"]],
-        "l1_strength": config["linear"]["l1_strength"],
-        "l2_strength": config["linear"]["l2_strength"],
+    }
+
+    if optimizers[config["linear"]["opt"]] == SGD:
+        config["logreg"]["momentum"] = config["linear"]["momentum"]
+        config["logreg"]["nesterov"] = config["linear"]["nesterov"]
+        config["logreg"]["weight_decay"] = config["linear"]["weight_decay"]
+
+    # Generic dataloading settings
+    dataloading = {
+        "num_workers": config["dataloading"]["num_workers"],
+        "pin_memory": config["dataloading"]["pin_memory"],
+        "prefetch_factor": config["dataloading"]["prefetch_factor"],
+        "persistent_workers": config["dataloading"]["persistent_workers"],
     }
 
     # Create unpackable dictionary for logreg training dataloader
     config["logreg_dataloader"] = {
         "batch_size": config["linear"]["batch_size"],
         "shuffle": True,
-        "num_workers": config["dataloading"]["num_workers"],
-        "prefetch_factor": config["dataloading"]["prefetch_factor"],
-        "persistent_workers": config["dataloading"]["persistent_workers"],
-        "pin_memory": config["dataloading"]["pin_memory"],
+        **dataloading,
     }
 
     # Create unpackable dictionary for training dataloaders
     config["train_dataloader"] = {
         "shuffle": False,
         "batch_size": config["data"]["pretrain_batch_size"],
-        "num_workers": config["dataloading"]["num_workers"],
-        "prefetch_factor": config["dataloading"]["prefetch_factor"],
-        "persistent_workers": config["dataloading"]["persistent_workers"],
-        "pin_memory": config["dataloading"]["pin_memory"],
+        **dataloading,
     }
 
     # Create unpackable dictionary for validation dataloaders
     config["val_dataloader"] = {
         "shuffle": False,
         "batch_size": config["dataloading"]["val_batch_size"],
-        "num_workers": config["dataloading"]["num_workers"],
-        "prefetch_factor": config["dataloading"]["prefetch_factor"],
-        "persistent_workers": config["dataloading"]["persistent_workers"],
-        "pin_memory": config["dataloading"]["pin_memory"],
+        **dataloading,
     }

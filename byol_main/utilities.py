@@ -113,7 +113,7 @@ def _optimizer(params, config):
 
     # Apply LARS wrapper if option is chosen
     if config["optimizer"]["lars"]:
-        opt = LARSWrapper(opt, eta=config["trust_coef"])
+        opt = LARSWrapper(opt, eta=config["optimizer"]["trust_coef"])
 
     # pick scheduler
     if config["scheduler"]["type"] == "cosine":
@@ -123,7 +123,7 @@ def _optimizer(params, config):
         scheduler = LinearWarmupCosineAnnealingLR(
             opt,
             config["scheduler"]["warmup_epochs"],
-            max_epochs=config["train"]["n_epochs"],
+            max_epochs=config["model"]["n_epochs"],
         )
         return [opt], [scheduler]
     elif config["scheduler"]["type"].lower() == "none":

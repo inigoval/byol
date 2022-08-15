@@ -107,7 +107,7 @@ class SimpleView(nn.Module):
         augs.append(T.Resize(config["data"]["input_height"]))
 
         if config["augmentations"]["center_crop_size"]:
-            augs.append(T.CenterCrop(config["center_crop_size"]))
+            augs.append(T.CenterCrop(config["augmentations"]["center_crop_size"]))
 
         augs.append(T.ToTensor())
         self.view = T.Compose(augs)

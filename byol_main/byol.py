@@ -48,7 +48,7 @@ class BYOL(Lightning_Eval):
 
         self.dummy_param = nn.Parameter(torch.empty(0))
 
-        self.m = config["m"]
+        self.m = config["model"]["m"]
 
     def forward(self, x):
         return self.backbone(x)  # dimension (batch, features), features from config e.g. 512
@@ -86,7 +86,7 @@ class BYOL(Lightning_Eval):
         return loss
 
     def on_train_epoch_end(self):
-        if self.config["m_decay"]:
+        if self.config["model"]["m_decay"]:
             self.update_m()
 
     def configure_optimizers(self):

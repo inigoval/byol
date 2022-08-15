@@ -83,7 +83,7 @@ class STL10_DataModule(Base_DataModule):
     def setup(self):
         self.data["train"] = STL10(root=self.path, split="train+unlabeled", transform=self.T_train)
 
-        # List of (name, train_dataset) tuples to train linear evaluation layer
+        # List of (name, train_dataset) tuples to evaluate linear layer
         self.data["val"] = [
             ("STL10_train", STL10(root=self.path, split="train", transform=self.T_test)),
             ("STL10_test", STL10(root=self.path, split="test", transform=self.T_test)),
