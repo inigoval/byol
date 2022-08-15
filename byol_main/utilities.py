@@ -217,6 +217,10 @@ def compute_encoded_mu_sig(dset, pl_module, batch_size=250):
     return mu, std.item()
 
 
+def check_unique_list(lst):
+    return len(set(lst)) == len(lst)
+
+
 """
 Directly copied from pl_bolts
 https://github.com/PyTorchLightning/lightning-bolts/blob/0.3.0/pl_bolts/optimizers/lars_scheduling.py#L62-L81

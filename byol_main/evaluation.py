@@ -17,11 +17,21 @@ from torch.optim.optimizer import Optimizer
 from torchvision.transforms import Normalize
 
 from torchvision.transforms import Normalize
-from utilities import log_examples, embed_dataset, freeze_model, unfreeze_model, compute_encoded_mu_sig
+from utilities import (
+    log_examples,
+    embed_dataset,
+    freeze_model,
+    unfreeze_model,
+    compute_encoded_mu_sig,
+    check_unique_list,
+)
 
 
 class Lightning_Eval(pl.LightningModule):
-    # for many knn eval datasets
+    """
+    Parent class for self-supervised LightningModules to perform linear evaluation with multiple data-sets.
+    """
+
     def __init__(self, config):
         super().__init__()
         self.config = config
@@ -33,8 +43,14 @@ class Lightning_Eval(pl.LightningModule):
         ## Log size of data-sets ##
         logging_params = {"n_train": len(self.trainer.datamodule.data["train"])}
 
-        for data in self.trainer.datamodule.data["val"]:
-            logging_params[f"{data['name']}_n"] = len(data["val"])
+        for name, data in self.trainer.datamodule.data["val"]:
+            logging_params[f"n_{name}"] = len(data)
+
+        for name, data in self.trainer.datamodule.data["test"]:
+            logging_params[f"n_{name}"] = len(data)
+
+        for name, data, _ in self.trainer.datamodule.data["eval_train"]:
+            logging_params[f"n_{name}"] = len(data)
 
         # for name, data in self.trainer.datamodule.data["test"]:
         #     logging_params[f"{name}_n"] = len(data)
@@ -51,49 +67,58 @@ class Lightning_Eval(pl.LightningModule):
     def on_validation_start(self):
 
         ## List of evaluation classes and dataloader_idx to use ##
-        self.val_list = []
+        self.eval_list = []
 
         ## Prepare for linear evaluation ##
         # Cycle through validation data-sets
-        for idx, data in enumerate(self.trainer.datamodule.data["val"]):
+        for idx, (name, data, dataloader_idx) in enumerate(self.trainer.datamodule.data["eval_train"]):
             if self.config["evaluation"]["linear_eval"]:
                 # Initialise linear eval data-set and run setup with training data
-                lin_eval = Linear_Eval(data["name"], idx)
-                lin_eval.setup(self, data["train"])
+                lin_eval = Linear_Eval(name, dataloader_idx)
+                lin_eval.setup(self, data)
 
                 # Add to list of evaluations
-                self.val_list.append(lin_eval)
+                self.eval_list.append(lin_eval)
 
             if self.config["evaluation"]["ridge_eval"]:
                 # Initialise linear eval data-set and run setup with training data
-                ridge_eval = Ridge_Eval(data["name"], idx)
-                ridge_eval.setup(self, data["train"])
+                ridge_eval = Ridge_Eval(name, dataloader_idx)
+                ridge_eval.setup(self, data)
 
                 # Add to list of evaluations
-                self.val_list.append(ridge_eval)
-
-            # if self.config["knn_eval"]:
-            #     self.val_list.append((KNN_Eval(name, idx)))
+                self.eval_list.append(ridge_eval)
 
     def validation_step(self, batch, batch_idx, dataloader_idx=0):
         x, y = batch
-        # Loop through validation data-sets
-        for idx, data in enumerate(self.val_list):
-            if dataloader_idx == idx:
-                # Filter out validation sets that require different data-loader
-                val_list_filtered = [val for val in self.val_list if val.dataloader_idx == idx]
+        # Only evaluate on given data if evaluation model has given dataloader_idx
+        eval_list_filtered = [
+            val for val in self.eval_list if dataloader_idx in val.dataloader_idx["val"]
+        ]
 
-                # Run validation step for filtered data-sets
-                for val in val_list_filtered:
-                    val.step(self, x, y)
+        # Run validation step for filtered data-sets
+        for val in eval_list_filtered:
+            val.step(self, x, y, dataloader_idx, stage="val")
 
     def on_validation_epoch_end(self):
         # Complete validation for all data-sets
-        for val in self.val_list:
+        for val in self.eval_list:
             val.end(self, stage="val")
 
-    def test_step(self, batch, batch_idx):
-        return
+    def test_step(self, batch, batch_idx, dataloader_idx=0):
+        x, y = batch
+
+        eval_list_filtered = [
+            val for val in self.eval_list if dataloader_idx in val.dataloader_idx["test"]
+        ]
+
+        # Run validation step for filtered data-sets
+        for val in eval_list_filtered:
+            val.step(self, x, y, dataloader_idx, stage="test")
+
+    def on_test_epoch_end(self):
+        # Complete validation for all data-sets
+        for val in self.eval_list:
+            val.end(self, stage="test")
 
 
 class Data_Eval:
@@ -101,9 +126,9 @@ class Data_Eval:
     Parent class for evaluation classes.
     """
 
-    def __init__(self, dataset_name, dataloader_idx):
+    def __init__(self, train_data_name, dataloader_idx):
 
-        self.name = dataset_name
+        self.train_data_name = train_data_name
         self.dataloader_idx = dataloader_idx
 
     def setup(self):
@@ -126,16 +151,29 @@ class Ridge_Eval(Data_Eval):
 
     """
 
-    def __init__(self, dataset_name, dataloader_idx):
+    def __init__(self, train_data_name, dataloader_idx):
         """
         Args:
             data: Data dictionary containing 'train', 'val', 'test' and 'name' keys.
         """
-        super().__init__(dataset_name, dataloader_idx)
-        self.acc = tm.Accuracy(average="micro", threshold=0)
+        super().__init__(train_data_name, dataloader_idx)
+        # for key, idx in dataloader_idx.items():
+        #     self.acc[key] = [tm.Accuracy(average='micro', threshold=0)] * len(idx)
+
+        assert check_unique_list(dataloader_idx["val"])
+        assert check_unique_list(dataloader_idx["test"])
+
+        self.acc = {
+            "val": {idx: tm.Accuracy(average="micro", threshold=0) for idx in dataloader_idx["val"]},
+            "test": {idx: tm.Accuracy(average="micro", threshold=0) for idx in dataloader_idx["test"]},
+        }
+
+        # self.acc = {
+        #     "val": [(tm.Accuracy(average="micro", threshold=0), idx) for idx in dataloader_idx["val"]],
+        #     "test": [(tm.Accuracy(average="micro", threshold=0), idx) for idx in dataloader_idx["test"]],
+        # }
 
     def setup(self, pl_module, data):
-
         with torch.no_grad():
             model = RidgeClassifier()
             X, y = embed_dataset(pl_module.backbone, data)
@@ -146,17 +184,26 @@ class Ridge_Eval(Data_Eval):
             model.fit(X, y)
             self.model = model
 
-        self.acc.reset()
+        # Could shorten this with recursion but might be less clear
+        for acc in self.acc["val"].values():
+            acc.reset()
+        for acc in self.acc["test"].values():
+            acc.reset()
 
-    def step(self, pl_module, X, y):
+    def step(self, pl_module, X, y, dataloader_idx, stage):
         X = pl_module(X).squeeze()
         X, y = X.detach().cpu().numpy(), y.detach().cpu()
         X = self.scaler.transform(X)
         preds = self.model.predict(X)
-        self.acc.update(torch.tensor(preds), y)
+
+        self.acc[stage][dataloader_idx].update(torch.tensor(preds), y)
 
     def end(self, pl_module, stage):
-        pl_module.log(f"{stage}/{self.name}/ridge_acc", self.acc.compute())
+
+        for dataloader_idx, acc in self.acc[stage].items():
+            # Grab evaluation data-set name directly from dataloader
+            eval_name, _ = pl_module.trainer.datamodule.data[stage][dataloader_idx]
+            pl_module.log(f"{stage}/{self.train_data_name}/{eval_name}/ridge_acc", acc.compute())
 
 
 class Linear_Eval(Data_Eval):
@@ -175,7 +222,15 @@ class Linear_Eval(Data_Eval):
             data: Data dictionary containing 'train', 'val', 'test' and 'name' keys.
         """
         super().__init__(dataset_name, dataloader_idx)
-        self.acc = tm.Accuracy(average="micro", threshold=0)
+
+        assert check_unique_list(dataloader_idx["val"])
+        assert check_unique_list(dataloader_idx["test"])
+
+        self.acc = {
+            "val": {idx: tm.Accuracy(average="micro", threshold=0) for idx in dataloader_idx["val"]},
+            "test": {idx: tm.Accuracy(average="micro", threshold=0) for idx in dataloader_idx["test"]},
+        }
+
         self.normalize = Normalize(0, 1)
 
     def setup(self, pl_module, data):
@@ -210,17 +265,27 @@ class Linear_Eval(Data_Eval):
         self.model = model
         unfreeze_model(pl_module.backbone)
 
-        # Unfreeze encoder and reset accuracy metric in case
-        self.acc.reset()
+        # Could shorten this with recursion but might be less clear
+        for acc in self.acc["val"].values():
+            acc.reset()
+        for acc in self.acc["test"].values():
+            acc.reset()
 
-    def step(self, pl_module, X, y):
+    def step(self, pl_module, X, y, dataloader_idx, stage):
         X = pl_module.backbone(X)
         X = self.normalize(X)
         preds = self.model(X).detach().cpu()
-        self.acc.update(preds, y.detach().cpu())
+
+        self.acc[stage][dataloader_idx].update(preds, y.detach().cpu())
+        # self.acc.update(preds, y.detach().cpu())
 
     def end(self, pl_module, stage):
-        pl_module.log(f"{stage}/{self.name}/linear_acc", self.acc.compute())
+        for dataloader_idx, acc in self.acc[stage].items():
+            # Grab evaluation data-set name directly from dataloader
+            eval_name, _ = pl_module.trainer.datamodule.data[stage][dataloader_idx]
+            pl_module.log(f"{stage}/{self.train_data_name}/{eval_name}/linear_acc", acc.compute())
+
+        # pl_module.log(f"{stage}/{self.name}/linear_acc", self.acc.compute())
 
 
 class LogisticRegression(nn.Module):

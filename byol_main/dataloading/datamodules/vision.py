@@ -36,13 +36,11 @@ class Base_DataModule(pl.LightningDataModule):
         return loader
 
     def val_dataloader(self):
-        loaders = [DataLoader(data["val"], **self.config["val_dataloader"]) for data in self.data["val"]]
+        loaders = [DataLoader(data, **self.config["val_dataloader"]) for _, data in self.data["val"]]
         return loaders
 
     def test_dataloader(self):
-        loaders = [
-            DataLoader(data["test"], **self.config["val_dataloader"]) for _, data in self.data["test"]
-        ]
+        loaders = [DataLoader(data, **self.config["val_dataloader"]) for _, data in self.data["test"]]
         return loaders
 
     def update_transforms(self, D_train):
@@ -85,15 +83,29 @@ class STL10_DataModule(Base_DataModule):
     def setup(self):
         self.data["train"] = STL10(root=self.path, split="train+unlabeled", transform=self.T_train)
 
+        # List of (name, train_dataset) tuples to train linear evaluation layer
         self.data["val"] = [
-            {
-                "name": "stl10_val",
-                "train": STL10(root=self.path, split="train", transform=self.T_test),
-                "val": STL10(root=self.path, split="test", transform=self.T_test),
-            },
+            ("STL10_train", STL10(root=self.path, split="train", transform=self.T_test)),
+            ("STL10_test", STL10(root=self.path, split="test", transform=self.T_test)),
         ]
 
-        self.test_names = ["stl10_test"]
         self.data["test"] = [
-            ("stl10_test", STL10(root=self.path, split="test", transform=self.T_test)),
+            ("STL10_test", STL10(root=self.path, split="test", transform=self.T_test)),
         ]
+
+        # List of (name, train_dataset, dataloader_idx_dict) tuples to train linear evaluation layer, dataloader_idx is a dictionary specifying which of the train/validaiton dataloaders to use for evaluation
+        self.data["eval_train"] = [
+            (
+                "STl10_train",
+                STL10(root=self.path, split="train", transform=self.T_test),
+                {"val": (0, 1), "test": (0,)},
+            ),
+        ]
+
+        # self.data["val"] = [
+        #     {
+        #         "name": "stl10_val",
+        #         "train": STL10(root=self.path, split="train", transform=self.T_test),
+        #         "val": STL10(root=self.path, split="test", transform=self.T_test),
+        #     },
+        # ]
