@@ -6,11 +6,11 @@
 # from .rgz import RGZ_DataModule, RGZ_DataModule_Eval, RGZ_DataModule_Supervised
 # from .gzmnist import GalaxyMNIST_DataModule, GalaxyMNIST_DataModule_Eval
 
-from .vision import STL10_DataModule
+from .vision import STL10_DataModule, Imagenette_DataModule
 
 # from .decals_dr5 import Decals_DataModule
 # from .legs import Legs_DataModule
 # from .mixed import Mixed_DataModule
 # from .generic_galaxy import Galaxy_DataModule, Galaxy_DataModule_Eval
 
-datasets = {"stl10": STL10_DataModule}
+datasets = {"stl10": STL10_DataModule, "imagenette": Imagenette_DataModule}

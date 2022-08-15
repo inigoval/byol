@@ -2,6 +2,7 @@ import logging
 import pytorch_lightning as pl
 
 from torch.utils.data import DataLoader
+from torchvision.datasets import ImageFolder
 
 from byol_main.dataloading.utils import compute_mu_sig_features, compute_mu_sig_images
 from dataloading.utils import _get_imagenet_norms
@@ -102,10 +103,30 @@ class STL10_DataModule(Base_DataModule):
             ),
         ]
 
-        # self.data["val"] = [
-        #     {
-        #         "name": "stl10_val",
-        #         "train": STL10(root=self.path, split="train", transform=self.T_test),
-        #         "val": STL10(root=self.path, split="test", transform=self.T_test),
-        #     },
-        # ]
+
+class Imagenette_DataModule(Base_DataModule):
+    def __init__(self, config):
+        norms = _get_imagenet_norms()
+        super().__init__(config, **norms)
+
+    def setup(self):
+        self.data["train"] = ImageFolder(self.path / "train", transform=self.T_train)
+
+        # List of (name, train_dataset) tuples to evaluate linear laye
+        self.data["val"] = [
+            ("imagenette_train", ImageFolder(self.path / "train", transform=self.T_test)),
+            ("imagenette_val", ImageFolder(self.path / "val", transform=self.T_test)),
+        ]
+
+        self.data["test"] = [
+            ("imagenette_val", ImageFolder(self.path / "val", transform=self.T_test)),
+        ]
+
+        # List of (name, train_dataset, dataloader_idx_dict) tuples to train linear evaluation layer, dataloader_idx is a dictionary specifying which of the train/validaiton dataloaders to use for evaluation
+        self.data["eval_train"] = [
+            (
+                "imagenette_train",
+                ImageFolder(self.path / "train", transform=self.T_test),
+                {"val": (0, 1), "test": (0,)},
+            ),
+        ]
