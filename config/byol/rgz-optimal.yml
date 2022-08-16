@@ -1,3 +1,4 @@
+
 preset: 'optimal'
 
 model:
@@ -5,6 +6,8 @@ model:
     features: 100     # Number of encoded features (null just uses original resnet output)
     n_epochs: 600
     downscale: True
+    m: 0.996 # Controls EMA hyperparameter for BYOL momentum encoder
+    m_decay: False
 
 projection_head:
     hidden: 1024
@@ -14,57 +17,41 @@ data:
     color_channels: 1
     classes: 2
     rotate: True
-    test_frac: 0.3 
-    val_frac: 1
-    # conf_test: 1
-    # unc_test: 1
-    # val_size: 0.6
-    rgz: True
     input_height: 128 # Keep this at 128 and adjust center_crop_size
+    pretrain_batch_size: 256
     val_batch_size: 500
+    cut_threshold: 27
+    test_frac: 0.3 
+
+optimizer:
+  type: 'sgd'
+  lr: 0.06
+  momentum: 0.9
+  weight_decay: 0.0005 # 0.0005
+  lars: False
+  trust_coef: 0.003
+
+scheduler:
+  type: 'cosine' # ['none', 'cosine', 'warmupcosine']
+  warmup_epochs: 10  # Only used in linear warmup cosine annealing, if scheduler type is 'warmupcosine'
 
 linear:
-    n_epochs: 100
+    n_epochs: 50
     opt: 'adam'
-    lr: 0.2
-    batch_size: 25
-    momentum: 0.9
+    lr: 0.0003
+    batch_size: 300
+    momentum: 0
+    nesterov: False
     weight_decay: 0
-    scheduler: 'cosine'
-
-knn:
-  neighbors: 20
-  temperature: 0.1
-  leave_first_out: True
 
 ## DATA ## 
-cut_threshold: 30
+augmentations:
+  type: 'simclr' # ['simclr', 'astroaug']
+  blur_kernel: 3 # Odd non-integer number
+  center_crop_size: 80
+  random_crop_scale: !!python/tuple [0.8, 1]
+  # blur_sig: !!python/tuple [0.1, 2.0]
+  p_blur: 0
+  s: 0.5
+  p_aug: 0.5
 
-## AUGMENTATIONS ##
-aug_type: 'simclr' # ['simclr', 'astroaug']
-blur_kernel: 3 # Odd non-integer number
-center_crop_size: 75
-random_crop_scale: !!python/tuple [0.8, 1]
-# blur_sig: !!python/tuple [0.1, 2.0]
-p_blur: 0.05
-s: 0.75
-p_aug: 0.5
-
-## Optimiser ## 
-# Base settings
-lr: 0.06
-momentum: 0.9
-weight_decay: 0.0005
-pretrain_batch_size: 256
-opt: 'sgd'
-# Scheduler
-scheduler: 'cosine' # ['none', 'cosine', 'warmupcosine']
-warmup_epochs: 10  # Only used in linear warmup cosine annealing
-
-# LARS
-lars: False
-trust_coef: 0.003
-
-## BYOL ## 
-m: 0.99
-m_decay: False

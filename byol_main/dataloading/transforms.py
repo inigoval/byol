@@ -307,7 +307,7 @@ def _zoobot_default_view(config):
 
 
 def _rgz_view(config):
-    if config["aug_type"] == "simclr":
+    if config["augmentations"]["type"] == "simclr":
 
         # Gaussian blurring
         # blur_kernel = config["blur_kernel"]
@@ -315,13 +315,13 @@ def _rgz_view(config):
         # blur_kernel = _blur_kernel(input_height)
         blur_kernel = 3
         # blur_sig = config["blur_sig"]
-        p_blur = config["p_blur"]
+        p_blur = config["augmentations"]["p_blur"]
         blur = LightlyGaussianBlur(blur_kernel, prob=p_blur)
         # blur = T.GaussianBlur(blur_kernel, sigma=blur_sig)
 
         # Cropping
-        center_crop = config["center_crop_size"]
-        random_crop = config["random_crop_scale"]
+        center_crop = config["augmentations"]["center_crop_size"]
+        random_crop = config["augmentations"]["random_crop_scale"]
 
         # Color jitter
         s = config["augmentations"]["s"]
@@ -343,17 +343,17 @@ def _rgz_view(config):
 
         return view
 
-    elif config["aug_type"] == "astroaug":
+    elif config["augmentations"]["type"] == "astroaug":
 
         paths = Path_Handler()
         path_dict = paths._dict()
         kernel_path = path_dict["main"] / "dataloading" / "FIRST_kernel.npy"
         kernel = np.load(kernel_path)
 
-        p = config["p_aug"]
+        p = config["augmentations"]["p_aug"]
 
         # Cropping
-        center_crop = config["center_crop_size"]
+        center_crop = config["augmentations"]["center_crop_size"]
         # random_crop = config["random_crop_scale"]
 
         augs = [

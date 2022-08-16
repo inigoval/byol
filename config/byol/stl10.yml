@@ -32,7 +32,7 @@ scheduler:
   warmup_epochs: 10  # Only used in linear warmup cosine annealing, if scheduler type is 'warmupcosine'
 
 augmentations:
-  s: 0.5
+  s: 1
   center_crop_size: null
 
 linear:
