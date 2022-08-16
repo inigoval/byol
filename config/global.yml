@@ -2,7 +2,7 @@ type: 'byol'
 project_name: 'debug-byol'
 debug: False
 seed: 0
-dataset: 'stl10' # ['imagenette', 'rgz', 'gzmnist', 'gz2', 'stl10', 'cifar10']
+dataset: 'rgz' # ['imagenette', 'rgz', 'gzmnist', 'gz2', 'stl10', 'cifar10']
 
 dataloading:
   num_workers: 8  # often overriden

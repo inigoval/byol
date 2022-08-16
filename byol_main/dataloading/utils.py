@@ -4,6 +4,7 @@ import numpy as np
 import torchvision.transforms as T
 import pytorch_lightning as pl
 import torch.utils.data as D
+import logging
 
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
@@ -176,7 +177,7 @@ def compute_mu_sig_images(dset, batch_size=0):
         # Calculate mean
         mu = torch.zeros(n_channels)
         for x, _ in loader:
-            print(x.shape, _.shape)
+            # print(x.shape, _.shape)
             for c in np.arange(n_channels):
                 x_c = x[:, c, :, :]
                 weight = x.shape[0] / n_dset
@@ -236,8 +237,6 @@ def compute_mu_sig_features(dset, batch_size=0):
     else:
         x, _ = dset2tens(dset)
         return torch.mean(x).item(), torch.std(x).item()
-
-
 
 
 def _get_imagenet_norms():

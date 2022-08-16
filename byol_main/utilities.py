@@ -113,7 +113,7 @@ def _optimizer(params, config):
 
     # Apply LARS wrapper if option is chosen
     if config["optimizer"]["lars"]:
-        opt = LARSWrapper(opt, eta=config["trust_coef"])
+        opt = LARSWrapper(opt, eta=config["optimizer"]["trust_coef"])
 
     # pick scheduler
     if config["scheduler"]["type"] == "cosine":
@@ -123,7 +123,7 @@ def _optimizer(params, config):
         scheduler = LinearWarmupCosineAnnealingLR(
             opt,
             config["scheduler"]["warmup_epochs"],
-            max_epochs=config["train"]["n_epochs"],
+            max_epochs=config["model"]["n_epochs"],
         )
         return [opt], [scheduler]
     elif config["scheduler"]["type"].lower() == "none":
@@ -201,7 +201,7 @@ def compute_encoded_mu_sig(dset, pl_module, batch_size=250):
     mu = 0
     # print("Computing mean")
     for x, _ in loader:
-        x = pl_module.backbone(x.to(pl_module.device).squeeze())
+        x = pl_module.backbone(x.to(pl_module.device)).squeeze()
         weight = x.shape[0] / n_dset
         mu += weight * torch.mean(x)
 
@@ -209,7 +209,7 @@ def compute_encoded_mu_sig(dset, pl_module, batch_size=250):
     D_sq = 0
     # print("Computing std")
     for x, _ in loader:
-        x = pl_module.backbone(x.to(pl_module.device).squeeze())
+        x = pl_module.backbone(x.to(pl_module.device)).squeeze()
         D_sq += torch.sum(x - mu) ** 2
     std = (D_sq / (n_dset * channels)) ** 0.5
 
