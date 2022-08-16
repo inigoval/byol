@@ -1,328 +1,355 @@
 import logging
-
 import pytorch_lightning as pl
-import umap
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import torchmetrics.functional as tmF
 import torchmetrics as tm
-import wandb
+import torch.nn.functional as F
+import torch.nn as nn
+import numpy as np
 
-from tqdm import tqdm
-from sklearn.decomposition import IncrementalPCA
-from pytorch_lightning.callbacks import Callback
 from torch.utils.data import DataLoader
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import RidgeClassifier
+from torch.nn.functional import softmax
+from typing import Any, Dict, List, Tuple, Type
+from torch import Tensor
+from torch.optim import Adam
+from torch.optim.optimizer import Optimizer
+from torchvision.transforms import Normalize
 
-from dataloading.utils import dset2tens
-from paths import Path_Handler
-from networks.models import MLPHead, LogisticRegression
-from utilities import log_examples
-
-
-def umap(x, y):
-    mapper = umap.UMAP().fit(x.view(x.shape[0], -1))
-    umap.plot.points(mapper, labels=y)
-
-
-def knn_predict(
-    feature: torch.Tensor,
-    feature_bank: torch.Tensor,
-    target_bank: torch.Tensor,
-    num_classes: int,
-    knn_k: int = 200,
-    knn_t: float = 0.1,
-) -> torch.Tensor:
-    """Code copied from https://github.com/lightly-ai/lightly/blob/master/lightly/utils/benchmarking.py
-
-    Run kNN predictions on features based on a feature bank
-    This method is commonly used to monitor performance of self-supervised
-    learning methods.
-    The default parameters are the ones
-    used in https://arxiv.org/pdf/1805.01978v1.pdf.
-    Args:
-        feature:
-            Tensor of shape [N, D] for which you want predictions
-        feature_bank:
-            Tensor of a database of features used for kNN, of shape [D, N] where N is len(l datamodule)
-        target_bank:
-            Labels for the features in our feature_bank, of shape ()
-        num_classes:
-            Number of classes (e.g. `10` for CIFAR-10)
-        knn_k:
-            Number of k neighbors used for kNN
-        knn_t:
-            Temperature parameter to reweights similarities for kNN
-    Returns:
-        A tensor containing the kNN predictions
-    Examples:
-        >>> images, targets, _ = batch
-        >>> feature = backbone(images).squeeze()
-        >>> # we recommend to normalize the features
-        >>> feature = F.normalize(feature, dim=1)
-        >>> pred_labels = knn_predict(
-        >>>     feature,
-        >>>     feature_bank,
-        >>>     target_bank,
-        >>>     num_classes=10,
-        >>> )
-    """
-
-    assert target_bank.min() >= 0
-
-    # compute cos similarity between each feature vector and feature bank ---> [B, N]
-    sim_matrix = torch.mm(
-        feature, feature_bank
-    )  # (B, D) matrix. mult (D, N) gives (B, N) (as feature dim got summed over to got cos sim)
-
-    # [B, K]
-    sim_weight, sim_idx = sim_matrix.topk(
-        k=knn_k, dim=-1
-    )  # this will be slow if feature_bank is large (e.g. 100k datapoints)
-
-    # [B, K]
-    # target_bank is (1, N) (due to .t() in init)
-    # feature.size(0) is the validation batch size
-    # expand copies target_bank to (val_batch, N)
-    # gather than indexes the N dimension to place the right labels (of the top k features), making sim_labels (val_batch) with values of the correct labels
-    # if these aren't true, will get index error when trying to index target_bank
-    assert sim_idx.min() >= 0
-    assert sim_idx.max() < target_bank.size(0)
-    sim_labels = torch.gather(target_bank.expand(feature.size(0), -1), dim=-1, index=sim_idx)
-    # we do a reweighting of the similarities
-    sim_weight = (sim_weight / knn_t).exp()
-
-    # counts for each class
-    one_hot_y = torch.zeros(feature.size(0) * knn_k, num_classes)
-    one_hot_y = one_hot_y.type_as(target_bank)
-
-    # [B*K, C]
-    one_hot_y = one_hot_y.scatter(dim=-1, index=sim_labels.view(-1, 1), value=1.0)
-
-    # weighted score ---> [B, C]
-    pred_scores = torch.sum(
-        one_hot_y.view(feature.size(0), -1, num_classes) * sim_weight.unsqueeze(dim=-1),
-        dim=1,
-    )
-    pred_labels = pred_scores.argsort(dim=-1, descending=True)
-    return pred_labels
+from torchvision.transforms import Normalize
+from utilities import (
+    log_examples,
+    embed_dataset,
+    freeze_model,
+    unfreeze_model,
+    compute_encoded_mu_sig,
+    check_unique_list,
+)
 
 
 class Lightning_Eval(pl.LightningModule):
+    """
+    Parent class for self-supervised LightningModules to perform linear evaluation with multiple data-sets.
+    """
+
     def __init__(self, config):
         super().__init__()
         self.config = config
-        self.knn_acc = tm.Accuracy(average="micro", threshold=0)
 
-    def on_train_start(self):
+    def on_fit_start(self):
         self.config["data"]["mu"] = self.trainer.datamodule.mu
         self.config["data"]["sig"] = self.trainer.datamodule.sig
+
+        ## Log size of data-sets ##
+        logging_params = {"n_train": len(self.trainer.datamodule.data["train"])}
+
+        for name, data in self.trainer.datamodule.data["val"]:
+            logging_params[f"n_{name}"] = len(data)
+
+        for name, data in self.trainer.datamodule.data["test"]:
+            logging_params[f"n_{name}"] = len(data)
+
+        for name, data, _ in self.trainer.datamodule.data["eval_train"]:
+            logging_params[f"n_{name}"] = len(data)
+
+        # for name, data in self.trainer.datamodule.data["test"]:
+        #     logging_params[f"{name}_n"] = len(data)
+
+        self.logger.log_hyperparams(logging_params)
         # self.log("train/mu", self.trainer.datamodule.mu)
         # self.log("train/sig", self.trainer.datamodule.sig)
 
         # logger = self.logger.experiment
 
-        log_examples(self.logger, self.trainer.datamodule.data["train"])
+        if not self.config["debug"]:
+            log_examples(self.logger, self.trainer.datamodule.data["train"])
 
     def on_validation_start(self):
-        with torch.no_grad():
-            data_bank = self.trainer.datamodule.data[
-                "labelled"
-            ]  # will get split into feature_bank and target_bank
-            data_bank_loader = DataLoader(
-                data_bank, 200
-            )  # 200 is the batch size used for the unpacking below
-            feature_bank = []
-            target_bank = []
-            for data in data_bank_loader:
-                # Load data and move to correct device
-                (
-                    x,
-                    y,
-                ) = data  # supervised-style batch of (images, labels), with batch size from above
-                x = x.type_as(self.dummy_param)
-                y = y.type_as(self.dummy_param).long()
 
-                # Encode data and normalize features (for kNN)
-                feature = self.forward(x).squeeze()  # (batch, features)  e.g. (200, 512)
-                feature = F.normalize(feature, dim=1)
-                feature_bank.append(
-                    feature
-                )  # tensor of all features, within which to find nearest-neighbours. Each is (B, N_features), N_features being the output dim of self.forward e.g. BYOL
-                target_bank.append(y)  # tensor with labels of those features
+        ## List of evaluation classes and dataloader_idx to use ##
+        self.eval_list = []
 
-            # Save full feature bank for validation epoch
-            self.feature_bank = (
-                torch.cat(feature_bank, dim=0).t().contiguous()
-            )  # (features, len(l datamodule)) due to the .t() transpose
-            self.target_bank = (
-                torch.cat(target_bank, dim=0).t().contiguous()
-            )  # either (label_dim, len) or just (len) depending on if labels should have singleton label_dim dimension
-            assert all(self.target_bank >= 0)
+        ## Prepare for linear evaluation ##
+        # Cycle through validation data-sets
+        for idx, (name, data, dataloader_idx) in enumerate(self.trainer.datamodule.data["eval_train"]):
+            if self.config["evaluation"]["linear_eval"]:
+                # Initialise linear eval data-set and run setup with training data
+                lin_eval = Linear_Eval(name, dataloader_idx)
+                lin_eval.setup(self, data)
 
-    def validation_step(self, batch, batch_idx):
-        if hasattr(self, "feature_bank") and hasattr(self, "target_bank"):
-            # Load batch
-            x, y = batch
-            # Extract + normalize features
-            feature = self.forward(x).squeeze()
-            feature = F.normalize(feature, dim=1)
+                # Add to list of evaluations
+                self.eval_list.append(lin_eval)
 
-            # Load feature bank and labels
-            feature_bank = self.feature_bank.type_as(x)
-            target_bank = self.target_bank.type_as(y)
+            if self.config["evaluation"]["ridge_eval"]:
+                # Initialise linear eval data-set and run setup with training data
+                ridge_eval = Ridge_Eval(name, dataloader_idx)
+                ridge_eval.setup(self, data)
 
-            pred_labels = knn_predict(
-                feature,  # feature to search for
-                feature_bank,  # feature bank to identify NN within
-                target_bank,  # labels of those features in feature_bank, same index
-                self.config["data"]["classes"],
-                knn_k=self.config["knn"]["neighbors"],
-                knn_t=self.config["knn"]["temperature"],
-            )
+                # Add to list of evaluations
+                self.eval_list.append(ridge_eval)
 
-            top1 = pred_labels[:, 0]
-
-            # Compute accuracy
-            # assert top1.min() >= 0
-            self.knn_acc.update(top1, y)
-
-    def validation_epoch_end(self, outputs):
-        if hasattr(self, "feature_bank") and hasattr(self, "target_bank"):
-            self.log("val/kNN_acc", self.knn_acc.compute() * 100)
-            self.knn_acc.reset()
-
-
-class Feature_Bank(Callback):
-    """Code adapted from https://github.com/lightly-ai/lightly/blob/master/lightly/utils/benchmarking.py
-
-    Calculates a feature bank for validation"""
-
-    def __init__(self):
-        super().__init__()
-
-    def on_validation_epoch_start(self, trainer, pl_module):
-        with torch.no_grad():
-            encoder = pl_module.backbone
-
-            data_bank = pl_module.trainer.datamodule.data["labelled"]
-            data_bank_loader = DataLoader(data_bank, 200)
-            feature_bank = []
-            target_bank = []
-            for data in data_bank_loader:
-                # Load data and move to correct device
-                x, y = data
-                x = x.type_as(pl_module.dummy_param)
-                y = y.type_as(pl_module.dummy_param).long()
-
-                # Encode data and normalize features (for kNN)
-                feature = encoder(x).squeeze()
-                feature = F.normalize(feature, dim=1)
-                feature_bank.append(feature)
-                target_bank.append(y)
-
-            # Save full feature bank for validation epoch
-            pl_module.feature_bank = torch.cat(feature_bank, dim=0).t().contiguous()
-            pl_module.target_bank = torch.cat(target_bank, dim=0).t().contiguous()
-
-
-class linear_net(pl.LightningModule):
-    def __init__(self, config):
-        super().__init__()
-        self.config = config
-
-        n_classes = self.config["data"]["classes"]
-        output_dim = self.config["model"]["output_dim"]
-        self.logreg = LogisticRegression(output_dim, n_classes)
-        self.ce_loss = torch.nn.CrossEntropyLoss()
-
-        self.train_acc = tm.Accuracy(average="micro", top_k=1, threshold=0)
-        self.val_acc = tm.Accuracy(average="micro", top_k=1, threshold=0)
-
-        self.dummy_param = nn.Parameter(torch.empty(0))
-
-        paths = Path_Handler()
-        self.paths = paths.dict
-
-    def forward(self, x):
-        """Return prediction"""
-        return self.logreg(x)
-
-    def training_step(self, batch, batch_idx):
-        # Load data and targets
+    def validation_step(self, batch, batch_idx, dataloader_idx=0):
         x, y = batch
-        x = x.view(x.shape[0], -1)
-        logits = self.forward(x)
-        y_pred = logits.softmax(dim=-1)
-        loss = self.ce_loss(logits, y)
-        self.log("linear_eval/train_loss", loss, on_step=False, on_epoch=True)
+        # Only evaluate on given data if evaluation model has given dataloader_idx
+        eval_list_filtered = [
+            val for val in self.eval_list if dataloader_idx in val.dataloader_idx["val"]
+        ]
 
-        # predictions = torch.argmax(logits, dim=1).int()
-        # acc = tmF.accuracy(y_pred, y)
-        # self.log("linear_eval/train_acc", acc, on_step=False, on_epoch=True)
+        # Run validation step for filtered data-sets
+        for val in eval_list_filtered:
+            val.step(self, x, y, dataloader_idx, stage="val")
 
-        self.train_acc(y_pred, y)
-        self.log("linear_eval/train_acc", self.train_acc, on_step=False, on_epoch=True)
-        return loss
+    def on_validation_epoch_end(self):
+        # Complete validation for all data-sets
+        for val in self.eval_list:
+            val.end(self, stage="val")
 
-    def validation_step(self, batch, batch_idx):
+    def test_step(self, batch, batch_idx, dataloader_idx=0):
         x, y = batch
-        x = x.type_as(self.dummy_param)
 
-        x = x.view(x.shape[0], -1)
-        logits = self.forward(x)
-        # y_pred = logits.softmax(dim=-1)
+        eval_list_filtered = [
+            val for val in self.eval_list if dataloader_idx in val.dataloader_idx["test"]
+        ]
 
-        loss = self.ce_loss(logits, y)
-        self.log("linear_eval/val_loss", loss)
+        # Run validation step for filtered data-sets
+        for val in eval_list_filtered:
+            val.step(self, x, y, dataloader_idx, stage="test")
 
-        # predictions = torch.argmax(logits, dim=1).int()
-        # acc = tmF.accuracy(y_pred, y)
-        self.val_acc(logits, y)
-        self.log("linear_eval/val_acc", self.val_acc, on_step=False, on_epoch=True)
+    def on_test_epoch_end(self):
+        # Complete validation for all data-sets
+        for val in self.eval_list:
+            val.end(self, stage="test")
 
-    def configure_optimizers(self):
-        lr = self.config["linear"]["lr"]
-        mom = self.config["linear"]["momentum"]
-        w_decay = self.config["linear"]["weight_decay"]
 
-        params = self.logreg.parameters()
+class Data_Eval:
+    """
+    Parent class for evaluation classes.
+    """
 
-        opts = {
-            "adam": lambda p: torch.optim.Adam(
-                p,
-                lr=lr,
-                weight_decay=w_decay,
-            ),
-            "sgd": lambda p: torch.optim.SGD(
-                p,
-                lr=lr,
-                momentum=mom,
-                weight_decay=w_decay,
-            ),
+    def __init__(self, train_data_name, dataloader_idx):
+
+        self.train_data_name = train_data_name
+        self.dataloader_idx = dataloader_idx
+
+    def setup(self):
+        return
+
+    def step(self, pl_module, x, y):
+        return
+
+    def end(self, pl_module, stage):
+        return
+
+
+class Ridge_Eval(Data_Eval):
+    """
+    Callback to perform linear evaluation at the end of each epoch.
+
+    Attributes:
+        data: Data dictionary containing 'train', 'val', 'test' and 'name' keys.
+        clf: Linear classification model.
+
+    """
+
+    def __init__(self, train_data_name, dataloader_idx):
+        """
+        Args:
+            data: Data dictionary containing 'train', 'val', 'test' and 'name' keys.
+        """
+        super().__init__(train_data_name, dataloader_idx)
+        # for key, idx in dataloader_idx.items():
+        #     self.acc[key] = [tm.Accuracy(average='micro', threshold=0)] * len(idx)
+
+        assert check_unique_list(dataloader_idx["val"])
+        assert check_unique_list(dataloader_idx["test"])
+
+        self.acc = {
+            "val": {idx: tm.Accuracy(average="micro", threshold=0) for idx in dataloader_idx["val"]},
+            "test": {idx: tm.Accuracy(average="micro", threshold=0) for idx in dataloader_idx["test"]},
         }
 
-        opt = opts[self.config["linear"]["opt"]](params)
+        # self.acc = {
+        #     "val": [(tm.Accuracy(average="micro", threshold=0), idx) for idx in dataloader_idx["val"]],
+        #     "test": [(tm.Accuracy(average="micro", threshold=0), idx) for idx in dataloader_idx["test"]],
+        # }
 
-        return opt
+    def setup(self, pl_module, data):
+        with torch.no_grad():
+            model = RidgeClassifier()
+            X, y = embed_dataset(pl_module.backbone, data)
+            X, y = X.detach().cpu().numpy(), y.detach().cpu().numpy()
+            self.scaler = StandardScaler()
+            self.scaler.fit(X)
+            X = self.scaler.transform(X)
+            model.fit(X, y)
+            self.model = model
+
+        # Could shorten this with recursion but might be less clear
+        for acc in self.acc["val"].values():
+            acc.reset()
+        for acc in self.acc["test"].values():
+            acc.reset()
+
+    def step(self, pl_module, X, y, dataloader_idx, stage):
+        X = pl_module(X).squeeze()
+        X, y = X.detach().cpu().numpy(), y.detach().cpu()
+        X = self.scaler.transform(X)
+        preds = self.model.predict(X)
+
+        self.acc[stage][dataloader_idx].update(torch.tensor(preds), y)
+
+    def end(self, pl_module, stage):
+
+        for dataloader_idx, acc in self.acc[stage].items():
+            # Grab evaluation data-set name directly from dataloader
+            eval_name, _ = pl_module.trainer.datamodule.data[stage][dataloader_idx]
+            pl_module.log(f"{stage}/{self.train_data_name}/{eval_name}/ridge_acc", acc.compute())
 
 
-class pca_net(nn.Module):
-    def __init__(self, config):
-        super(pca_net, self).__init__()
-        self.config = config
-        self.pca = IncrementalPCA(config["pca"]["n_dim"])
+class Linear_Eval(Data_Eval):
+    """
+    Callback to perform linear evaluation at the end of each epoch.
 
-    def forward(self, x):
-        x = x.view(x.shape[0], -1)
-        x = self.pca.transform(x)
-        return torch.from_numpy(x).float()
+    Attributes:
+        data: Data dictionary containing 'train', 'val', 'test' and 'name' keys.
+        clf: Linear classification model.
 
-    def fit(self, loader):
-        print("Fitting PCA")
-        for epoch in tqdm(np.arange(self.config["pca"]["n_epochs"])):
-            print(f"Epoch {epoch}")
-            for x, _ in tqdm(loader):
-                x = x.view(x.shape[0], -1)
-                x = x.cpu().detach().numpy()
-                self.pca.partial_fit(x)
+    """
+
+    def __init__(self, dataset_name, dataloader_idx):
+        """
+        Args:
+            data: Data dictionary containing 'train', 'val', 'test' and 'name' keys.
+        """
+        super().__init__(dataset_name, dataloader_idx)
+
+        assert check_unique_list(dataloader_idx["val"])
+        assert check_unique_list(dataloader_idx["test"])
+
+        self.acc = {
+            "val": {idx: tm.Accuracy(average="micro", threshold=0) for idx in dataloader_idx["val"]},
+            "test": {idx: tm.Accuracy(average="micro", threshold=0) for idx in dataloader_idx["test"]},
+        }
+
+        self.normalize = Normalize(0, 1)
+
+    def setup(self, pl_module, data):
+        ## Train linear classifier ##
+
+        # Enable gradients to train linear model but freeze encoder
+        torch.set_grad_enabled(True)
+        freeze_model(pl_module.backbone)
+        pl_module.backbone.eval()
+
+        # Calculate mean and std in feature space and save normalization constants
+        mean, std = compute_encoded_mu_sig(data, pl_module)
+        self.normalize = Normalize(mean, std)
+
+        # Define data-loader and initialize logistic regression model
+        train_dataloader = DataLoader(data, **pl_module.config["logreg_dataloader"])
+        model = LogisticRegression(**pl_module.config["logreg"]).to(pl_module.device)
+
+        for epoch in np.arange(pl_module.config["linear"]["n_epochs"]):
+            for data in train_dataloader:
+                X, y = data
+                X, y = X.to(pl_module.device), y.to(pl_module.device)
+                X = pl_module(X)
+                X = self.normalize(X)
+                model.training_step(X, y)
+
+        # Disable gradients to train linear model
+        torch.set_grad_enabled(False)
+
+        # Save model
+        model.eval()
+        self.model = model
+        unfreeze_model(pl_module.backbone)
+
+        # Could shorten this with recursion but might be less clear
+        for acc in self.acc["val"].values():
+            acc.reset()
+        for acc in self.acc["test"].values():
+            acc.reset()
+
+    def step(self, pl_module, X, y, dataloader_idx, stage):
+        X = pl_module.backbone(X)
+        X = self.normalize(X)
+        preds = self.model(X).detach().cpu()
+
+        self.acc[stage][dataloader_idx].update(preds, y.detach().cpu())
+        # self.acc.update(preds, y.detach().cpu())
+
+    def end(self, pl_module, stage):
+        for dataloader_idx, acc in self.acc[stage].items():
+            # Grab evaluation data-set name directly from dataloader
+            eval_name, _ = pl_module.trainer.datamodule.data[stage][dataloader_idx]
+            pl_module.log(f"{stage}/{self.train_data_name}/{eval_name}/linear_acc", acc.compute())
+
+        # pl_module.log(f"{stage}/{self.name}/linear_acc", self.acc.compute())
+
+
+class LogisticRegression(nn.Module):
+    """Logistic regression model."""
+
+    def __init__(
+        self,
+        input_dim: int,
+        num_classes: int,
+        bias: bool = True,
+        learning_rate: float = 1e-4,
+        optimizer: Type[Optimizer] = Adam,
+        l1_strength: float = 0.0,
+        l2_strength: float = 0.0,
+        **kwargs: Any,
+    ) -> None:
+        """
+        Args:
+            input_dim: number of dimensions of the input (at least 1)
+            num_classes: number of class labels (binary: 2, multi-class: >2)
+            bias: specifies if a constant or intercept should be fitted (equivalent to fit_intercept in sklearn)
+            learning_rate: learning_rate for the optimizer
+            optimizer: the optimizer to use (default: ``Adam``)
+            l1_strength: L1 regularization strength (default: ``0.0``)
+            l2_strength: L2 regularization strength (default: ``0.0``)
+        """
+        super().__init__()
+        self.input_dim = input_dim
+        self.num_classes = num_classes
+        self.bias = bias
+        self.learning_rate = learning_rate
+        self.l1_strength = l1_strength
+        self.l2_strength = l2_strength
+
+        self.linear = nn.Linear(in_features=self.input_dim, out_features=self.num_classes, bias=bias)
+        self.optimizer = optimizer(self.linear.parameters(), lr=self.learning_rate)
+
+    def forward(self, x: Tensor) -> Tensor:
+        x = self.linear(x.squeeze())
+        y_hat = softmax(x, dim=-1)
+        return y_hat
+
+    def training_step(self, x: Tensor, y: Tensor):
+        # Encode & flatten
+        # x = self.encoder(x).squeeze()
+
+        y_hat = self.linear(x.squeeze())
+
+        # PyTorch cross_entropy function combines log_softmax and nll_loss in single function
+        loss = F.cross_entropy(y_hat, y, reduction="sum")
+
+        # L1 regularizer
+        if self.l1_strength > 0:
+            l1_reg = self.linear.weight.abs().sum()
+            loss += self.l1_strength * l1_reg
+
+        # L2 regularizer
+        if self.l2_strength > 0:
+            l2_reg = self.linear.weight.pow(2).sum()
+            loss += self.l2_strength * l2_reg
+
+        # Normalize loss by number of samples
+        loss /= x.size(0)
+
+        # Backpropagate and step optimizer
+        loss.backward()
+        self.optimizer.step()

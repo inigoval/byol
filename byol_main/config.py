@@ -1,5 +1,8 @@
 import yaml
-from paths import Path_Handler
+
+from torch.optim import Adam, SGD
+
+from byol_main.paths import Path_Handler
 
 # Define paths
 paths = Path_Handler()
@@ -24,7 +27,7 @@ def load_config():
 
     # if loading a benchmark, use load the specific config
     preset = dataset_config["preset"]
-    if preset:
+    if preset != "none":
         path = path_dict["config"] / type / f"{dataset}-{preset}.yml"
         with open(path, "r") as ymlconfig:
             dataset_config = yaml.load(ymlconfig, Loader=yaml.FullLoader)
@@ -38,37 +41,43 @@ def load_config():
 def update_config(config):
     """Update config with values requiring initialisation of config"""
 
-    # Learning rate scaling from BYOL
-    # config["lr"] = config["lr"] * config["batch_size"] / 256
+    # Create unpackable dictionary for logistic regression model
+    optimizers = {"adam": Adam, "sgd": SGD}
+    config["logreg"] = {
+        "input_dim": config["model"]["features"],
+        "num_classes": config["data"]["classes"],
+        "learning_rate": config["linear"]["lr"],
+        "optimizer": optimizers[config["linear"]["opt"]],
+        "l1_strength": config["linear"]["l1_strength"],
+        "l2_strength": config["linear"]["l2_strength"],
+    }
 
-    # Adjust parameters for different data-sets
-    if config["dataset"] == "imagenette":
-        config["data"]["color_channels"] = 3
-        config["data"]["classes"] = 10
-        config["data"]["input_height"] = 128
-        config["center_crop_size"] = 128
+    # Create unpackable dictionary for logreg training dataloader
+    config["logreg_dataloader"] = {
+        "batch_size": config["linear"]["batch_size"],
+        "shuffle": True,
+        "num_workers": config["dataloading"]["num_workers"],
+        "prefetch_factor": config["dataloading"]["prefetch_factor"],
+        "persistent_workers": config["dataloading"]["persistent_workers"],
+        "pin_memory": config["dataloading"]["pin_memory"],
+    }
 
-    if config["dataset"] == "rgz":
-        config["data"]["color_channels"] = 1
-        config["data"]["classes"] = 2
-        config["data"]["input_height"] = config["center_crop_size"]
-        config["data"]["rotate"] = True
+    # Create unpackable dictionary for training dataloaders
+    config["train_dataloader"] = {
+        "shuffle": False,
+        "batch_size": config["data"]["pretrain_batch_size"],
+        "num_workers": config["dataloading"]["num_workers"],
+        "prefetch_factor": config["dataloading"]["prefetch_factor"],
+        "persistent_workers": config["dataloading"]["persistent_workers"],
+        "pin_memory": config["dataloading"]["pin_memory"],
+    }
 
-    # Adjust parameters for different data-sets
-    if config["dataset"] == "stl10":
-        config["data"]["color_channels"] = 3
-        config["data"]["classes"] = 10
-        config["data"]["input_height"] = 96
-        config["data"]["center_crop_size"] = 128
-
-    if config["dataset"] == "cifar10":
-        config["data"]["color_channels"] = 3
-        config["data"]["classes"] = 10
-        config["data"]["input_height"] = 32
-        config["data"]["center_crop_size"] = 32
-
-    if config["dataset"] == "gzmnist":
-        config["data"]["color_channels"] = 3
-        config["data"]["classes"] = 4
-        config["data"]["input_height"] = 64
-        config["data"]["rotate"] = True
+    # Create unpackable dictionary for validation dataloaders
+    config["val_dataloader"] = {
+        "shuffle": False,
+        "batch_size": config["dataloading"]["val_batch_size"],
+        "num_workers": config["dataloading"]["num_workers"],
+        "prefetch_factor": config["dataloading"]["prefetch_factor"],
+        "persistent_workers": config["dataloading"]["persistent_workers"],
+        "pin_memory": config["dataloading"]["pin_memory"],
+    }

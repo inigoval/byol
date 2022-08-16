@@ -1,12 +1,7 @@
-import yaml
-import torch.nn as nn
-import torch.nn.functional as F
-from torch import logsumexp
+import logging
+
 import torch
-import numpy as np
 import matplotlib.pyplot as plt
-import pytorch_lightning as pl
-import wandb
 
 from pl_bolts.optimizers.lr_scheduler import LinearWarmupCosineAnnealingLR
 from torch.optim import Optimizer
@@ -14,7 +9,6 @@ from PIL import Image
 from mpl_toolkits.axes_grid1 import ImageGrid
 from torch.utils.data import DataLoader
 from torchvision.utils import make_grid
-from torchvision.transforms import ToPILImage
 
 from byol_main.paths import Path_Handler
 
@@ -83,15 +77,27 @@ def batch_eval(fn_dict, dset, batch_size=200):
 def freeze_model(model):
     for param in model.parameters():
         param.requires_grad = False
+    # model.eval()
+
+
+def unfreeze_model(model):
+    for param in model.parameters():
+        param.requires_grad = True
+    # model.train()
 
 
 def _optimizer(params, config):
-    lr = config["lr"]
-    mom = config["momentum"]
-    w_decay = config["weight_decay"]
+    lr = config["optimizer"]["lr"]
 
+    # sgd only
+    mom = config["optimizer"]["momentum"]
+    w_decay = config["optimizer"]["weight_decay"]
+
+    betas = (config.get("beta_1", 0.9), config.get("beta_2", 0.999))
+
+    # for adam, lr is the step size and is modified by exp. moving av. of prev. gradients
     opts = {
-        "adam": lambda p: torch.optim.Adam(p, lr=lr),
+        "adam": lambda p: torch.optim.Adam(p, lr=lr, betas=betas),
         "sgd": lambda p: torch.optim.SGD(
             p,
             lr=lr,
@@ -100,26 +106,51 @@ def _optimizer(params, config):
         ),
     }
 
-    opt = opts[config["opt"]](params)
+    if config["optimizer"]["type"] == "adam" and config["optimizer"]["lr"] > 0.01:
+        logging.warning("Learning rate {} may be too high for adam".format(config["lr"]))
+
+    opt = opts[config["optimizer"]["type"]](params)
 
     # Apply LARS wrapper if option is chosen
-    if config["lars"]:
+    if config["optimizer"]["lars"]:
         opt = LARSWrapper(opt, eta=config["trust_coef"])
 
-    if config["scheduler"] == "cosine":
+    # pick scheduler
+    if config["scheduler"]["type"] == "cosine":
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(opt, config["model"]["n_epochs"])
         return [opt], [scheduler]
-
-    elif config["scheduler"] == "warmupcosine":
+    elif config["scheduler"]["type"] == "warmupcosine":
         scheduler = LinearWarmupCosineAnnealingLR(
             opt,
-            config["warmup_epochs"],
+            config["scheduler"]["warmup_epochs"],
             max_epochs=config["train"]["n_epochs"],
         )
         return [opt], [scheduler]
-
-    elif config["scheduler"] == "None":
+    elif config["scheduler"]["type"].lower() == "none":
         return opt
+    else:
+        raise ValueError(config["scheduler"]["type"])
+
+
+def embed_dataset(encoder, data, batch_size=200):
+    train_loader = DataLoader(data, batch_size)
+    device = next(encoder.parameters()).device
+    feature_bank = []
+    target_bank = []
+    for data in train_loader:
+        # Load data and move to correct device
+        x, y = data
+        x = x.to(device)
+        y = y.to(device)
+
+        feature_bank.append(encoder(x).squeeze())
+        target_bank.append(y)
+
+    # Save full feature bank for validation epoch
+    feature_bank = torch.cat(feature_bank)
+    target_bank = torch.cat(target_bank)
+
+    return feature_bank, target_bank
 
 
 def log_examples(wandb_logger, dset, n=18):
@@ -155,6 +186,39 @@ def log_examples(wandb_logger, dset, n=18):
         count += 1
 
     wandb_logger.log_image(key="image_pairs", images=save_list)
+
+
+def compute_encoded_mu_sig(dset, pl_module, batch_size=250):
+    """
+    Compute the mean and standard deviation of the encoded features of the dataset
+    """
+    # Load samples in batches
+    n_dset = len(dset)
+    loader = DataLoader(dset, batch_size)
+    channels = pl_module.config["model"]["features"]
+
+    # Calculate mean
+    mu = 0
+    # print("Computing mean")
+    for x, _ in loader:
+        x = pl_module.backbone(x.to(pl_module.device).squeeze())
+        weight = x.shape[0] / n_dset
+        mu += weight * torch.mean(x)
+
+    # Calculate std
+    D_sq = 0
+    # print("Computing std")
+    for x, _ in loader:
+        x = pl_module.backbone(x.to(pl_module.device).squeeze())
+        D_sq += torch.sum(x - mu) ** 2
+    std = (D_sq / (n_dset * channels)) ** 0.5
+
+    # print(f"mean: {mu}, std: {std}")
+    return mu, std.item()
+
+
+def check_unique_list(lst):
+    return len(set(lst)) == len(lst)
 
 
 """

@@ -1,0 +1,70 @@
+preset: 'optimal'
+
+model:
+    architecture: 'resnet18' 
+    features: 100     # Number of encoded features (null just uses original resnet output)
+    n_epochs: 600
+    downscale: True
+
+projection_head:
+    hidden: 1024
+    out: 256
+
+data:
+    color_channels: 1
+    classes: 2
+    rotate: True
+    test_frac: 0.3 
+    val_frac: 1
+    # conf_test: 1
+    # unc_test: 1
+    # val_size: 0.6
+    rgz: True
+    input_height: 128 # Keep this at 128 and adjust center_crop_size
+    val_batch_size: 500
+
+linear:
+    n_epochs: 100
+    opt: 'adam'
+    lr: 0.2
+    batch_size: 25
+    momentum: 0.9
+    weight_decay: 0
+    scheduler: 'cosine'
+
+knn:
+  neighbors: 20
+  temperature: 0.1
+  leave_first_out: True
+
+## DATA ## 
+cut_threshold: 30
+
+## AUGMENTATIONS ##
+aug_type: 'simclr' # ['simclr', 'astroaug']
+blur_kernel: 3 # Odd non-integer number
+center_crop_size: 75
+random_crop_scale: !!python/tuple [0.8, 1]
+# blur_sig: !!python/tuple [0.1, 2.0]
+p_blur: 0.05
+s: 0.75
+p_aug: 0.5
+
+## Optimiser ## 
+# Base settings
+lr: 0.06
+momentum: 0.9
+weight_decay: 0.0005
+pretrain_batch_size: 256
+opt: 'sgd'
+# Scheduler
+scheduler: 'cosine' # ['none', 'cosine', 'warmupcosine']
+warmup_epochs: 10  # Only used in linear warmup cosine annealing
+
+# LARS
+lars: False
+trust_coef: 0.003
+
+## BYOL ## 
+m: 0.99
+m_decay: False
