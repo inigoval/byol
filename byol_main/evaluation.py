@@ -5,6 +5,7 @@ import torchmetrics as tm
 import torch.nn.functional as F
 import torch.nn as nn
 import numpy as np
+import sklearn
 
 from torch.utils.data import DataLoader
 from sklearn.preprocessing import StandardScaler
@@ -203,10 +204,75 @@ class Ridge_Eval(Data_Eval):
         for dataloader_idx, acc in self.acc[stage].items():
             # Grab evaluation data-set name directly from dataloader
             eval_name, _ = pl_module.trainer.datamodule.data[stage][dataloader_idx]
-            pl_module.log(f"{stage}/{self.train_data_name}/{eval_name}/ridge_acc", acc.compute())
+            pl_module.log(f"{stage}/{self.train_data_name}/ridge_acc/{eval_name}", acc.compute())
 
 
 class Linear_Eval(Data_Eval):
+    """
+    Callback to perform linear evaluation at the end of each epoch.
+
+    Attributes:
+        data: Data dictionary containing 'train', 'val', 'test' and 'name' keys.
+        clf: Linear classification model.
+
+    """
+
+    def __init__(self, train_data_name, dataloader_idx):
+        """
+        Args:
+            data: Data dictionary containing 'train', 'val', 'test' and 'name' keys.
+        """
+        super().__init__(train_data_name, dataloader_idx)
+        # for key, idx in dataloader_idx.items():
+        #     self.acc[key] = [tm.Accuracy(average='micro', threshold=0)] * len(idx)
+
+        assert check_unique_list(dataloader_idx["val"])
+        assert check_unique_list(dataloader_idx["test"])
+
+        self.acc = {
+            "val": {idx: tm.Accuracy(average="micro", threshold=0) for idx in dataloader_idx["val"]},
+            "test": {idx: tm.Accuracy(average="micro", threshold=0) for idx in dataloader_idx["test"]},
+        }
+
+        # self.acc = {
+        #     "val": [(tm.Accuracy(average="micro", threshold=0), idx) for idx in dataloader_idx["val"]],
+        #     "test": [(tm.Accuracy(average="micro", threshold=0), idx) for idx in dataloader_idx["test"]],
+        # }
+
+    def setup(self, pl_module, data):
+        with torch.no_grad():
+            model = sklearn.linear_model.LogisticRegression()
+            X, y = embed_dataset(pl_module.backbone, data)
+            X, y = X.detach().cpu().numpy(), y.detach().cpu().numpy()
+            self.scaler = StandardScaler()
+            self.scaler.fit(X)
+            X = self.scaler.transform(X)
+            model.fit(X, y)
+            self.model = model
+
+        # Could shorten this with recursion but might be less clear
+        for acc in self.acc["val"].values():
+            acc.reset()
+        for acc in self.acc["test"].values():
+            acc.reset()
+
+    def step(self, pl_module, X, y, dataloader_idx, stage):
+        X = pl_module(X).squeeze()
+        X, y = X.detach().cpu().numpy(), y.detach().cpu()
+        X = self.scaler.transform(X)
+        preds = self.model.predict(X)
+
+        self.acc[stage][dataloader_idx].update(torch.tensor(preds), y)
+
+    def end(self, pl_module, stage):
+
+        for dataloader_idx, acc in self.acc[stage].items():
+            # Grab evaluation data-set name directly from dataloader
+            eval_name, _ = pl_module.trainer.datamodule.data[stage][dataloader_idx]
+            pl_module.log(f"{stage}/{self.train_data_name}/linear_acc/{eval_name}", acc.compute())
+
+
+class Linear_Eval_PL(Data_Eval):
     """
     Callback to perform linear evaluation at the end of each epoch.
 
@@ -283,7 +349,7 @@ class Linear_Eval(Data_Eval):
         for dataloader_idx, acc in self.acc[stage].items():
             # Grab evaluation data-set name directly from dataloader
             eval_name, _ = pl_module.trainer.datamodule.data[stage][dataloader_idx]
-            pl_module.log(f"{stage}/{self.train_data_name}/{eval_name}/linear_acc", acc.compute())
+            pl_module.log(f"{stage}/{self.train_data_name}/linear_acc/{eval_name}", acc.compute())
 
         # pl_module.log(f"{stage}/{self.name}/linear_acc", self.acc.compute())
 
