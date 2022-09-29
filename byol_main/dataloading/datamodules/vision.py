@@ -8,7 +8,7 @@ from byol_main.dataloading.utils import compute_mu_sig_features, compute_mu_sig_
 from dataloading.utils import _get_imagenet_norms
 from torchvision.datasets import STL10
 from byol_main.paths import Path_Handler
-from byol_main.dataloading.transforms import ReduceView, MultiView, SimpleView, SupervisedView
+from byol_main.dataloading.transforms import MultiView, SimpleView, SupervisedView
 
 
 class Base_DataModule(pl.LightningDataModule):
