@@ -1,4 +1,3 @@
-import logging
 import pytorch_lightning as pl
 import torch
 import torchmetrics as tm
@@ -30,7 +29,8 @@ from utilities import (
 
 class Lightning_Eval(pl.LightningModule):
     """
-    Parent class for self-supervised LightningModules to perform linear evaluation with multiple data-sets.
+    Parent class for self-supervised LightningModules to perform linear evaluation with multiple
+    data-sets.
     """
 
     def __init__(self, config):
@@ -41,7 +41,7 @@ class Lightning_Eval(pl.LightningModule):
         self.config["data"]["mu"] = self.trainer.datamodule.mu
         self.config["data"]["sig"] = self.trainer.datamodule.sig
 
-        ## Log size of data-sets ##
+        # Log size of data-sets #
         logging_params = {"n_train": len(self.trainer.datamodule.data["train"])}
 
         for name, data in self.trainer.datamodule.data["val"]:
@@ -241,7 +241,7 @@ class Linear_Eval(Data_Eval):
 
     def setup(self, pl_module, data):
         with torch.no_grad():
-            model = sklearn.linear_model.LogisticRegression()
+            model = sklearn.linear_model.LogisticRegression(penalty="l2", C=1)
             X, y = embed_dataset(pl_module.backbone, data)
             X, y = X.detach().cpu().numpy(), y.detach().cpu().numpy()
             self.scaler = StandardScaler()

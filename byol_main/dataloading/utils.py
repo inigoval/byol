@@ -1,23 +1,16 @@
 import torch
-import torchvision
 import numpy as np
-import torchvision.transforms as T
-import pytorch_lightning as pl
 import torch.utils.data as D
-import logging
+import albumentations as A
 
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
-from torchvision.datasets import MNIST
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader
 from pytorch_lightning.trainer.supporters import CombinedLoader
 
-from byol_main.paths import Path_Handler
-from byol_main.utilities import batch_eval
 
-
-def data_splitter_strat(dset, seed=None, split=1, val_frac=0.2, u_cut=False):
-    if seed == None:
+def data_splitter_strat(dset, seed=None, split=1, val_frac=0.2):
+    if seed is None:
         seed = np.random.randint(9999999)
 
     n = len(dset)
@@ -245,3 +238,11 @@ def _get_imagenet_norms():
 
 def _get_cifar10_norms():
     return {"mu": (0.4914, 0.4822, 0.4465), "sig": (0.2023, 0.1994, 0.2010)}
+
+
+def _img_transform(transforms):
+    # Compose list of transforms
+    view = A.Compose(transforms)
+
+    # Define callable transform
+    return lambda img: view(image=np.array(img))["image"]
