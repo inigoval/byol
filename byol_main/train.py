@@ -8,7 +8,6 @@ from pytorch_lightning.profiler import AdvancedProfiler, PyTorchProfiler
 
 from byol_main.byol import BYOL
 from byol_main.config import load_config, update_config
-from byol_main.utilities import log_examples
 from dataloading.datamodules import datasets
 from paths import Path_Handler, create_path
 
@@ -100,7 +99,8 @@ def run_contrastive_pretraining(config, wandb_logger):
     logging.info(f"Threads: {torch.get_num_threads()}")
 
     # TODO could probably be directly included in config rather than config['compute'] indexing this
-    # This has been written like this so that you only need to change one setting in the config for swapping between slurm and direct on gpu
+    # This has been written like this so that you only need to change one setting in the config for
+    # swapping between slurm and direct on gpu
     trainer_settings = {
         "slurm": {"gpus": 1, "num_nodes": 1},
         "gpu": {"devices": 1, "accelerator": "gpu"},
@@ -136,9 +136,6 @@ def run_contrastive_pretraining(config, wandb_logger):
 
     config["model"]["output_dim"] = config["model"]["features"]
 
-    ## Record some data-points and their augmentations if not in debugging mode ##
-    if not config["debug"]:
-        log_examples(wandb_logger, pretrain_data.data["train"])
 
     # Train model #
     pre_trainer.fit(model, pretrain_data)
