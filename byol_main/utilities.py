@@ -97,7 +97,8 @@ def _optimizer(params, config):
 
     # for adam, lr is the step size and is modified by exp. moving av. of prev. gradients
     opts = {
-        "adam": lambda p: torch.optim.Adam(p, lr=lr, betas=betas),
+        "adam": lambda p: torch.optim.Adam(p, lr=lr, betas=betas, weight_decay=w_decay),
+        "adamw": lambda p: torch.optim.AdamW(p, lr=lr, betas=betas, weight_decay=w_decay),
         "sgd": lambda p: torch.optim.SGD(
             p,
             lr=lr,
