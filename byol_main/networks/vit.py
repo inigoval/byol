@@ -134,9 +134,12 @@ class ViT(nn.Module):
         emb_dropout=0.0
     ):
         super().__init__()
-        image_height = image_width = image_size
-        patch_height = patch_width = patch_size
+        # If image isn't square, get dimensions from tuple
+        # otherwise for square image just copy single dimension for square image
+        image_height, image_width = pair(image_size)
+        patch_height, patch_width = pair(patch_size)
 
+        # Check that
         assert (
             image_height % patch_height == 0 and image_width % patch_width == 0
         ), "Image dimensions must be divisible by the patch size."
