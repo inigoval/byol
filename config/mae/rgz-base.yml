@@ -1,16 +1,14 @@
-preset: 'optimal'
+preset: 'none'
 
 model:
-    architecture: 'resnet18' 
-    features: 100     # Number of encoded features (null just uses original resnet output)
+    architecture: 'vit'
+    patch_size: 16
+    num_layers: 12
+    num_heads: 12
+    features: 768
+    mlp_dim: 3072
+    decoder_dim: 512
     n_epochs: 600
-    downscale: True
-    m: 0.996 # Controls EMA hyperparameter for BYOL momentum encoder
-    m_decay: False
-
-projection_head:
-    hidden: 1024
-    out: 256
 
 data:
     color_channels: 1
@@ -23,8 +21,8 @@ data:
     test_frac: 0.3 
 
 optimizer:
-  type: 'sgd'
-  lr: 0.06
+  type: 'adamw'
+  lr: 0.00015
   momentum: 0.9
   weight_decay: 0.0005 # 0.0005
   lars: False
@@ -41,12 +39,12 @@ linear:
     batch_size: 300
     momentum: 0
     nesterov: False
-    weight_decay: 0
+    weight_decay: 0.5
 
 ## DATA ## 
 augmentations:
   center_crop_size: 80
-  random_crop_scale: !!python/tuple [0.8, 1]
+  random_crop_scale: !!python/tuple [0.5, 1]
   p_radio: 0.5
   p_blur: 0
   blur_kernel: 3 # Odd non-integer number

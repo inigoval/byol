@@ -45,23 +45,22 @@ class RGZ_DataModule(Base_DataModule):
             "test_size": self.config["data"]["test_frac"],
         }
         self.data["val"] = [
-            ("MiraBest_conf_train", MBFRConfident(**data_dict, train=True)),
-            ("MiraBest_conf_test", MBFRConfident(**data_dict, train=False)),
-            ("MiraBest_unc_train", MBFRUncertain(**data_dict, train=True)),
-            ("MiraBest_unc_test", MBFRUncertain(**data_dict, train=False)),
+            ("MB_conf_train", MBFRConfident(**data_dict, train=True)),
+            ("MB_conf_test", MBFRConfident(**data_dict, train=False)),
+            ("MB_unc_train", MBFRUncertain(**data_dict, train=True)),
+            ("MB_unc_test", MBFRUncertain(**data_dict, train=False)),
         ]
 
         self.data["test"] = [
-            ("MiraBest_unc_test", MBFRUncertain(**data_dict, train=False)),
-            ("MiraBest_conf_test", MBFRConfident(**data_dict, train=False)),
+            ("MB_unc_test", MBFRUncertain(**data_dict, train=False)),
+            ("MB_conf_test", MBFRConfident(**data_dict, train=False)),
         ]
 
-        # List of (name, train_dataset, dataloader_idx_dict) tuples to train linear evaluation layer, dataloader_idx is a dictionary specifying which of the train/validaiton dataloaders to use for evaluation
+        # List of (name, train_dataset) tuples to train linear evaluation layer
         self.data["eval_train"] = [
             (
-                "MiraBest_conf_train",
+                "MB_conf_train",
                 MBFRConfident(**data_dict, train=True),
-                {"val": (0, 1, 2, 3), "test": (0, 1)},
             ),
         ]
 
@@ -541,7 +540,12 @@ class RGZ108k(D.Dataset):
         "md5": "d5d3d04e1d462b02b69285af3391ba25",
     }
 
-    def __init__(self, root, train=True, transform=None, target_transform=None, download=False):
+    def __init__(
+        self, root, train=True, transform=None, target_transform=None, download=False, noisy=False
+    ):
+
+        if noisy is True:
+            self.base_folder += "-noisy"
 
         self.root = os.path.expanduser(root)
         self.transform = transform

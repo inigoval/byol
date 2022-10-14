@@ -5,6 +5,7 @@ import torch.nn.functional as F
 import torch.nn as nn
 import numpy as np
 import sklearn
+import logging
 
 from torch.utils.data import DataLoader
 from sklearn.preprocessing import StandardScaler
@@ -44,13 +45,13 @@ class Lightning_Eval(pl.LightningModule):
         # Log size of data-sets #
         logging_params = {"n_train": len(self.trainer.datamodule.data["train"])}
 
-        for name, data in self.trainer.datamodule.data["val"]:
+        for name, data in self.trainer.datamodule.data["val"] + self.trainer.datamodule.data["test"]:
             logging_params[f"n_{name}"] = len(data)
 
-        for name, data in self.trainer.datamodule.data["test"]:
-            logging_params[f"n_{name}"] = len(data)
+        # for name, data in self.trainer.datamodule.data["test"]:
+        #     logging_params[f"n_{name}"] = len(data)
 
-        for name, data, _ in self.trainer.datamodule.data["eval_train"]:
+        for name, data in self.trainer.datamodule.data["eval_train"]:
             logging_params[f"n_{name}"] = len(data)
 
         # for name, data in self.trainer.datamodule.data["test"]:
@@ -62,7 +63,7 @@ class Lightning_Eval(pl.LightningModule):
 
         # logger = self.logger.experiment
 
-        if not self.config["debug"]:
+        if not self.config["debug"] and self.config["type"] != "mae":
             log_examples(self.logger, self.trainer.datamodule.data["train"])
 
     def on_validation_start(self):
@@ -91,13 +92,9 @@ class Lightning_Eval(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx, dataloader_idx=0):
         x, y = batch
-        # Only evaluate on given data if evaluation model has given dataloader_idx
-        eval_list_filtered = [
-            val for val in self.eval_list if dataloader_idx in val.dataloader_idx["val"]
-        ]
 
         # Run validation step for filtered data-sets
-        for val in eval_list_filtered:
+        for val in self.eval_list:
             val.step(self, x, y, dataloader_idx, stage="val")
 
     def on_validation_epoch_end(self):
@@ -108,12 +105,8 @@ class Lightning_Eval(pl.LightningModule):
     def test_step(self, batch, batch_idx, dataloader_idx=0):
         x, y = batch
 
-        eval_list_filtered = [
-            val for val in self.eval_list if dataloader_idx in val.dataloader_idx["test"]
-        ]
-
         # Run validation step for filtered data-sets
-        for val in eval_list_filtered:
+        for val in self.eval_list:
             val.step(self, x, y, dataloader_idx, stage="test")
 
     def on_test_epoch_end(self):
@@ -258,6 +251,7 @@ class Linear_Eval(Data_Eval):
 
     def step(self, pl_module, X, y, dataloader_idx, stage):
         X = pl_module(X).squeeze()
+        # logging.info(X.shape)
         X, y = X.detach().cpu().numpy(), y.detach().cpu()
         X = self.scaler.transform(X)
         preds = self.model.predict(X)
@@ -269,7 +263,7 @@ class Linear_Eval(Data_Eval):
         for dataloader_idx, acc in self.acc[stage].items():
             # Grab evaluation data-set name directly from dataloader
             eval_name, _ = pl_module.trainer.datamodule.data[stage][dataloader_idx]
-            pl_module.log(f"{stage}/{self.train_data_name}/linear_acc/{eval_name}", acc.compute())
+            pl_module.log(f"{self.train_data_name}/{stage}/linear_acc/{eval_name}", acc.compute())
 
 
 class Linear_Eval_PL(Data_Eval):

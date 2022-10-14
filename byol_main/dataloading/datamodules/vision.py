@@ -4,11 +4,11 @@ import pytorch_lightning as pl
 from torch.utils.data import DataLoader
 from torchvision.datasets import ImageFolder
 
-from byol_main.dataloading.utils import compute_mu_sig_features, compute_mu_sig_images
+from byol_main.dataloading.utils import compute_mu_sig_images
 from dataloading.utils import _get_imagenet_norms
 from torchvision.datasets import STL10
 from byol_main.paths import Path_Handler
-from byol_main.dataloading.transforms import MultiView, SimpleView, SupervisedView
+from byol_main.dataloading.transforms import MultiView, SimpleView, MAEView, _train_view
 
 
 class Base_DataModule(pl.LightningDataModule):
@@ -24,7 +24,8 @@ class Base_DataModule(pl.LightningDataModule):
 
         self.mu, self.sig = mu, sig
 
-        self.T_train = MultiView(config, mu=self.mu, sig=self.sig)
+        self.T_train = _train_view(config)(config, mu=self.mu, sig=self.sig)
+
         self.T_test = SimpleView(config, mu=self.mu, sig=self.sig)
 
         self.data = {}
@@ -94,12 +95,11 @@ class STL10_DataModule(Base_DataModule):
             ("STL10_test", STL10(root=self.path, split="test", transform=self.T_test)),
         ]
 
-        # List of (name, train_dataset, dataloader_idx_dict) tuples to train linear evaluation layer, dataloader_idx is a dictionary specifying which of the train/validaiton dataloaders to use for evaluation
+        # List of (name, train_dataset) tuples to train linear evaluation layer
         self.data["eval_train"] = [
             (
                 "STl10_train",
                 STL10(root=self.path, split="train", transform=self.T_test),
-                {"val": (0, 1), "test": (0,)},
             ),
         ]
 
@@ -122,7 +122,7 @@ class Imagenette_DataModule(Base_DataModule):
             ("imagenette_val", ImageFolder(self.path / "val", transform=self.T_test)),
         ]
 
-        # List of (name, train_dataset, dataloader_idx_dict) tuples to train linear evaluation layer, dataloader_idx is a dictionary specifying which of the train/validaiton dataloaders to use for evaluation
+        # List of (name, train_dataset) tuples to train linear evaluation layer
         self.data["eval_train"] = [
             (
                 "imagenette_train",

@@ -99,6 +99,46 @@ class MultiView(nn.Module):
         self.normalize = _img_transform([A.Normalize(mean=mu, std=sig), ToTensorV2()])
 
 
+class MAEView(nn.Module):
+    def __init__(self, config, mu=(0,), sig=(1,)):
+        super().__init__()
+        self.config = config
+
+        augs = []
+        # if config['dataset'] == 'gz2':  # is a tensor, needs to be a PIL to later call T.ToTensor
+        #     augs.append(T.ToPILImage())
+
+        if config["data"]["rotate"]:
+            augs.append(A.Rotate(limit=180))
+
+        input_height = config["data"]["input_height"]
+        augs.append(A.Resize(input_height, input_height))
+
+        if config["augmentations"]["center_crop_size"]:
+            crop_size = config["augmentations"]["center_crop_size"]
+            augs.append(A.CenterCrop(crop_size, crop_size))
+
+        augs.append(
+            A.RandomResizedCrop(
+                input_height, input_height, scale=config["augmentations"]["random_crop_scale"]
+            )
+        )
+
+        self.view = _img_transform(augs)
+        self.n_views = 1
+        self.normalize = _img_transform([A.Normalize(mean=mu, std=sig), ToTensorV2()])
+        # self.normalize = lambda x: x  # TODO temporarily disable normalisation (see also MultiView)
+
+    def __call__(self, x):
+        x = np.array(x)
+        x = self.view(x)
+        x = self.normalize(x)
+        return x
+
+    def update_normalization(self, mu, sig):
+        self.normalize = _img_transform([A.Normalize(mean=mu, std=sig), ToTensorV2()])
+
+
 class SimpleView(nn.Module):
     def __init__(self, config, mu=(0,), sig=(1,)):
         super().__init__()
@@ -118,7 +158,14 @@ class SimpleView(nn.Module):
             crop_size = config["augmentations"]["center_crop_size"]
             augs.append(A.CenterCrop(crop_size, crop_size))
 
+        # augs.append(
+        #     A.Lambda(
+        #         name="expand_channels", image=Expand_Channels(config["data"]["color_channels"]), p=1
+        #     )
+        # )
+
         self.view = _img_transform(augs)
+
         self.normalize = _img_transform([A.Normalize(mean=mu, std=sig), ToTensorV2()])
         # self.normalize = lambda x: x  # TODO temporarily disable normalisation (see also MultiView)
 
@@ -239,13 +286,6 @@ def _rgz_view(config):
         # A.Emboss(
         #     alpha=(0.2, 0.5), strength=(0.2, 0.5), p=p
         # ),  # Quick emulation of incorrect w-kernels # Doesnt force the maxima to 1
-        # A.Lambda(
-        #     name="Dirty beam convolution",
-        #     image=image_domain.radio.CustomKernelConvolution(
-        #         kernel=kernel, rfi_dropout=0.4, psf_radius=None, sidelobe_scaling=1, mode="sum"
-        #     ),
-        #     p=p,
-        # ),  # Add sidelobes
         # Brightness
         # A.Lambda(
         #     name="Brightness perspective distortion",
@@ -253,7 +293,6 @@ def _rgz_view(config):
         #     p=p,
         # ),  # Gaussian Noise and pb brightness scaling
         # Modelling based transforms
-        A.CenterCrop(width=center_crop, height=center_crop, p=1),
         A.ShiftScaleRotate(
             shift_limit=0.1,
             scale_limit=0,
@@ -263,12 +302,21 @@ def _rgz_view(config):
             value=0,
             p=p,
         ),
+        # A.Lambda(
+        #     name="Dirty beam convolution",
+        #     image=image_domain.radio.CustomKernelConvolution(
+        #         kernel=kernel, rfi_dropout=0.1, psf_radius=None, sidelobe_scaling=1, mode="sum"
+        #     ),
+        #     p=p,
+        # ),  # Add sidelobes
+        A.CenterCrop(width=center_crop, height=center_crop, p=1),
     ]
 
     input_height = config["data"]["input_height"]
     s = cfg_augs["s"]
     vision_augs = [
         A.RandomResizedCrop(input_height, input_height, scale=cfg_augs["random_crop_scale"]),
+        # A.Lambda(name="expand_channels", image=Expand_Channels(config["data"]["color_channels"]), p=1),
         A.ColorJitter(0.8 * s, 0.8 * s, 0.8 * s, 0.2 * s, p=0.8),
     ]
 
@@ -281,6 +329,23 @@ def _blur_kernel(input_height):
     if blur_kernel % 2 == 0:
         blur_kernel += 1
     return blur_kernel
+
+
+def _train_view(config):
+    if config["type"] in ["mae"]:
+        return MAEView
+    elif config["type"] in ["byol"]:
+        return MultiView
+
+
+class Expand_Channels(torch.nn.Module):
+    def __init__(self, n_channels):
+        super().__init__()
+        self.n_channels = n_channels
+
+    def forward(self, img):
+        H, W = img.shape[-1], img.shape[-2]
+        return img.expand(-1, -1, self.n_channels)
 
 
 def _rgz_view_old(config):

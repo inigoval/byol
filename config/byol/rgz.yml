@@ -1,7 +1,7 @@
-preset: 'optimal'
+preset: 'none'
 
 model:
-    architecture: 'resnet18' 
+    architecture: 'resnet34' 
     features: 100     # Number of encoded features (null just uses original resnet output)
     n_epochs: 600
     downscale: True
@@ -41,12 +41,12 @@ linear:
     batch_size: 300
     momentum: 0
     nesterov: False
-    weight_decay: 0.5
+    weight_decay: 0
 
 ## DATA ## 
 augmentations:
   center_crop_size: 80
-  random_crop_scale: !!python/tuple [0.5, 1]
+  random_crop_scale: !!python/tuple [0.8, 1]
   p_radio: 0.5
   p_blur: 0
   blur_kernel: 3 # Odd non-integer number

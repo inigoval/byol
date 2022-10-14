@@ -7,6 +7,7 @@ from pytorch_lightning.callbacks import LearningRateMonitor
 from pytorch_lightning.profiler import AdvancedProfiler, PyTorchProfiler
 
 from byol_main.byol import BYOL
+from byol_main.mae import MAE
 from byol_main.config import load_config, update_config
 from dataloading.datamodules import datasets
 from paths import Path_Handler, create_path
@@ -124,10 +125,7 @@ def run_contrastive_pretraining(config, wandb_logger):
     )
 
     # Initialise model #
-    models = {
-        "byol": BYOL,
-        "supervised": Supervised,
-    }
+    models = {"byol": BYOL, "supervised": Supervised, "mae": MAE}
     model = models[config["type"]](config)
 
     # profile_art = wandb.Artifact(f"trace-{wandb.run.id}", type="profile")
@@ -135,7 +133,6 @@ def run_contrastive_pretraining(config, wandb_logger):
     # wandb.run.log_artifact(profile_art)
 
     config["model"]["output_dim"] = config["model"]["features"]
-
 
     # Train model #
     pre_trainer.fit(model, pretrain_data)

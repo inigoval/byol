@@ -1,7 +1,7 @@
-type: 'byol'
+type: 'mae'
 project_name: 'debug-byol'
-dataset: 'rgz' # ['imagenette', 'rgz', 'gzmnist', 'gz2', 'stl10', 'cifar10']
-debug: False
+dataset: 'stl10' # ['imagenette', 'rgz', 'gzmnist', 'gz2', 'stl10', 'cifar10']
+debug: True
 seed: 0
 
 dataloading:
@@ -23,5 +23,5 @@ evaluation:
   check_val_every_n_epoch: 5
 
 compute: 'slurm'
-precision: 16 # [16, 32, 'bf16'], often overriden
+precision: 32 # [16, 32, 'bf16'], often overriden
 profiler: 'none'
