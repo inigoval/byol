@@ -127,7 +127,6 @@ class ViT(nn.Module):
         depth,
         heads,
         mlp_dim,
-        pool="cls",
         channels=3,
         dim_head=64,
         dropout=0.0,
@@ -139,43 +138,60 @@ class ViT(nn.Module):
         image_height, image_width = pair(image_size)
         patch_height, patch_width = pair(patch_size)
 
-        # Check that
+        # Check that image can be split up into patches of given size
         assert (
             image_height % patch_height == 0 and image_width % patch_width == 0
         ), "Image dimensions must be divisible by the patch size."
 
+        # Calculate total number of patches
         num_patches = (image_height // patch_height) * (image_width // patch_width)
-        patch_dim = channels * patch_height * patch_width
-        assert pool in {"cls", "mean"}, "pool type must be either cls (cls token) or mean (mean pooling)"
 
+        # Calculate total number of values in each patch
+        patch_dim = channels * patch_height * patch_width
+
+        # Turn (c x h x w) images into (n_patchs x patch_dim) flattened patches and project to latent dimension
         self.to_patch_embedding = nn.Sequential(
-            Rearrange("b c (h p1) (w p2) -> b (h w) (p1 p2 c)", p1=patch_height, p2=patch_width),
+            Rearrange("b c (n1 p1) (n2 p2) -> b (n1 n2) (p1 p2 c)", p1=patch_height, p2=patch_width),
             nn.Linear(patch_dim, dim),
         )
 
+        # Positional embedding is learned in ViT. Note that timm implementation multiplies normal distribution initialization by 0.02
         self.pos_embedding = nn.Parameter(torch.randn(1, num_patches + 1, dim))
+
+        # Initialize cls token which is used as representation
         self.cls_token = nn.Parameter(torch.randn(1, 1, dim))
         self.dropout = nn.Dropout(emb_dropout)
 
+        # Initialize transformer with given parameters
         self.transformer = Transformer(dim, depth, heads, dim_head, mlp_dim, dropout)
 
-        self.pool = pool
         self.to_latent = nn.Identity()
 
         self.mlp_head = nn.Sequential(nn.LayerNorm(dim), nn.Linear(dim, num_classes))
 
     def forward(self, img):
+        # Turn image into flattened patches
         x = self.to_patch_embedding(img)
+
+        # Get batch size and number of patches
         b, n, _ = x.shape
 
+        # Expand cls token to correct size
         cls_tokens = repeat(self.cls_token, "1 1 d -> b 1 d", b=b)
+
+        # Combine cls tokens with patches
         x = torch.cat((cls_tokens, x), dim=1)
+
+        # Add positional embedding and dropout
         x += self.pos_embedding[:, : (n + 1)]
         x = self.dropout(x)
 
+        # Run embedding through transformer
         x = self.transformer(x)
 
-        x = x.mean(dim=1) if self.pool == "mean" else x[:, 0]
+        # Get new class token
+        x = x[:, 0]
 
+        #  Return class token after passing through MLP
         x = self.to_latent(x)
         return self.mlp_head(x)
