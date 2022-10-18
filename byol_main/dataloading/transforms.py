@@ -316,7 +316,7 @@ def _rgz_view(config):
     input_height = config["data"]["input_height"]
     s = cfg_augs["s"]
     vision_augs = [
-        A.RandomResizedCrop(input_height, input_height, scale=cfg_augs["random_crop_scale"]),
+        A.RandomResizedCrop(center_crop, center_crop, scale=cfg_augs["random_crop_scale"]),
         # A.Lambda(name="expand_channels", image=Expand_Channels(config["data"]["color_channels"]), p=1),
         A.ColorJitter(0.8 * s, 0.8 * s, 0.8 * s, 0.2 * s, p=0.8),
     ]
