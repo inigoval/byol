@@ -1,15 +1,22 @@
 preset: 'none'
 
 model:
-    architecture: 'vit'
-    patch_size: 16
-    num_layers: 12
-    num_heads: 12
-    features: 768
-    mlp_dim: 3072
-    decoder_dim: 512
     n_epochs: 600
+    masking_ratio: 0.75
 
+    decoder: 
+        dim: 512
+        depth: 2
+        heads: 4
+        dim_head: 64
+
+    vit:
+        patch_size: 6
+        dim: 512
+        depth: 6
+        heads: 8
+        mlp_dim: 2048
+      
 data:
     color_channels: 3
     classes: 10
@@ -22,11 +29,13 @@ data:
 
 optimizer:
   type: 'adamw'
-  lr: 0.00015
+  lr: 0.0003
   momentum: 0.9
   weight_decay: 0.0005 # 0.0005
   lars: False
   trust_coef: 0.003
+  beta_1: 0.9
+  beta_2: 0.95
 
 scheduler:
   type: 'cosine' # ['none', 'cosine', 'warmupcosine']

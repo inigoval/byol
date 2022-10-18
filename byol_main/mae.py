@@ -3,56 +3,48 @@ from torch import nn
 import torch.nn.functional as F
 from einops import repeat
 
-from byol_main.networks.vit import Transformer
+from byol_main.networks.vit import Transformer, ViT
+from byol_main.evaluation import Lightning_Eval
+from utilities import _optimizer
 
 
-class MAE(nn.Module):
-    def __init__(
-        self,
-        *,
-        encoder,
-        decoder_dim,
-        masking_ratio=0.75,
-        decoder_depth=1,
-        decoder_heads=8,
-        decoder_dim_head=64
-    ):
-        super().__init__()
-        assert masking_ratio > 0 and masking_ratio < 1, "masking ratio must be kept between 0 and 1"
-        self.masking_ratio = masking_ratio
+class MAE(Lightning_Eval):
+    def __init__(self, config):
+        super().__init__(config)
+        self.save_hyperparameters()  # save hyperparameters for easy inference
+        self.config = config
 
-        # Extract some hyperparameters and functions from encoder (vision transformer to be trained)
-        self.encoder = encoder
-        num_patches, encoder_dim = encoder.pos_embedding.shape[-2:]
-        self.to_patch, self.patch_to_emb = encoder.to_patch_embedding[:2]
+        self.masking_ratio = config["model"]["masking_ratio"]
+
+        # Initialize encoder and extract dimensions
+        self.encoder = ViT(image_size=self.config["data"]["input_height"], **self.config["model"]["vit"])
+        self.to_patch, self.patch_to_emb = self.encoder.to_patch_embedding[:2]
         pixel_values_per_patch = self.patch_to_emb.weight.shape[-1]
+        num_patches, enc_dim = self.encoder.pos_embedding.shape[-2:]
 
         # Projection to match encoder/decoder dimensions
-        self.enc_to_dec = (
-            nn.Linear(encoder_dim, decoder_dim) if encoder_dim != decoder_dim else nn.Identity()
-        )
+        dec_dim = self.config["model"]["decoder"]["dim"]
+        self.enc2dec = nn.Linear(enc_dim, dec_dim) if enc_dim != dec_dim else nn.Identity()
+
+        # Initialize decoder
+        self.config["model"]["decoder"]["mlp_dim"] = self.config["model"]["decoder"]["dim"] * 4
+        self.decoder = Transformer(**self.config["model"]["decoder"]).to(self.device)
 
         # Masking tokens for decoder.
-        self.mask_token = nn.Parameter(torch.randn(decoder_dim))
-
-        # Decoder network
-        self.decoder = Transformer(
-            dim=decoder_dim,
-            depth=decoder_depth,
-            heads=decoder_heads,
-            dim_head=decoder_dim_head,
-            mlp_dim=decoder_dim * 4,
-        )
+        self.mask_token = nn.Parameter(torch.randn(dec_dim))
 
         # Fixed embeddings for decoder
-        self.decoder_pos_emb = nn.Embedding(num_patches, decoder_dim)
-        self.to_pixels = nn.Linear(decoder_dim, pixel_values_per_patch)
+        self.decoder_pos_emb = nn.Embedding(num_patches, dec_dim)
+        self.to_pixels = nn.Linear(dec_dim, pixel_values_per_patch)
 
-    def forward(self, img):
-        device = img.device
+    def forward(self, x):
+        return self.encoder(x)  # dimension (batch, features), features from config e.g. 512
 
+    def training_step(self, batch, batch_idx):
         # Get patches from image
-        patches = self.to_patch(img)
+        x, _ = batch
+
+        patches = self.to_patch(x)
 
         # Get batch size and number of patches
         batch, num_patches, *_ = patches.shape
@@ -65,13 +57,13 @@ class MAE(nn.Module):
         num_masked = int(self.masking_ratio * num_patches)
 
         # Get random indices to choose random masked patches
-        rand_indices = torch.rand(batch, num_patches, device=device).argsort(dim=-1)
+        rand_indices = torch.rand(batch, num_patches).argsort(dim=-1).to(self.device)
 
         # Save masked and unmasked indices
         masked_indices, unmasked_indices = rand_indices[:, :num_masked], rand_indices[:, num_masked:]
 
         # Get the unmasked tokens to be encoded
-        batch_range = torch.arange(batch, device=device)[:, None]
+        batch_range = torch.arange(batch)[:, None]
         tokens = tokens[batch_range, unmasked_indices]
 
         # Get the patches to be masked for the final reconstruction loss
@@ -82,12 +74,13 @@ class MAE(nn.Module):
 
         # Project encoder to decoder dimensions, if they are not equal,
         # the paper says you can get away with a smaller dimension for decoder
-        decoder_tokens = self.enc_to_dec(encoded_tokens)
+        decoder_tokens = self.enc2dec(encoded_tokens)
 
         # Reapply decoder position embedding to unmasked tokens
         decoder_tokens = decoder_tokens + self.decoder_pos_emb(unmasked_indices)
 
-        # Repeat mask tokens for number of masked, and add the positions using the masked indices derived above
+        # Repeat mask tokens for number of masked, and add the positions
+        # using the masked indices derived above
         mask_tokens = repeat(self.mask_token, "d -> b n d", b=batch, n=num_masked)
         mask_tokens = mask_tokens + self.decoder_pos_emb(masked_indices)
 
@@ -102,5 +95,16 @@ class MAE(nn.Module):
         pred_pixel_values = self.to_pixels(mask_tokens)
 
         # calculate reconstruction loss
-        recon_loss = F.mse_loss(pred_pixel_values, masked_patches)
-        return recon_loss
+        loss = F.mse_loss(pred_pixel_values, masked_patches)
+
+        self.log("train/loss", loss, on_step=False, on_epoch=True)
+        return loss
+
+    @property
+    def backbone(self):
+        return self.encoder
+
+    def configure_optimizers(self):
+        params = self.parameters()
+
+        return _optimizer(params, self.config)

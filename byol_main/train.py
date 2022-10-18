@@ -132,8 +132,6 @@ def run_contrastive_pretraining(config, wandb_logger):
     # profile_art.add_file(glob.glob(str(experiment_dir / "*.pt.trace.json"))[0], "trace.pt.trace.json")
     # wandb.run.log_artifact(profile_art)
 
-    config["model"]["output_dim"] = config["model"]["features"]
-
     # Train model #
     pre_trainer.fit(model, pretrain_data)
     pre_trainer.test(model, dataloaders=pretrain_data)

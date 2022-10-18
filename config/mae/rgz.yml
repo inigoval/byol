@@ -1,14 +1,21 @@
 preset: 'none'
 
 model:
-    architecture: 'vit'
-    patch_size: 4
-    num_layers: 8 
-    num_heads: 8
-    features: 200
-    mlp_dim: 1000
-    decoder_dim: 512
     n_epochs: 600
+    masking_ratio: 0.75
+
+    decoder: 
+        dim: 512
+        depth: 2
+        heads: 4
+        dim_head: 64
+
+    vit:
+        patch_size: 4
+        dim: 512
+        depth: 6
+        heads: 8
+        mlp_dim: 2048
 
 data:
     color_channels: 1
