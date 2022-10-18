@@ -172,7 +172,6 @@ class ViT(nn.Module):
 
     def forward(self, x):
         # Turn image into flattened patches
-        logging.info(x.shape)
         x = self.to_patch_embedding(x)
 
         # Get batch size and number of patches
