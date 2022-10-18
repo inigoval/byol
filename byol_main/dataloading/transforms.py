@@ -117,6 +117,7 @@ class MAEView(nn.Module):
         if config["augmentations"]["center_crop_size"]:
             crop_size = config["augmentations"]["center_crop_size"]
             augs.append(A.CenterCrop(crop_size, crop_size))
+            input_height = crop_size
 
         augs.append(
             A.RandomResizedCrop(

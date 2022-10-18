@@ -44,7 +44,7 @@ def update_config(config):
     # Create unpackable dictionary for logistic regression model
     optimizers = {"adam": Adam, "sgd": SGD}
     config["logreg"] = {
-        "input_dim": config["model"]["features"],
+        # "input_dim": config["model"]["features"],
         "num_classes": config["data"]["classes"],
         "learning_rate": config["linear"]["lr"],
         "optimizer": optimizers[config["linear"]["opt"]],

@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+import logging
 
 from einops import rearrange, repeat
 from einops.layers.torch import Rearrange
@@ -122,7 +123,7 @@ class ViT(nn.Module):
         *,
         image_size,
         patch_size,
-        num_classes,
+        # num_classes,
         dim,
         depth,
         heads,
@@ -167,11 +168,12 @@ class ViT(nn.Module):
 
         self.to_latent = nn.Identity()
 
-        self.mlp_head = nn.Sequential(nn.LayerNorm(dim), nn.Linear(dim, num_classes))
+        # self.mlp_head = nn.Sequential(nn.LayerNorm(dim), nn.Linear(dim, num_classes))
 
-    def forward(self, img):
+    def forward(self, x):
         # Turn image into flattened patches
-        x = self.to_patch_embedding(img)
+        logging.info(x.shape)
+        x = self.to_patch_embedding(x)
 
         # Get batch size and number of patches
         b, n, _ = x.shape
@@ -194,4 +196,6 @@ class ViT(nn.Module):
 
         #  Return class token after passing through MLP
         x = self.to_latent(x)
-        return self.mlp_head(x)
+        # return self.mlp_head(x)
+
+        return x
