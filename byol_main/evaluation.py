@@ -230,7 +230,7 @@ class Linear_Eval(Data_Eval):
 
         for val_name, acc in self.acc[stage].items():
             # Grab evaluation data-set name directly from dataloader
-            pl_module.log(f"{self.train_data_name}/{stage}/linear_acc/{val_name}", acc.compute())
+            pl_module.log(f"{stage}/{self.train_data_name}/linear_acc/{val_name}", acc.compute())
 
 
 class Linear_Eval_PL(Data_Eval):
