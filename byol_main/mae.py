@@ -17,7 +17,11 @@ class MAE(Lightning_Eval):
         self.masking_ratio = config["model"]["masking_ratio"]
 
         # Initialize encoder and extract dimensions
-        self.encoder = ViT(image_size=self.config["data"]["input_height"], **self.config["model"]["vit"])
+        self.encoder = ViT(
+            image_size=self.config["data"]["input_height"],
+            **self.config["model"]["vit"],
+            channels=self.config["data"]["color_channels"]
+        )
         self.to_patch, self.patch_to_emb = self.encoder.to_patch_embedding[:2]
         pixel_values_per_patch = self.patch_to_emb.weight.shape[-1]
         num_patches, enc_dim = self.encoder.pos_embedding.shape[-2:]
