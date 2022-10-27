@@ -25,7 +25,7 @@ class BYOL(Lightning_Eval):
         self.save_hyperparameters()  # save hyperparameters for easy inference
         self.config = config
 
-        self.backbone = _get_backbone(config)
+        self.encoder = _get_backbone(config)
 
         # create a byol model based on ResNet
         features = self.config["model"]["features"]
@@ -38,10 +38,10 @@ class BYOL(Lightning_Eval):
         self.projection_head = BYOLProjectionHead(features, proj["hidden"], proj["out"])
         self.prediction_head = BYOLProjectionHead(proj["out"], proj["hidden"], proj["out"])
 
-        self.backbone_momentum = copy.deepcopy(self.backbone)
+        self.encoder_momentum = copy.deepcopy(self.encoder)
         self.projection_head_momentum = copy.deepcopy(self.projection_head)
 
-        deactivate_requires_grad(self.backbone_momentum)
+        deactivate_requires_grad(self.encoder_momentum)
         deactivate_requires_grad(self.projection_head_momentum)
 
         self.criterion = lightly.loss.NegativeCosineSimilarity()
@@ -51,11 +51,11 @@ class BYOL(Lightning_Eval):
         self.m = config["model"]["m"]
 
     def forward(self, x):
-        return self.backbone(x)  # dimension (batch, features), features from config e.g. 512
+        return self.encoder(x)  # dimension (batch, features), features from config e.g. 512
 
     def project(self, x):
         # representation
-        y = self.backbone(x).flatten(start_dim=1)
+        y = self.encoder(x).flatten(start_dim=1)
         # projection
         z = self.projection_head(y)
         # prediction (of proj of target network)
@@ -63,14 +63,14 @@ class BYOL(Lightning_Eval):
         return p
 
     def project_momentum(self, x):
-        y = self.backbone_momentum(x).flatten(start_dim=1)
+        y = self.encoder_momentum(x).flatten(start_dim=1)
         z = self.projection_head_momentum(y)
         z = z.detach()
         return z
 
     def training_step(self, batch, batch_idx):
         # Update momentum value
-        update_momentum(self.backbone, self.backbone_momentum, m=self.m)
+        update_momentum(self.encoder, self.encoder_momentum, m=self.m)
         update_momentum(self.projection_head, self.projection_head_momentum, m=self.m)
 
         # Load in data
@@ -91,7 +91,7 @@ class BYOL(Lightning_Eval):
 
     def configure_optimizers(self):
         params = (
-            list(self.backbone.parameters())
+            list(self.encoder.parameters())
             + list(self.projection_head.parameters())
             + list(self.prediction_head.parameters())
         )
@@ -199,7 +199,7 @@ class BYOL_Supervised(BYOL):
 
     def configure_optimizers(self):
         params = (
-            list(self.backbone.parameters())
+            list(self.encoder.parameters())
             + list(self.projection_head.parameters())
             + list(self.prediction_head.parameters())
             # need to add supervised head parameters to optimizer
@@ -212,7 +212,7 @@ class BYOL_Supervised(BYOL):
 
     def represent(self, x):
         # representation
-        return self.backbone(x).flatten(start_dim=1)
+        return self.encoder(x).flatten(start_dim=1)
 
     def project(self, y):
         # now takes representation y as input
@@ -227,9 +227,9 @@ class BYOL_Supervised(BYOL):
         log_on_step = True
 
         # Update momentum value
-        # aka update self.backbone_momentum with exp. moving av. of self.backbone
+        # aka update self.encoder_momentum with exp. moving av. of self.encoder
         # (similarly for heads)
-        update_momentum(self.backbone, self.backbone_momentum, m=self.m)
+        update_momentum(self.encoder, self.encoder_momentum, m=self.m)
         update_momentum(self.projection_head, self.projection_head_momentum, m=self.m)
         # prediction head not EMA'd as target (averaged) network doesn't need one
         # similarly don't need to EMA the supervised head as target network doesn't need one

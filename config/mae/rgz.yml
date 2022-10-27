@@ -1,7 +1,7 @@
 preset: 'none'
 
 model:
-    n_epochs: 600
+    n_epochs: 2
     masking_ratio: 0.75
 
     decoder: 
@@ -12,17 +12,18 @@ model:
 
     vit:
         patch_size: 4
-        dim: 512
+        dim: 256
         depth: 6
         heads: 8
-        mlp_dim: 2048
+        mlp_dim: 1028
+        # arch: 'vit-small'
 
 data:
     color_channels: 1
     classes: 2
     rotate: True
     input_height: 128 # Keep this at 128 and adjust center_crop_size
-    pretrain_batch_size: 256
+    batch_size: 256
     val_batch_size: 500
     cut_threshold: 27
     test_frac: 0.3 

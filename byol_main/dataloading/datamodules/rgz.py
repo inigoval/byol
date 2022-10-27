@@ -2,6 +2,7 @@ import torch.utils.data as D
 import numpy as np
 import os
 import sys
+import torchvision.transforms as T
 
 if sys.version_info[0] == 2:
     import cPickle as pickle
@@ -18,7 +19,7 @@ from astroaugmentations.datasets.MiraBest_F import MBFRFull, MBFRConfident, MBFR
 
 class RGZ_DataModule(Base_DataModule):
     def __init__(self, config):
-        super().__init__(config, mu=(0,), sig=(1,))
+        super().__init__(config, mu=(0.008008896,), sig=(0.05303395,))
 
     def prepare_data(self):
         MBFRFull(self.path, train=False, download=True)

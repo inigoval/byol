@@ -6,6 +6,7 @@ import torch.nn as nn
 import numpy as np
 import sklearn
 import logging
+from einops import rearrange
 
 from torch.utils.data import DataLoader
 from sklearn.preprocessing import StandardScaler
@@ -20,6 +21,7 @@ from torchvision.transforms import Normalize
 from torchvision.transforms import Normalize
 from utilities import log_examples, embed_dataset, freeze_model, unfreeze_model
 from utilities import compute_encoded_mu_sig, check_unique_list
+from networks.models import LogisticRegression
 
 
 class Lightning_Eval(pl.LightningModule):
@@ -150,7 +152,7 @@ class Ridge_Eval(Data_Eval):
     def setup(self, pl_module, data):
         with torch.no_grad():
             model = RidgeClassifier()
-            X, y = embed_dataset(pl_module.backbone, data)
+            X, y = embed_dataset(pl_module.encoder, data)
             X, y = X.detach().cpu().numpy(), y.detach().cpu().numpy()
             self.scaler = StandardScaler()
             self.scaler.fit(X)
@@ -203,8 +205,8 @@ class Linear_Eval(Data_Eval):
 
     def setup(self, pl_module, data):
         with torch.no_grad():
-            model = sklearn.linear_model.LogisticRegression(penalty="l2", C=1)
-            X, y = embed_dataset(pl_module.backbone, data)
+            model = sklearn.linear_model.LogisticRegression(penalty="none")
+            X, y = embed_dataset(pl_module.encoder, data)
             X, y = X.detach().cpu().numpy(), y.detach().cpu().numpy()
             self.scaler = StandardScaler()
             self.scaler.fit(X)

@@ -17,7 +17,7 @@ data:
     classes: 2
     rotate: True
     input_height: 128 # Keep this at 128 and adjust center_crop_size
-    pretrain_batch_size: 256
+    batch_size: 256
     val_batch_size: 500
     cut_threshold: 27
     test_frac: 0.3 

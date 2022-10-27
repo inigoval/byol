@@ -7,12 +7,16 @@ from torchvision.models.vision_transformer import _vision_transformer
 
 
 class MLPHead(nn.Module):
-    """Fully connected head wtih a single hidden layer"""
+    """
+    Fully connected head with a single hidden layer. Batchnorm applied as first layer so that
+    feature space of encoder doesn't need to be normalized.
+    """
 
     def __init__(self, in_channels, mlp_hidden_size, projection_size):
         super(MLPHead, self).__init__()
 
         self.net = nn.Sequential(
+            nn.BatchNorm1d(in_channels),
             nn.Linear(in_channels, mlp_hidden_size),
             nn.BatchNorm1d(mlp_hidden_size),
             nn.ReLU(inplace=True),
@@ -25,12 +29,46 @@ class MLPHead(nn.Module):
 
 class LogisticRegression(torch.nn.Module):
     def __init__(self, input_dim, output_dim):
-        super(LogisticRegression, self).__init__()
+        super().__init__()
+        self.batchnorm = nn.BatchNorm1d(input_dim)
         self.linear = torch.nn.Linear(input_dim, output_dim)
 
     def forward(self, x):
-        return self.linear(x)
+        x = self.batchnorm(x)
+        x = self.linear(x)
+        return x
 
+
+
+class Classification_Head(nn.Module):
+    """
+    Fully connected head with a single hidden layer. Batchnorm applied as first layer so that
+    feature space of encoder doesn't need to be normalized.
+    """
+
+    def __init__(self, in_channels, mlp_hidden_size, projection_size):
+        super().__init__()
+
+        layers = [nn.Batchnorm1d(in_channels)] + [] * n_hidden + [nn.Linear(mlp_hidden_size)]
+
+        self.net = nn.Sequential(
+            nn.BatchNorm1d(in_channels),
+            nn.Linear(in_channels, mlp_hidden_size),
+            nn.BatchNorm1d(mlp_hidden_size),
+            nn.ReLU(inplace=True),
+            nn.Linear(mlp_hidden_size, projection_size),
+        )
+
+    def forward(self, x):
+        return self.net(x)
+
+class Encoder(nn.Module):
+    def __init__(self, backbone):
+        super().__init__()
+        self.encoder = backbone
+
+    def forward(self, x):
+        return self.encoder(x)
 
 def _get_backbone(config):
 
@@ -56,13 +94,12 @@ def _get_backbone(config):
 
     if "resnet" in config["model"]["architecture"]:
         # c_out = channels out
-        c_out = list(net.children())[
-            -1
-        ].in_features  # output dim of e.g. resnet, once the classification layer is removed (below)
+        # output dim of e.g. resnet, once the classification layer is removed (below)
+        c_out = list(net.children())[-1].in_features
+
     elif "efficientnet" in config["model"]["architecture"]:
-        c_out = list(net.children())[-1][
-            1
-        ].in_features  # sequential is -1, then 1 is linear (0 being dropout)
+        # sequential is -1, then 1 is linear (0 being dropout)
+        c_out = list(net.children())[-1][1].in_features
 
     # i.e. remove the last layer (aka the classification layer) as default-defined
     # for resnet, is linear. for effnet, is sequential([dropout, linear]). Same thing.
@@ -99,7 +136,12 @@ def _get_backbone(config):
     else:
         backbone = net
 
-    return backbone
+    # Define layers for finetuning
+    encoder = Encoder(backbone)
+    encoder.dim = features
+    encoder.finetuning_layers = nn.ModuleList(list(backbone.children())[4:-2])
+
+    return encoder
 
 
 def _get_transformer(config):

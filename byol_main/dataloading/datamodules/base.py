@@ -32,7 +32,7 @@ class Base_DataModule(pl.LightningDataModule):
     def train_dataloader(self):
         loader = DataLoader(
             self.data["train"],
-            batch_size=self.config["pretrain_batch_size"],
+            batch_size=self.config["batch_size"],
             shuffle=True,
             num_workers=self.config["num_workers"],
             # num_workers=1,
@@ -157,7 +157,7 @@ class Base_DataModule_Supervised(pl.LightningDataModule):
 
     def train_dataloader(self):
         # Batch all data together
-        batch_size = self.config["pretrain_batch_size"]
+        batch_size = self.config["batch_size"]
         n_workers = self.config["num_workers"]
         loader = DataLoader(
             self.data["train"],
