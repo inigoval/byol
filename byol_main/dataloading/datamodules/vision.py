@@ -73,6 +73,37 @@ class Base_DataModule(pl.LightningDataModule):
             self.T_train.n_views = original_T_train_views
 
 
+class FineTuning_DataModule(pl.LightningDataModule):
+    def __init__(self, config):
+        super().__init__()
+
+        # override default paths via config if desired
+        paths = Path_Handler(**config.get("paths_to_override", {}))
+        path_dict = paths._dict()
+        self.path = path_dict[config["dataset"]]
+
+        self.config = config
+
+        self.mu, self.sig = config["data"]["mu"], config["data"]["sig"]
+
+        self.data = {}
+
+    def prepare_data(self):
+        return
+
+    def train_dataloader(self):
+        loader = DataLoader(self.data["train"], **self.config["train_dataloader"])
+        return loader
+
+    def val_dataloader(self):
+        loader = DataLoader(self.data["val"], **self.config["val_dataloader"])
+        return loader
+
+    def test_dataloader(self):
+        loader = DataLoader(self.data["test"], **self.config["val_dataloader"])
+        return loader
+
+
 class STL10_DataModule(Base_DataModule):
     def __init__(self, config):
         norms = _get_imagenet_norms()

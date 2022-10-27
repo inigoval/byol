@@ -24,7 +24,6 @@ class BYOL(Lightning_Eval):
         super().__init__(config)
         self.save_hyperparameters()  # save hyperparameters for easy inference
         self.config = config
-
         self.encoder = _get_backbone(config)
 
         # create a byol model based on ResNet
@@ -43,7 +42,6 @@ class BYOL(Lightning_Eval):
 
         deactivate_requires_grad(self.encoder_momentum)
         deactivate_requires_grad(self.projection_head_momentum)
-
         self.criterion = lightly.loss.NegativeCosineSimilarity()
 
         self.dummy_param = nn.Parameter(torch.empty(0))
@@ -90,6 +88,10 @@ class BYOL(Lightning_Eval):
             self.update_m()
 
     def configure_optimizers(self):
+        self.config["optimizer"]["lr"] = (
+            self.config["optimizer"]["lr"] * self.config["data"]["batch_size"] / 256
+        )
+
         params = (
             list(self.encoder.parameters())
             + list(self.projection_head.parameters())

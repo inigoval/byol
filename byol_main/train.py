@@ -9,8 +9,9 @@ from pytorch_lightning.profiler import AdvancedProfiler, PyTorchProfiler
 from byol_main.byol import BYOL
 from byol_main.mae import MAE
 from byol_main.config import load_config, update_config
-from dataloading.datamodules import datasets
+from dataloading.datamodules import datasets, finetune_datasets
 from paths import Path_Handler, create_path
+from byol_main.evaluation import finetune
 
 from supervised import Supervised
 
@@ -153,16 +154,6 @@ def main():
     wandb.init(project=config["project_name"])
     config["run_id"] = str(wandb.run.id)
 
-    # Initialise wandb logger, change this if you want to use a different logger #
-    # paths = Path_Handler()
-    # path_dict = paths._dict()
-    # wandb_save_dir = path_dict["files"] / 'wandb'  # e.g. (repo aka byol)/files
-    # independent of model checkpoint loc
-
-    # structure will be e.g.
-    # config['files'] / l5ikqywp / checkpoints / {}.ckpt
-    # config['files'] / l5ikqywp / run-20220513_122412-l5ikqywp / (wandb stuff)
-
     path_dict = Path_Handler()._dict()
 
     wandb_logger = pl.loggers.WandbLogger(
@@ -177,6 +168,12 @@ def main():
 
     ## Run pretraining ##
     pretrain_checkpoint, model = run_contrastive_pretraining(config, wandb_logger)
+
+    if config["evaluation"]["finetune"] is True:
+        for seed in range(config["finetune"]["iterations"]):
+            config["finetune"]["seed"] = seed
+            finetune_datamodule = finetune_datasets[config["dataset"]](config)
+            finetune(config, model.encoder, finetune_datamodule, wandb_logger)
 
     wandb_logger.experiment.finish()
 

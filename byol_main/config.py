@@ -73,7 +73,7 @@ def update_config(config):
     # Create unpackable dictionary for training dataloaders
     config["train_dataloader"] = {
         "shuffle": False,
-        "batch_size": config["data"]["pretrain_batch_size"],
+        "batch_size": config["data"]["batch_size"],
         **dataloading,
     }
 
@@ -83,3 +83,10 @@ def update_config(config):
         "batch_size": config["dataloading"]["val_batch_size"],
         **dataloading,
     }
+
+    config["finetune"]["n_classes"] = config["data"]["classes"]
+
+    if config["type"] == "mae":
+        config["finetune"]["dim"] = config["model"]["vit"]["dim"]
+    elif config["type"] == "byol":
+        config["finetune"]["dim"] = config["model"]["features"]

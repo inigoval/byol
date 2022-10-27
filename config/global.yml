@@ -1,7 +1,7 @@
-type: 'mae'
-project_name: 'debug-byol'
-dataset: 'stl10' # ['imagenette', 'rgz', 'gzmnist', 'gz2', 'stl10', 'cifar10']
-debug: True
+type: 'byol'
+project_name: 'BYOL_TestResNet'
+dataset: 'rgz' # ['imagenette', 'rgz', 'gzmnist', 'gz2', 'stl10', 'cifar10']
+debug: False
 seed: 0
 
 dataloading:
@@ -12,6 +12,7 @@ dataloading:
   val_batch_size: 500 # validation batch size
 
 evaluation:
+  finetune: True
   knn_eval: False
   linear_eval: True
   ridge_eval: True
@@ -21,6 +22,14 @@ evaluation:
   n_iterations: 1
   topk: 5
   check_val_every_n_epoch: 5
+
+finetune:
+  seed: 0
+  iterations: 1
+  n_layers: 2 
+  lr_decay: 0.75
+  n_epochs: 100
+  batch_size: 1024
 
 compute: 'slurm'
 precision: 32 # [16, 32, 'bf16'], often overriden

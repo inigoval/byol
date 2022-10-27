@@ -12,7 +12,7 @@ else:
 from PIL import Image
 from torchvision.datasets.utils import download_url, check_integrity
 
-from .vision import Base_DataModule
+from .vision import Base_DataModule, FineTuning_DataModule
 from dataloading.utils import rgz_cut
 from astroaugmentations.datasets.MiraBest_F import MBFRFull, MBFRConfident, MBFRUncertain
 
@@ -29,9 +29,10 @@ class RGZ_DataModule(Base_DataModule):
     def setup(self, stage=None):
 
         # Compute mu and sigma value for data and update normalization constants
-        d_rgz = RGZ108k(self.path, train=True, transform=self.T_train)
-        d_train = d_rgz
-        self.update_transforms(d_train)
+        # No longer needed
+        # d_rgz = RGZ108k(self.path, train=True, transform=self.T_train)
+        # d_train = d_rgz
+        # self.update_transforms(d_train)
 
         # Re-initialise dataset with new mu and sig values
         d_rgz = RGZ108k(self.path, train=True, transform=self.T_train)
@@ -48,13 +49,13 @@ class RGZ_DataModule(Base_DataModule):
         self.data["val"] = [
             ("MB_conf_train", MBFRConfident(**data_dict, train=True)),
             ("MB_conf_test", MBFRConfident(**data_dict, train=False)),
-            ("MB_unc_train", MBFRUncertain(**data_dict, train=True)),
-            ("MB_unc_test", MBFRUncertain(**data_dict, train=False)),
+            # ("MB_unc_train", MBFRUncertain(**data_dict, train=True)),
+            # ("MB_unc_test", MBFRUncertain(**data_dict, train=False)),
         ]
 
         self.data["test"] = [
-            ("MB_unc_test", MBFRUncertain(**data_dict, train=False)),
             ("MB_conf_test", MBFRConfident(**data_dict, train=False)),
+            # ("MB_unc_test", MBFRUncertain(**data_dict, train=False)),
         ]
 
         # List of (name, train_dataset) tuples to train linear evaluation layer
@@ -87,6 +88,59 @@ class RGZ_DataModule(Base_DataModule):
         self.data["test_rgz"] = {"conf": d_conf, "unc": d_unc}
 
         return d_conf
+
+
+class RGZ_DataModule_Finetune(FineTuning_DataModule):
+    def __init__(self, config):
+        super().__init__(config)
+
+        # Cropping
+        center_crop = config["augmentations"]["center_crop_size"]
+        random_crop = config["augmentations"]["random_crop_scale"]
+
+        self.T_train = T.Compose(
+            [
+                T.RandomRotation(180),
+                T.CenterCrop(center_crop),
+                T.RandomResizedCrop(center_crop, scale=random_crop),
+                T.RandomHorizontalFlip(),
+                T.RandomVerticalFlip(),
+                T.ToTensor(),
+                T.Normalize(self.mu, self.sig),
+            ]
+        )
+
+        self.T_test = T.Compose(
+            [
+                T.CenterCrop(center_crop),
+                T.ToTensor(),
+                T.Normalize(self.mu, self.sig),
+            ]
+        )
+
+    def prepare_data(self):
+        MBFRFull(self.path, train=False, download=True)
+        MBFRFull(self.path, train=True, download=True)
+
+    def setup(self, stage=None):
+        data_dict = {
+            "root": self.path,
+            "aug_type": "torchvision",
+            "test_size": self.config["data"]["test_frac"],
+            "seed": self.config["finetune"]["seed"],
+        }
+
+        self.data["train"] = MBFRConfident(**data_dict, train=True, transform=self.T_train)
+        self.data["val"] = MBFRConfident(**data_dict, train=True, transform=self.T_test)
+        self.data["test"] = MBFRConfident(**data_dict, train=False, transform=self.T_test)
+
+        # List of (name, train_dataset) tuples to evaluate linear layer
+        data_dict = {
+            "root": self.path,
+            "transform": self.T_test,
+            "aug_type": "torchvision",
+            "test_size": self.config["data"]["test_frac"],
+        }
 
 
 class RGZ20k(D.Dataset):

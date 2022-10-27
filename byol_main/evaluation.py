@@ -245,30 +245,25 @@ class Linear_Eval_PL(Data_Eval):
 
     """
 
-    def __init__(self, dataset_name, dataloader_idx):
+    def __init__(self, train_data_name, val_list, test_list):
         """
         Args:
             data: Data dictionary containing 'train', 'val', 'test' and 'name' keys.
         """
-        super().__init__(dataset_name, dataloader_idx)
-
-        assert check_unique_list(dataloader_idx["val"])
-        assert check_unique_list(dataloader_idx["test"])
+        super().__init__(train_data_name, val_list, test_list)
 
         self.acc = {
-            "val": {idx: tm.Accuracy(average="micro", threshold=0) for idx in dataloader_idx["val"]},
-            "test": {idx: tm.Accuracy(average="micro", threshold=0) for idx in dataloader_idx["test"]},
+            "val": {val: tm.Accuracy(average="micro", threshold=0) for val in self.val_list},
+            "test": {test: tm.Accuracy(average="micro", threshold=0) for test in self.test_list},
         }
-
-        self.normalize = Normalize(0, 1)
 
     def setup(self, pl_module, data):
         ## Train linear classifier ##
 
         # Enable gradients to train linear model but freeze encoder
         torch.set_grad_enabled(True)
-        freeze_model(pl_module.backbone)
-        pl_module.backbone.eval()
+        freeze_model(pl_module.encoder)
+        pl_module.encoder.eval()
 
         # Calculate mean and std in feature space and save normalization constants
         mean, std = compute_encoded_mu_sig(data, pl_module)
@@ -292,7 +287,7 @@ class Linear_Eval_PL(Data_Eval):
         # Save model
         model.eval()
         self.model = model
-        unfreeze_model(pl_module.backbone)
+        unfreeze_model(pl_module.encoder)
 
         # Could shorten this with recursion but might be less clear
         for acc in self.acc["val"].values():
@@ -301,7 +296,7 @@ class Linear_Eval_PL(Data_Eval):
             acc.reset()
 
     def step(self, pl_module, X, y, dataloader_idx, stage):
-        X = pl_module.backbone(X)
+        X = pl_module.encoder(X)
         X = self.normalize(X)
         preds = self.model(X).detach().cpu()
 
@@ -317,68 +312,128 @@ class Linear_Eval_PL(Data_Eval):
         # pl_module.log(f"{stage}/{self.name}/linear_acc", self.acc.compute())
 
 
-class LogisticRegression(nn.Module):
-    """Logistic regression model."""
+class FineTune(pl.LightningModule):
+    """
+    Parent class for self-supervised LightningModules to perform linear evaluation with multiple
+    data-sets.
+    """
 
     def __init__(
         self,
-        input_dim: int,
-        num_classes: int,
-        bias: bool = True,
-        learning_rate: float = 1e-4,
-        optimizer: Type[Optimizer] = Adam,
-        # l1_strength: float = 0.0,
-        # l2_strength: float = 0.0,
-        **kwargs: Any,
-    ) -> None:
-        """
-        Args:
-            input_dim: number of dimensions of the input (at least 1)
-            num_classes: number of class labels (binary: 2, multi-class: >2)
-            bias: specifies if a constant or intercept should be fitted (equivalent to fit_intercept in sklearn)
-            learning_rate: learning_rate for the optimizer
-            optimizer: the optimizer to use (default: ``Adam``)
-            l1_strength: L1 regularization strength (default: ``0.0``)
-            l2_strength: L2 regularization strength (default: ``0.0``)
-        """
+        encoder,
+        dim,
+        n_classes,
+        n_epochs=100,
+        n_layers=0,
+        batch_size=1024,
+        lr_decay=0.75,
+        seed=0,
+        **kwargs,
+    ):
         super().__init__()
-        self.input_dim = input_dim
-        self.num_classes = num_classes
-        self.bias = bias
-        self.learning_rate = learning_rate
-        # self.l1_strength = l1_strength
-        # self.l2_strength = l2_strength
+        self.n_layers = n_layers
+        self.freeze = True if n_layers == 0 else False
+        self.batch_size = batch_size
+        self.encoder = encoder
+        self.lr_decay = lr_decay
+        self.head = LogisticRegression(input_dim=dim, output_dim=n_classes)
+        self.n_epochs = n_epochs
+        self.seed = seed
 
-        self.linear = nn.Linear(in_features=self.input_dim, out_features=self.num_classes, bias=bias)
-        self.optimizer = optimizer(self.linear.parameters(), lr=self.learning_rate)
+        self.val_acc = tm.Accuracy(average="micro", threshold=0)
+        self.test_acc = tm.Accuracy(average="micro", threshold=0)
 
     def forward(self, x: Tensor) -> Tensor:
-        x = self.linear(x.squeeze())
-        y_hat = softmax(x, dim=-1)
-        return y_hat
+        x = self.encoder(x)
+        x = rearrange(x, "b c h w -> b (c h w)")
+        x = self.head(x)
+        return x
 
-    def training_step(self, x: Tensor, y: Tensor):
-        # Encode & flatten
-        # x = self.encoder(x).squeeze()
+    def on_fit_start(self):
 
-        y_hat = self.linear(x.squeeze())
+        # Log size of data-sets #
+        logging_params = {key: len(value) for key, value in self.trainer.datamodule.data.items()}
+        self.logger.log_hyperparams(logging_params)
 
-        # PyTorch cross_entropy function combines log_softmax and nll_loss in single function
-        loss = F.cross_entropy(y_hat, y, reduction="sum")
+    def training_step(self, batch, batch_idx):
+        # Load data and targets
+        x, y = batch
+        logits = self.forward(x)
+        y_pred = logits.softmax(dim=-1)
+        loss = F.cross_entropy(y_pred, y, label_smoothing=0.1 if self.freeze else 0)
+        self.log("linear_eval/train_loss_{self.seed}", loss, on_step=False, on_epoch=True)
+        return loss
 
-        # # L1 regularizer
-        # if self.l1_strength > 0:
-        #     l1_reg = self.linear.weight.abs().sum()
-        #     loss += self.l1_strength * l1_reg
+    def validation_step(self, batch, batch_idx, dataloader_idx=0):
+        x, y = batch
+        preds = self.forward(x)
+        self.val_acc(preds, y)
+        self.log("finetuning/val_acc_{self.seed}", self.val_acc, on_step=False, on_epoch=True)
 
-        # # L2 regularizer
-        # if self.l2_strength > 0:
-        #     l2_reg = self.linear.weight.pow(2).sum()
-        #     loss += self.l2_strength * l2_reg
+    def test_step(self, batch, batch_idx, dataloader_idx=0):
+        x, y = batch
+        preds = self.forward(x)
+        self.test_acc(preds, y)
+        self.log("finetuning/test_acc_{self.seed}", self.test_acc, on_step=False, on_epoch=True)
 
-        # Normalize loss by number of samples
-        loss /= x.size(0)
+    def configure_optimizers(self):
+        if self.freeze:
+            # Scale base lr=0.1
+            lr = 0.1 * self.batch_size / 256
+            params = self.head.parameters()
+            return torch.optim.SGD(params, momentum=0.9, lr=lr)
+        else:
+            lr = 0.001 * self.batch_size / 256
+            params = [{"params": self.head.parameters(), "lr": lr}]
+            layers = self.encoder.finetuning_layers[::-1]
+            # layers.reverse()
+            assert self.n_layers <= len(
+                layers
+            ), f"Network only has {len(layers)} layers, {self.n_layers} specified for finetuning"
+            for i, layer in enumerate(layers[: self.n_layers]):
+                params.append({"params": layer.parameters(), "lr": lr * (self.lr_decay**i)})
 
-        # Backpropagate and step optimizer
-        loss.backward()
-        self.optimizer.step()
+            opt = torch.optim.AdamW(params, weight_decay=0.05, betas=(0.9, 0.999))
+            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(opt, self.n_epochs)
+            return [opt], [scheduler]
+
+
+def finetune(config, encoder, datamodule, logger):
+
+    checkpoint = pl.callbacks.ModelCheckpoint(
+        monitor=None,
+        every_n_epochs=1,
+        save_on_train_epoch_end=True,
+        auto_insert_metric_name=False,
+        verbose=True,
+        dirpath=config["files"] / config["run_id"] / "finetuning",
+        # e.g. byol/files/(run_id)/checkpoints/12-344-18.134.ckpt.
+        filename="{epoch}",  # filename may not work here TODO
+        save_weights_only=True,
+        # save_top_k=3,
+    )
+
+    trainer_settings = {
+        "slurm": {"gpus": 1, "num_nodes": 1},
+        "gpu": {"devices": 1, "accelerator": "gpu"},
+    }
+    config["trainer_settings"] = trainer_settings[config["compute"]]
+
+    ## Initialise pytorch lightning trainer ##
+    trainer = pl.Trainer(
+        **trainer_settings[config["compute"]],
+        fast_dev_run=config["debug"],
+        max_epochs=config["finetune"]["n_epochs"],
+        logger=logger,
+        deterministic=True,
+        callbacks=[checkpoint],
+        precision=config["precision"],
+    )
+
+    model = FineTune(encoder, **config["finetune"])
+
+    trainer.fit(model, datamodule)
+
+    trainer.test(model)
+
+    return checkpoint, model

@@ -39,6 +39,9 @@ class LogisticRegression(torch.nn.Module):
         return x
 
 
+# class CNN(nn.Module):
+#     def __init__(self):
+
 
 class Classification_Head(nn.Module):
     """
@@ -62,6 +65,7 @@ class Classification_Head(nn.Module):
     def forward(self, x):
         return self.net(x)
 
+
 class Encoder(nn.Module):
     def __init__(self, backbone):
         super().__init__()
@@ -69,6 +73,7 @@ class Encoder(nn.Module):
 
     def forward(self, x):
         return self.encoder(x)
+
 
 def _get_backbone(config):
 
