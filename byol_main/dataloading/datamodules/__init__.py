@@ -7,7 +7,7 @@
 # from .gzmnist import GalaxyMNIST_DataModule, GalaxyMNIST_DataModule_Eval
 
 from .vision import STL10_DataModule, Imagenette_DataModule
-from .rgz import RGZ_DataModule
+from .rgz import RGZ_DataModule, RGZ_DataModule_Finetune
 
 # from .decals_dr5 import Decals_DataModule
 # from .legs import Legs_DataModule
@@ -15,3 +15,8 @@ from .rgz import RGZ_DataModule
 # from .generic_galaxy import Galaxy_DataModule, Galaxy_DataModule_Eval
 
 datasets = {"stl10": STL10_DataModule, "imagenette": Imagenette_DataModule, "rgz": RGZ_DataModule}
+finetune_datasets = {
+    # "stl10": STL10_DataModule,
+    # "imagenette": Imagenette_DataModule,
+    "rgz": RGZ_DataModule_Finetune,
+}
