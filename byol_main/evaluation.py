@@ -64,7 +64,7 @@ class Lightning_Eval(pl.LightningModule):
         for name, data in self.trainer.datamodule.data["eval_train"]:
             if self.config["evaluation"]["linear_eval"]:
                 # Initialise linear eval data-set and run setup with training data
-                lin_eval = Linear_Eval(name, self.val_list, self.test_list)
+                lin_eval = Linear_Eval(self, name, self.val_list, self.test_list)
                 lin_eval.setup(self, data)
 
                 # Add to list of evaluations
@@ -72,7 +72,7 @@ class Lightning_Eval(pl.LightningModule):
 
             if self.config["evaluation"]["ridge_eval"]:
                 # Initialise linear eval data-set and run setup with training data
-                ridge_eval = Ridge_Eval(name, self.val_list, self.test_list)
+                ridge_eval = Ridge_Eval(self, name, self.val_list, self.test_list)
                 ridge_eval.setup(self, data)
 
                 # Add to list of evaluations
@@ -190,14 +190,14 @@ class Linear_Eval(Data_Eval):
 
     """
 
-    def __init__(self, train_data_name, val_list, test_list):
+    def __init__(self, pl_module, train_data_name, val_list, test_list):
         """
         Args:
             data: Data dictionary containing 'train', 'val', 'test' and 'name' keys.
         """
         super().__init__(train_data_name, val_list, test_list)
 
-        self.acc = {
+        pl_module.lin_acc = {
             "val": {val: tm.Accuracy(average="micro", threshold=0) for val in self.val_list},
             "test": {test: tm.Accuracy(average="micro", threshold=0) for test in self.test_list},
         }
@@ -214,9 +214,9 @@ class Linear_Eval(Data_Eval):
             self.model = model
 
         # Could shorten this with recursion but might be less clear
-        for acc in self.acc["val"].values():
+        for acc in pl_module.lin_acc["val"].values():
             acc.reset()
-        for acc in self.acc["test"].values():
+        for acc in pl_module.acc["test"].values():
             acc.reset()
 
     def step(self, pl_module, X, y, val_name, stage):
