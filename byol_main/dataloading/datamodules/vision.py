@@ -53,7 +53,7 @@ class Base_DataModule(pl.LightningDataModule):
                     self.mu, self.sig
                 )
             )
-        elif self.config["debug"]:
+        elif self.config["trainer"]["fast_dev_run"]:
             logging.info("Skipping mu/sig calculation - debug mode")
 
         else:

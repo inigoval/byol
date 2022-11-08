@@ -1,4 +1,5 @@
 import logging
+from typing import Type, Any, Callable, Union, List, Optional
 
 import torch
 import matplotlib.pyplot as plt
@@ -86,51 +87,59 @@ def unfreeze_model(model):
     # model.train()
 
 
-def _optimizer(params, config):
-    lr = config["optimizer"]["lr"]
+def _scheduler(
+    opt: Optimizer,
+    n_epochs: int,
+    decay_type: str = "warmupcosine",
+    warmup_epochs: int = 10,
+):
 
-    # sgd only
-    mom = config["optimizer"]["momentum"]
-    w_decay = config["optimizer"]["weight_decay"]
+    if decay_type == "cosine":
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(opt, n_epochs)
+        return scheduler
 
-    betas = (config.get("beta_1", 0.9), config.get("beta_2", 0.999))
+    elif decay_type == "warmupcosine":
+        scheduler = LinearWarmupCosineAnnealingLR(
+            opt,
+            warmup_epochs,
+            max_epochs=n_epochs,
+        )
+        return scheduler
+
+    else:
+        raise ValueError(decay_type)
+
+
+def _optimizer(
+    params,
+    type: str = "sgd",
+    lr: float = 0.2,
+    momentum: float = 0.9,
+    weight_decay: float = 0.0000015,
+    beta_1: float = 0.9,
+    beta_2: float = 0.999,
+    **kwargs,
+):
+
+    betas = (beta_1, beta_2)
 
     # for adam, lr is the step size and is modified by exp. moving av. of prev. gradients
     opts = {
-        "adam": lambda p: torch.optim.Adam(p, lr=lr, betas=betas, weight_decay=w_decay),
-        "adamw": lambda p: torch.optim.AdamW(p, lr=lr, betas=betas, weight_decay=w_decay),
-        "sgd": lambda p: torch.optim.SGD(
-            p,
-            lr=lr,
-            momentum=mom,
-            weight_decay=w_decay,
-        ),
+        "adam": lambda p: torch.optim.Adam(p, lr=lr, betas=betas, weight_decay=weight_decay),
+        "adamw": lambda p: torch.optim.AdamW(p, lr=lr, betas=betas, weight_decay=weight_decay),
+        "sgd": lambda p: torch.optim.SGD(p, lr=lr, momentum=momentum, weight_decay=weight_decay),
     }
 
-    if config["optimizer"]["type"] == "adam" and config["optimizer"]["lr"] > 0.01:
-        logging.warning("Learning rate {} may be too high for adam".format(config["lr"]))
+    if type == "adam" and lr > 0.01:
+        logging.warning(f"Learning rate {lr} may be too high for adam")
 
-    opt = opts[config["optimizer"]["type"]](params)
+    opt = opts[type](params)
+
+    return opt
 
     # Apply LARS wrapper if option is chosen
-    if config["optimizer"]["lars"]:
-        opt = LARSWrapper(opt, eta=config["optimizer"]["trust_coef"])
-
-    # pick scheduler
-    if config["scheduler"]["type"] == "cosine":
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(opt, config["model"]["n_epochs"])
-        return [opt], [scheduler]
-    elif config["scheduler"]["type"] == "warmupcosine":
-        scheduler = LinearWarmupCosineAnnealingLR(
-            opt,
-            config["scheduler"]["warmup_epochs"],
-            max_epochs=config["model"]["n_epochs"],
-        )
-        return [opt], [scheduler]
-    elif config["scheduler"]["type"].lower() == "none":
-        return opt
-    else:
-        raise ValueError(config["scheduler"]["type"])
+    # if config["optimizer"]["lars"]:
+    #     opt = LARSWrapper(opt, eta=config["optimizer"]["trust_coef"])
 
 
 def embed_dataset(encoder, data, batch_size=200):

@@ -6,7 +6,7 @@ import copy
 
 import logging
 from math import cos, pi
-from byol_main.utilities import _optimizer
+from byol_main.utilities import _optimizer, _scheduler
 from lightly.models.modules.heads import BYOLProjectionHead
 from lightly.models.utils import deactivate_requires_grad
 from lightly.models.utils import update_momentum
@@ -14,21 +14,24 @@ from pytorch_lightning.callbacks import Callback
 
 from zoobot.pytorch.estimators import efficientnet_custom, custom_layers
 from zoobot.pytorch.training import losses
+from architectures.resnet import _get_resnet
 
 from byol_main.evaluation import Lightning_Eval
-from byol_main.networks.models import _get_backbone
+
+# from byol_main.networks.models import _get_backbone
 
 
 class BYOL(Lightning_Eval):
     def __init__(self, config):
         super().__init__(config)
-        self.save_hyperparameters()  # save hyperparameters for easy inference
         self.config = config
-        self.encoder = _get_backbone(config)
+        self.save_hyperparameters()  # save hyperparameters for easy inference
+        self.encoder = _get_resnet(**self.config["model"]["architecture"])
+        self.encoder.dim = self.encoder.features
 
         # create a byol model based on ResNet
-        features = self.config["model"]["features"]
-        proj = self.config["projection_head"]
+        features = self.config["model"]["architecture"]["features"]
+        proj = self.config["model"]["projection_head"]
         # these are both basically small dense networks of different sizes
         # architecture is: linear w/ relu, batch-norm, linear
         # by default: representation (features)=512, hidden (both heads)=1024, out=256
@@ -46,7 +49,7 @@ class BYOL(Lightning_Eval):
 
         self.dummy_param = nn.Parameter(torch.empty(0))
 
-        self.m = config["model"]["m"]
+        self.m = self.config["model"]["m"]
 
     def forward(self, x):
         return self.encoder(x)  # dimension (batch, features), features from config e.g. 512
@@ -88,9 +91,8 @@ class BYOL(Lightning_Eval):
             self.update_m()
 
     def configure_optimizers(self):
-        self.config["optimizer"]["lr"] = (
-            self.config["optimizer"]["lr"] * self.config["data"]["batch_size"] / 256
-        )
+        # Scale learning rate with batch size
+        self.config["model"]["optimizer"]["lr"] *= self.config["model"]["optimizer"]["batch_size"] / 256
 
         params = (
             list(self.encoder.parameters())
@@ -98,12 +100,20 @@ class BYOL(Lightning_Eval):
             + list(self.prediction_head.parameters())
         )
 
-        return _optimizer(params, self.config)
+        opt = _optimizer(params, **self.config["model"]["optimizer"])
+
+        if self.config["model"]["scheduler"]["decay_type"].lower() == "none":
+            return opt
+        else:
+            scheduler = _scheduler(
+                opt, self.config["model"]["n_epochs"], **self.config["model"]["scheduler"]
+            )
+            return [opt], [scheduler]
 
     def update_m(self):
         with torch.no_grad():
             epoch = self.current_epoch
-            n_epochs = self.config["model"]["n_epochs"]
+            n_epochs = self.config["model"]["model"]["n_epochs"]
             self.m = 1 - (1 - self.m) * (cos(pi * epoch / n_epochs) + 1) / 2
 
 

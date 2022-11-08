@@ -50,7 +50,7 @@ class Base_DataModule(pl.LightningDataModule):
                     self.mu, self.sig
                 )
             )
-        elif self.config["debug"]:
+        elif self.config["trainer"]["fast_dev_run"]:
             logging.info("Skipping mu/sig calculation - debug mode")
 
         else:
@@ -126,7 +126,7 @@ class Base_DataModule_Eval(pl.LightningDataModule):
         return loader
 
     def update_transforms(self, D_train):
-        if not self.config["debug"]:
+        if not self.config["trainer"]["fast_dev_run"]:
             mu, sig = compute_mu_sig_features(D_train)
             self.mu, self.sig = mu, sig
             logging.info("Set mu {:3.2f}, sig {:3.2f}".format(self.mu, self.sig))
@@ -191,7 +191,7 @@ class Base_DataModule_Supervised(pl.LightningDataModule):
         return loader
 
     def update_transforms(self, D_train):
-        if not self.config["debug"]:
+        if not self.config["trainer"]["fast_dev_run"]:
             mu, sig = compute_mu_sig_images(D_train, batch_size=1000)
             self.mu, self.sig = mu, sig
 

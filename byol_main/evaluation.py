@@ -32,7 +32,6 @@ class Lightning_Eval(pl.LightningModule):
 
     def __init__(self, config):
         super().__init__()
-        self.config = config
 
     def on_fit_start(self):
         self.config["data"]["mu"] = self.trainer.datamodule.mu
@@ -50,7 +49,7 @@ class Lightning_Eval(pl.LightningModule):
 
         self.logger.log_hyperparams(logging_params)
 
-        if not self.config["debug"] and self.config["type"] != "mae":
+        if not self.config["trainer"]["fast_dev_run"] and self.config["type"] != "mae":
             log_examples(self.logger, self.trainer.datamodule.data["train"])
 
     def on_validation_start(self):
@@ -361,7 +360,7 @@ class FineTune(pl.LightningModule):
         logits = self.forward(x)
         y_pred = logits.softmax(dim=-1)
         loss = F.cross_entropy(y_pred, y, label_smoothing=0.1 if self.freeze else 0)
-        self.log("linear_eval/train_loss_{self.seed}", loss, on_step=False, on_epoch=True)
+        self.log("finetune/train_loss_{self.seed}", loss, on_step=False, on_epoch=True)
         return loss
 
     def validation_step(self, batch, batch_idx, dataloader_idx=0):
@@ -422,7 +421,7 @@ def finetune(config, encoder, datamodule, logger):
     ## Initialise pytorch lightning trainer ##
     trainer = pl.Trainer(
         **trainer_settings[config["compute"]],
-        fast_dev_run=config["debug"],
+        fast_dev_run=config["trainer"]["fast_dev_run"],
         max_epochs=config["finetune"]["n_epochs"],
         logger=logger,
         deterministic=True,

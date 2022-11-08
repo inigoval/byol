@@ -84,9 +84,11 @@ def update_config(config):
         **dataloading,
     }
 
-    config["finetune"]["n_classes"] = config["data"]["classes"]
+    config["model"]["optimizer"]["batch_size"] = config["data"]["batch_size"]
 
-    if config["type"] == "mae":
-        config["finetune"]["dim"] = config["model"]["vit"]["dim"]
-    elif config["type"] == "byol":
-        config["finetune"]["dim"] = config["model"]["features"]
+    # Set finetuning config to values from rest of config
+    config["model"]["architecture"]["n_c"] = config["data"]["color_channels"]
+    config["finetune"]["n_classes"] = config["data"]["classes"]
+    config["finetune"]["dim"] = config["model"]["architecture"]["features"]
+    # if config["type"] == "mae":
+    #     config["finetune"]["dim"] = config["model"]["vit"]["dim"]

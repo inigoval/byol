@@ -11,7 +11,8 @@ from byol_main.mae import MAE
 from byol_main.config import load_config, update_config
 from dataloading.datamodules import datasets, finetune_datasets
 from paths import Path_Handler, create_path
-from byol_main.evaluation import finetune
+
+from finetune.finetune import run_finetuning
 
 from supervised import Supervised
 
@@ -49,23 +50,23 @@ def run_contrastive_pretraining(config, wandb_logger):
         "min_loss": {"mode": "min", "monitor": loss_to_monitor},
         "last": {"monitor": None},
     }
-
     ## Creates experiment path if it doesn't exist already ##
     experiment_dir = config["files"] / config["run_id"]
     create_path(experiment_dir)
 
     ## Initialise checkpoint ##
     pretrain_checkpoint = pl.callbacks.ModelCheckpoint(
-        **checkpoint_mode[config["evaluation"]["checkpoint_mode"]],
+        # **checkpoint_mode[config["evaluation"]["checkpoint_mode"]],
+        monitor=None,
         every_n_epochs=1,
         save_on_train_epoch_end=True,
         auto_insert_metric_name=False,
         verbose=True,
         dirpath=experiment_dir / "checkpoints",
         # e.g. byol/files/(run_id)/checkpoints/12-344-18.134.ckpt.
-        filename="{epoch}-{step}-{loss_to_monitor:.4f}",  # filename may not work here TODO
+        # filename="{epoch}-{step}-{loss_to_monitor:.4f}",  # filename may not work here TODO
+        filename="model",
         save_weights_only=True,
-        # save_top_k=3,
     )
     logging.info(f"checkpoint monitoring: {checkpoint_mode[config['evaluation']['checkpoint_mode']]}")
 
@@ -100,26 +101,13 @@ def run_contrastive_pretraining(config, wandb_logger):
 
     logging.info(f"Threads: {torch.get_num_threads()}")
 
-    # TODO could probably be directly included in config rather than config['compute'] indexing this
-    # This has been written like this so that you only need to change one setting in the config for
-    # swapping between slurm and direct on gpu
-    trainer_settings = {
-        "slurm": {"gpus": 1, "num_nodes": 1},
-        "gpu": {"devices": 1, "accelerator": "gpu"},
-    }
-    config["trainer_settings"] = trainer_settings[config["compute"]]
-
     ## Initialise pytorch lightning trainer ##
     pre_trainer = pl.Trainer(
-        # gpus=1,
-        **trainer_settings[config["compute"]],
-        fast_dev_run=config["debug"],
-        max_epochs=config["model"]["n_epochs"],  # note that this will affect momentum of BYOL ensemble!
-        logger=wandb_logger,
-        deterministic=True,
-        callbacks=callbacks,
-        precision=config["precision"],
+        **config["trainer"],
+        max_epochs=config["model"]["n_epochs"],
         check_val_every_n_epoch=config["evaluation"]["check_val_every_n_epoch"],
+        logger=wandb_logger,
+        callbacks=callbacks,
         log_every_n_steps=200,
         profiler=profiler,
         # max_steps = 200  # TODO temp
@@ -158,9 +146,10 @@ def main():
 
     wandb_logger = pl.loggers.WandbLogger(
         project=config["project_name"],
-        save_dir=path_dict["files"]
-        / config["run_id"],  # and will then add e.g. run-20220513_122412-l5ikqywp automatically
-        reinit=True,
+        # and will then add e.g. run-20220513_122412-l5ikqywp automatically
+        save_dir=path_dict["files"] / config["run_id"],
+        log_model="True",
+        # reinit=True,
         config=config,
     )
 
@@ -169,11 +158,9 @@ def main():
     ## Run pretraining ##
     pretrain_checkpoint, model = run_contrastive_pretraining(config, wandb_logger)
 
-    if config["evaluation"]["finetune"] is True:
-        for seed in range(config["finetune"]["iterations"]):
-            config["finetune"]["seed"] = seed
-            finetune_datamodule = finetune_datasets[config["dataset"]](config)
-            finetune(config, model.encoder, finetune_datamodule, wandb_logger)
+    if config["evaluation"]["finetune"] is True and not config["trainer"]["fast_dev_run"]:
+        finetune_datamodule = finetune_datasets[config["dataset"]](config)
+        run_finetuning(config, model.encoder, finetune_datamodule, wandb_logger)
 
     wandb_logger.experiment.finish()
 
