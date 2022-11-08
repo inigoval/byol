@@ -122,7 +122,7 @@ def rgz_cut(rgz_dset, threshold, mb_cut=True, remove_duplicates=False):
 
 
 def dset2tens(dset):
-    """Return a tuple (x, y) containing the entire input dataset (carefuwith large datasets)"""
+    """Return a tuple (x, y) containing the entire input dataset (careful with large datasets)"""
     return next(iter(DataLoader(dset, int(len(dset)))))
 
 
