@@ -355,26 +355,39 @@ def _rgz_view(config):
     # blur = LightlyGaussianBlur(blur_kernel, prob=p_blur)
 
     # Cropping
-    center_crop = config["augmentations"]["center_crop_size"]
-    random_crop = config["augmentations"]["random_crop_scale"]
 
-    # Color jitter
-    s = config["augmentations"]["s"]
-    color_jitter = T.ColorJitter(0.8 * s, 0.8 * s, 0.8 * s, 0)
+    # Create augmentation pipeline, use config to ablate if needed
+    augs = []
+    if config["augmentations"]["rotation"]:
+        augs.append(T.RandomRotation(180))
 
-    # Define a view
-    view = T.Compose(
-        [
-            T.RandomRotation(180),
-            T.CenterCrop(center_crop),
-            T.RandomResizedCrop(center_crop, scale=random_crop),
-            T.RandomHorizontalFlip(),
-            T.RandomVerticalFlip(),
-            T.RandomApply([color_jitter], p=0.8),
-            # blur,
-            T.ToTensor(),
-        ]
-    )
+    if config["augmentations"]["center_crop"]:
+        center_crop = config["augmentations"]["center_crop_size"]
+        augs.append(T.CenterCrop(center_crop))
+    else:
+        # Make sure random crop still has an argument if center crop isn't used
+        center_crop = config["data"]["input_height"]
+
+    if config["augmentations"]["random_crop"]:
+        random_crop = config["augmentations"]["random_crop_scale"]
+        augs.append(T.RandomResizedCrop(center_crop, scale=random_crop))
+
+    if config["augmentations"]["flip"]:
+        augs.append(T.RandomHorizontalFlip())
+        augs.append(T.RandomVerticalFlip())
+
+    if config["augmentations"]["s"]:
+        s = config["augmentations"]["s"]
+        color_jitter = T.ColorJitter(0.8 * s, 0.8 * s, 0.8 * s, 0)
+        augs.append(T.RandomApply([color_jitter], p=0.8))
+
+    if config["augmentations"]["p_blur"]:
+        p_blur = config["augmentations"]["p_blur"]
+        augs.append(T.RandomApply([T.GaussianBlur(_blur_kernel(center_crop))], p=p_blur))
+
+    augs.append(T.ToTensor())
+
+    view = T.Compose(augs)
 
     return view
 
