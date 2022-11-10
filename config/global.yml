@@ -1,8 +1,7 @@
 type: 'byol'
-project_name: 'BYOL_TestResNet'
+project_name: 'BYOL_AblateAugs'
 dataset: 'rgz' # ['imagenette', 'rgz', 'gzmnist', 'gz2', 'stl10', 'cifar10']
 seed: 0
-n_epochs: 1
 
 dataloading:
   num_workers: 8  # often overriden
@@ -15,20 +14,20 @@ evaluation:
   finetune: True
   knn_eval: False
   linear_eval: True
-  ridge_eval: True
+  ridge_eval: False
   n_eval_epochs: 1
   checkpoint_mode: 'last'
   early_stopping: False
   n_iterations: 1
   topk: 5
-  check_val_every_n_epoch: 5
+  check_val_every_n_epoch: 20
 
 finetune:
   seed: 0
-  n_layers: 2 
+  n_layers: 0 
   lr_decay: 0.75
   n_epochs: 200
-  batch_size: 1024
+  batch_size: 100
 
 compute: 'slurm'
 precision: 32 # [16, 32, 'bf16'], often overriden

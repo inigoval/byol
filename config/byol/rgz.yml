@@ -1,16 +1,16 @@
 preset: 'none'
 
 model:
-    n_epochs: 1000
+    n_epochs: 500
     m: 0.996 # Controls EMA hyperparameter for BYOL momentum encoder
     m_decay: False
 
     architecture:
-        preset: 'resnet34' # ['resnet18', 'resnet34', 'resnet50', 'none']
+        preset: 'none' # ['resnet18', 'resnet34', 'resnet50', 'none']
         features: 512     # Number of encoded features (null just uses original resnet output)
         downscale: True
         block_type: 'basic'
-        layers: !!python/tuple [1, 2, 2, 1]
+        layers: !!python/tuple [3, 3, 4, 2]
 
     projection_head:
         hidden: 512
@@ -53,7 +53,10 @@ linear:
 augmentations:
   center_crop_size: 80
   random_crop_scale: !!python/tuple [0.8, 1]
-  p_radio: 0.5
-  p_blur: 0
-  s: 0.5
-  p_aug: 0.5
+
+  s: 0 # Set to 0 to disable
+  rotation: False
+  center_crop: True
+  random_crop: True
+  flip: False
+  p_blur: 0 #set to 0 to disable blurring
