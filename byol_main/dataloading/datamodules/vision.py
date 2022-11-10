@@ -92,15 +92,33 @@ class FineTuning_DataModule(pl.LightningDataModule):
         return
 
     def train_dataloader(self):
-        loader = DataLoader(self.data["train"], **self.config["train_dataloader"])
+        loader = DataLoader(
+            self.data["train"],
+            batch_size=self.config["finetune"]["batch_size"],
+            num_workers=8,
+            prefetch_factor=30,
+            shuffle=True,
+        )
         return loader
 
     def val_dataloader(self):
-        loader = DataLoader(self.data["val"], **self.config["val_dataloader"])
+        loader = DataLoader(
+            self.data["val"],
+            batch_size=200,
+            num_workers=8,
+            prefetch_factor=30,
+            shuffle=False,
+        )
         return loader
 
     def test_dataloader(self):
-        loader = DataLoader(self.data["test"], **self.config["val_dataloader"])
+        loader = DataLoader(
+            self.data["test"],
+            batch_size=200,
+            num_workers=8,
+            prefetch_factor=30,
+            shuffle=False,
+        )
         return loader
 
 

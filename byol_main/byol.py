@@ -33,8 +33,7 @@ class BYOL(Lightning_Eval):
         features = self.config["model"]["architecture"]["features"]
         proj = self.config["model"]["projection_head"]
         # these are both basically small dense networks of different sizes
-        # architecture is: linear w/ relu, batch-norm, linear
-        # by default: representation (features)=512, hidden (both heads)=1024, out=256
+        # architecture is: linear w/ relu, batch-norm, linear by default: representation (features)=512, hidden (both heads)=1024, out=256
         # so projection_head is 512->1024,relu/BN,1024->256
         # and prediction_head is 256->1024,relu/BN,1024->256
         self.projection_head = BYOLProjectionHead(features, proj["hidden"], proj["out"])

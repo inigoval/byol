@@ -126,21 +126,13 @@ class RGZ_DataModule_Finetune(FineTuning_DataModule):
         data_dict = {
             "root": self.path,
             "aug_type": "torchvision",
-            "test_size": self.config["data"]["test_frac"],
+            "test_size": self.config["finetune"]["test_frac"],
             "seed": self.config["finetune"]["seed"],
         }
 
         self.data["train"] = MBFRConfident(**data_dict, train=True, transform=self.T_train)
         self.data["val"] = MBFRConfident(**data_dict, train=True, transform=self.T_test)
         self.data["test"] = MBFRConfident(**data_dict, train=False, transform=self.T_test)
-
-        # List of (name, train_dataset) tuples to evaluate linear layer
-        data_dict = {
-            "root": self.path,
-            "transform": self.T_test,
-            "aug_type": "torchvision",
-            "test_size": self.config["data"]["test_frac"],
-        }
 
 
 class RGZ20k(D.Dataset):
