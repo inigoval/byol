@@ -63,6 +63,7 @@ def run_contrastive_pretraining(config, wandb_logger):
         auto_insert_metric_name=False,
         verbose=True,
         dirpath=experiment_dir / "checkpoints",
+        save_last=True,
         # e.g. byol/files/(run_id)/checkpoints/12-344-18.134.ckpt.
         # filename="{epoch}-{step}-{loss_to_monitor:.4f}",  # filename may not work here TODO
         filename="model",
@@ -148,7 +149,7 @@ def main():
         project=config["project_name"],
         # and will then add e.g. run-20220513_122412-l5ikqywp automatically
         save_dir=path_dict["files"] / config["run_id"],
-        log_model="True",
+        # log_model="True",
         # reinit=True,
         config=config,
     )
@@ -157,6 +158,9 @@ def main():
 
     ## Run pretraining ##
     pretrain_checkpoint, model = run_contrastive_pretraining(config, wandb_logger)
+
+    wandb.save(pretrain_checkpoint.best_model_path)
+    # wadnb.save()
 
     if config["evaluation"]["finetune"] is True and not config["trainer"]["fast_dev_run"]:
         finetune_datamodule = finetune_datasets[config["dataset"]](config)
