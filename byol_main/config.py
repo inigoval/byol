@@ -92,3 +92,21 @@ def update_config(config):
     config["finetune"]["dim"] = config["model"]["architecture"]["features"]
     # if config["type"] == "mae":
     #     config["finetune"]["dim"] = config["model"]["vit"]["dim"]
+
+
+def load_config_finetune():
+    """Helper function to load yaml config file, convert to python dictionary and return."""
+
+    path = path_dict["config"] / "finetune.yml"
+
+    # load data-set specific config
+    with open(path, "r") as ymlconfig:
+        config = yaml.load(ymlconfig, Loader=yaml.FullLoader)
+
+        # if loading a benchmark, use load the specific config
+        # if (preset := config["finetune"]["preset"]) != "none":
+        path = path_dict["config"] / "finetune.yml"
+        with open(path, "r") as ymlconfig:
+            config = yaml.load(ymlconfig, Loader=yaml.FullLoader)
+
+    return config
