@@ -4,11 +4,11 @@ import pytorch_lightning as pl
 from torch.utils.data import DataLoader
 from torchvision.datasets import ImageFolder
 
-from byol_main.dataloading.utils import compute_mu_sig_features, compute_mu_sig_images
+from byol_main.dataloading.utils import compute_mu_sig_images
 from dataloading.utils import _get_imagenet_norms
 from torchvision.datasets import STL10
 from byol_main.paths import Path_Handler
-from byol_main.dataloading.transforms import ReduceView, MultiView, SimpleView, SupervisedView
+from byol_main.dataloading.transforms import MultiView, SimpleView, MAEView, _train_view
 
 
 class Base_DataModule(pl.LightningDataModule):
@@ -24,7 +24,8 @@ class Base_DataModule(pl.LightningDataModule):
 
         self.mu, self.sig = mu, sig
 
-        self.T_train = MultiView(config, mu=self.mu, sig=self.sig)
+        self.T_train = _train_view(config)(config, mu=self.mu, sig=self.sig)
+
         self.T_test = SimpleView(config, mu=self.mu, sig=self.sig)
 
         self.data = {}
@@ -52,7 +53,7 @@ class Base_DataModule(pl.LightningDataModule):
                     self.mu, self.sig
                 )
             )
-        elif self.config["debug"]:
+        elif self.config["trainer"]["fast_dev_run"]:
             logging.info("Skipping mu/sig calculation - debug mode")
 
         else:
@@ -70,6 +71,55 @@ class Base_DataModule(pl.LightningDataModule):
 
             # restore to normal 2-view mode (assumed the only sensible option)
             self.T_train.n_views = original_T_train_views
+
+
+class FineTuning_DataModule(pl.LightningDataModule):
+    def __init__(self, config):
+        super().__init__()
+
+        # override default paths via config if desired
+        paths = Path_Handler(**config.get("paths_to_override", {}))
+        path_dict = paths._dict()
+        self.path = path_dict[config["dataset"]]
+
+        self.config = config
+
+        self.mu, self.sig = config["data"]["mu"], config["data"]["sig"]
+
+        self.data = {}
+
+    def prepare_data(self):
+        return
+
+    def train_dataloader(self):
+        loader = DataLoader(
+            self.data["train"],
+            batch_size=self.config["finetune"]["batch_size"],
+            num_workers=8,
+            prefetch_factor=30,
+            shuffle=True,
+        )
+        return loader
+
+    def val_dataloader(self):
+        loader = DataLoader(
+            self.data["val"],
+            batch_size=200,
+            num_workers=8,
+            prefetch_factor=30,
+            shuffle=False,
+        )
+        return loader
+
+    def test_dataloader(self):
+        loader = DataLoader(
+            self.data["test"],
+            batch_size=200,
+            num_workers=8,
+            prefetch_factor=30,
+            shuffle=False,
+        )
+        return loader
 
 
 class STL10_DataModule(Base_DataModule):
@@ -94,12 +144,11 @@ class STL10_DataModule(Base_DataModule):
             ("STL10_test", STL10(root=self.path, split="test", transform=self.T_test)),
         ]
 
-        # List of (name, train_dataset, dataloader_idx_dict) tuples to train linear evaluation layer, dataloader_idx is a dictionary specifying which of the train/validaiton dataloaders to use for evaluation
+        # List of (name, train_dataset) tuples to train linear evaluation layer
         self.data["eval_train"] = [
             (
                 "STl10_train",
                 STL10(root=self.path, split="train", transform=self.T_test),
-                {"val": (0, 1), "test": (0,)},
             ),
         ]
 
@@ -122,7 +171,7 @@ class Imagenette_DataModule(Base_DataModule):
             ("imagenette_val", ImageFolder(self.path / "val", transform=self.T_test)),
         ]
 
-        # List of (name, train_dataset, dataloader_idx_dict) tuples to train linear evaluation layer, dataloader_idx is a dictionary specifying which of the train/validaiton dataloaders to use for evaluation
+        # List of (name, train_dataset) tuples to train linear evaluation layer
         self.data["eval_train"] = [
             (
                 "imagenette_train",

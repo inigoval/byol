@@ -27,7 +27,7 @@ class Supervised(
         self.save_hyperparameters()  # save hyperparameters for easy inference
         self.config = config
 
-        self.backbone = build_net(config)
+        self.encoder = build_net(config)
         self.head = nn.Linear(config["model"]["features"], config["data"]["classes"])
 
         # create a byol model based on ResNet
@@ -44,10 +44,10 @@ class Supervised(
 
     def forward(self, x):
         # dimension (batch, features), features from config e.g. 512
-        return self.backbone(x)
+        return self.encoder(x)
 
     def predict(self, x):
-        x = self.backbone(x).squeeze()
+        x = self.encoder(x).squeeze()
         x = self.head(x)
         x = F.softmax(x, dim=-1)
         return x
@@ -105,7 +105,7 @@ class Supervised(
         self.acc_val.reset()
 
     def configure_optimizers(self):
-        params = list(self.backbone.parameters()) + list(self.head.parameters())
+        params = list(self.encoder.parameters()) + list(self.head.parameters())
 
         return _optimizer(params, self.config)
 

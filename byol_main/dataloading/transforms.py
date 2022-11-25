@@ -51,8 +51,8 @@ class MultiView(nn.Module):
 
         # Define a view
         self.view = self._view()  # creates a callable transform
-        # self.normalize = T.Normalize(mu, sig)
-        self.normalize = lambda x: x  # TODO temporarily disable normalisation (see also SimpleView)
+        self.normalize = T.Normalize(mu, sig)
+        # self.normalize = lambda x: x  # TODO temporarily disable normalisation (see also SimpleView)
         self.n_views = n_views
 
     def __call__(self, x):
@@ -92,6 +92,47 @@ class MultiView(nn.Module):
         self.normalize = T.Normalize(mu, sig)
 
 
+class MAEView(nn.Module):
+    def __init__(self, config, mu=(0,), sig=(1,)):
+        super().__init__()
+        self.config = config
+
+        augs = []
+        # if config['dataset'] == 'gz2':  # is a tensor, needs to be a PIL to later call T.ToTensor
+        #     augs.append(T.ToPILImage())
+
+        if config["data"]["rotate"]:
+            augs.append(A.Rotate(limit=180))
+
+        input_height = config["data"]["input_height"]
+        augs.append(A.Resize(input_height, input_height))
+
+        if config["augmentations"]["center_crop_size"]:
+            crop_size = config["augmentations"]["center_crop_size"]
+            augs.append(A.CenterCrop(crop_size, crop_size))
+            input_height = crop_size
+
+        augs.append(
+            A.RandomResizedCrop(
+                input_height, input_height, scale=config["augmentations"]["random_crop_scale"]
+            )
+        )
+
+        self.view = _img_transform(augs)
+        self.n_views = 1
+        self.normalize = _img_transform([A.Normalize(mean=mu, std=sig), ToTensorV2()])
+        # self.normalize = lambda x: x  # TODO temporarily disable normalisation (see also MultiView)
+
+    def __call__(self, x):
+        x = np.array(x)
+        x = self.view(x)
+        x = self.normalize(x)
+        return x
+
+    def update_normalization(self, mu, sig):
+        self.normalize = _img_transform([A.Normalize(mean=mu, std=sig), ToTensorV2()])
+
+
 class SimpleView(nn.Module):
     def __init__(self, config, mu=(0,), sig=(1,)):
         super().__init__()
@@ -112,8 +153,8 @@ class SimpleView(nn.Module):
         augs.append(T.ToTensor())
         self.view = T.Compose(augs)
 
-        # self.normalize = T.Normalize(mu, sig)
-        self.normalize = lambda x: x  # TODO temporarily disable normalisation (see also MultiView)
+        self.normalize = T.Normalize(mu, sig)
+        # self.normalize = lambda x: x  # TODO temporarily disable normalisation (see also MultiView)
 
     def __call__(self, x):
         # Use rotation if training
@@ -307,125 +348,48 @@ def _zoobot_default_view(config):
 
 
 def _rgz_view(config):
-    if config["augmentations"]["type"] == "simclr":
 
-        # Gaussian blurring
-        # blur_kernel = config["blur_kernel"]
-        # input_height = config["center_crop_size"]
-        # blur_kernel = _blur_kernel(input_height)
-        blur_kernel = 3
-        # blur_sig = config["blur_sig"]
-        p_blur = config["augmentations"]["p_blur"]
-        blur = LightlyGaussianBlur(blur_kernel, prob=p_blur)
-        # blur = T.GaussianBlur(blur_kernel, sigma=blur_sig)
+    # Gaussian blurring
+    # blur_kernel = config["blur_kernel"]
+    # p_blur = config["augmentations"]["p_blur"]
+    # blur = LightlyGaussianBlur(blur_kernel, prob=p_blur)
 
-        # Cropping
+    # Cropping
+
+    # Create augmentation pipeline, use config to ablate if needed
+    augs = []
+    if config["augmentations"]["rotation"]:
+        augs.append(T.RandomRotation(180))
+
+    if config["augmentations"]["center_crop"]:
         center_crop = config["augmentations"]["center_crop_size"]
-        random_crop = config["augmentations"]["random_crop_scale"]
+        augs.append(T.CenterCrop(center_crop))
+    else:
+        # Make sure random crop still has an argument if center crop isn't used
+        center_crop = config["data"]["input_height"]
 
-        # Color jitter
+    if config["augmentations"]["random_crop"]:
+        random_crop = config["augmentations"]["random_crop_scale"]
+        augs.append(T.RandomResizedCrop(center_crop, scale=random_crop))
+
+    if config["augmentations"]["flip"]:
+        augs.append(T.RandomHorizontalFlip())
+        augs.append(T.RandomVerticalFlip())
+
+    if config["augmentations"]["s"]:
         s = config["augmentations"]["s"]
         color_jitter = T.ColorJitter(0.8 * s, 0.8 * s, 0.8 * s, 0)
+        augs.append(T.RandomApply([color_jitter], p=0.8))
 
-        # Define a view
-        view = T.Compose(
-            [
-                T.RandomRotation(180),
-                T.CenterCrop(center_crop),
-                T.RandomResizedCrop(center_crop, scale=random_crop),
-                T.RandomHorizontalFlip(),
-                T.RandomVerticalFlip(),
-                T.RandomApply([color_jitter], p=0.8),
-                blur,
-                T.ToTensor(),
-            ]
-        )
+    if config["augmentations"]["p_blur"]:
+        p_blur = config["augmentations"]["p_blur"]
+        augs.append(T.RandomApply([T.GaussianBlur(_blur_kernel(center_crop))], p=p_blur))
 
-        return view
+    augs.append(T.ToTensor())
 
-    elif config["augmentations"]["type"] == "astroaug":
+    view = T.Compose(augs)
 
-        paths = Path_Handler()
-        path_dict = paths._dict()
-        kernel_path = path_dict["main"] / "dataloading" / "FIRST_kernel.npy"
-        kernel = np.load(kernel_path)
-
-        p = config["augmentations"]["p_aug"]
-
-        # Cropping
-        center_crop = config["augmentations"]["center_crop_size"]
-        # random_crop = config["random_crop_scale"]
-
-        augs = [
-            # Change source perspective
-            A.Lambda(
-                name="Superpixel spectral index change",
-                image=AA.radio.SpectralIndex(
-                    mean=-0.8, std=0.2, super_pixels=True, n_segments=100, seed=None
-                ),
-                p=p,
-            ),  # With segmentation
-            A.Lambda(
-                name="Brightness perspective distortion",
-                image=AA.BrightnessGradient(limits=(0.0, 1.0)),
-                p=p,
-            ),  # No noise
-            A.ElasticTransform(  # Elastically transform the source
-                sigma=100, alpha_affine=25, interpolation=1, border_mode=1, value=0, p=p
-            ),
-            A.ShiftScaleRotate(
-                shift_limit=0.1,
-                scale_limit=0.1,
-                rotate_limit=90,
-                interpolation=2,
-                border_mode=0,
-                value=0,
-                p=p,
-            ),
-            A.VerticalFlip(p=0.5),
-            # Change properties of noise / imaging artefacts
-            A.Lambda(
-                name="Spectral index change of whole image",
-                image=AA.radio.SpectralIndex(mean=-0.8, std=0.2, seed=None),
-                p=p,
-            ),  # Across the whole image
-            A.Emboss(
-                alpha=(0.2, 0.5), strength=(0.2, 0.5), p=p
-            ),  # Quick emulation of incorrect w-kernels # Doesnt force the maxima to 1
-            A.Lambda(
-                name="Dirty beam convlolution",
-                image=AA.radio.CustomKernelConvolution(
-                    kernel=kernel, rfi_dropout=0.4, psf_radius=1.3, sidelobe_scaling=1, mode="sum"
-                ),
-                p=p,
-            ),  # Add sidelobes
-            A.Lambda(
-                name="Brightness perspective distortion",
-                image=AA.BrightnessGradient(limits=(0.0, 1), primary_beam=True, noise=0.01),
-                p=p,
-            ),  # Gaussian Noise and pb brightness scaling
-            # Modelling based transforms
-            A.ShiftScaleRotate(
-                shift_limit=0.1,
-                scale_limit=0.1,
-                rotate_limit=180,
-                interpolation=2,
-                border_mode=0,
-                value=0,
-                p=p,
-            ),
-            A.CenterCrop(width=center_crop, height=center_crop, p=1),
-            A.Lambda(
-                name="Dirty beam convlolution",
-                image=AA.MinMaxNormalize(mean=0.5, std=0.5),
-                always_apply=True,
-            ),
-            ToTensorV2(),
-        ]
-
-        view = A.Compose(augs)
-
-        return lambda img: view(image=np.array(img))["image"]
+    return view
 
 
 def _blur_kernel(input_height):
@@ -433,6 +397,13 @@ def _blur_kernel(input_height):
     if blur_kernel % 2 == 0:
         blur_kernel += 1
     return blur_kernel
+
+
+def _train_view(config):
+    if config["type"] in ["mae"]:
+        return MAEView
+    elif config["type"] in ["byol"]:
+        return MultiView
 
 
 class SIMCLR_GaussianBlur:
@@ -459,6 +430,16 @@ class SIMCLR_GaussianBlur:
             sample = cv2.GaussianBlur(sample, (self.kernel_size, self.kernel_size), sigma)
 
         return sample
+
+
+class Expand_Channels(torch.nn.Module):
+    def __init__(self, n_channels):
+        super().__init__()
+        self.n_channels = n_channels
+
+    def forward(self, img):
+        H, W = img.shape[-1], img.shape[-2]
+        return img.expand(-1, -1, self.n_channels)
 
 
 class LightlyGaussianBlur(object):

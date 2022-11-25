@@ -1,0 +1,58 @@
+preset: 'none'
+
+model:
+    n_epochs: 600
+    masking_ratio: 0.75
+
+    decoder: 
+        dim: 512
+        depth: 2
+        heads: 4
+        dim_head: 64
+
+    vit:
+        patch_size: 6
+        dim: 512
+        depth: 6
+        heads: 8
+        mlp_dim: 2048
+        arch: 'vit-small'
+      
+data:
+    color_channels: 3
+    classes: 10
+    rotate: False
+    input_height: 96
+    batch_size: 256
+    val_batch_size: 500
+    cut_threshold: 27
+    test_frac: 0.3 
+
+optimizer:
+  type: 'adamw'
+  lr: 0.0003
+  momentum: 0.9
+  weight_decay: 0.0005 # 0.0005
+  lars: False
+  trust_coef: 0.003
+  beta_1: 0.9
+  beta_2: 0.95
+
+scheduler:
+  type: 'cosine' # ['none', 'cosine', 'warmupcosine']
+  warmup_epochs: 10  # Only used in linear warmup cosine annealing, if scheduler type is 'warmupcosine'
+
+linear:
+    n_epochs: 50
+    opt: 'adam'
+    lr: 0.0003
+    batch_size: 300
+    momentum: 0
+    nesterov: False
+    weight_decay: 0.5
+
+## DATA ## 
+augmentations:
+  random_crop_scale: !!python/tuple [0.25, 1]
+  s: 0.5
+  center_crop_size: null

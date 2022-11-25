@@ -6,7 +6,7 @@ import copy
 
 import logging
 from math import cos, pi
-from byol_main.utilities import _optimizer
+from byol_main.utilities import _optimizer, _scheduler
 from lightly.models.modules.heads import BYOLProjectionHead
 from lightly.models.utils import deactivate_requires_grad
 from lightly.models.utils import update_momentum
@@ -14,48 +14,48 @@ from pytorch_lightning.callbacks import Callback
 
 from zoobot.pytorch.estimators import efficientnet_custom, custom_layers
 from zoobot.pytorch.training import losses
+from architectures.resnet import _get_resnet
 
 from byol_main.evaluation import Lightning_Eval
-from byol_main.networks.models import _get_backbone
+
+# from byol_main.networks.models import _get_backbone
 
 
 class BYOL(Lightning_Eval):
     def __init__(self, config):
         super().__init__(config)
-        self.save_hyperparameters()  # save hyperparameters for easy inference
         self.config = config
-
-        self.backbone = _get_backbone(config)
+        self.save_hyperparameters()  # save hyperparameters for easy inference
+        self.encoder = _get_resnet(**self.config["model"]["architecture"])
+        self.encoder.dim = self.encoder.features
 
         # create a byol model based on ResNet
-        features = self.config["model"]["features"]
-        proj = self.config["projection_head"]
+        features = self.config["model"]["architecture"]["features"]
+        proj = self.config["model"]["projection_head"]
         # these are both basically small dense networks of different sizes
-        # architecture is: linear w/ relu, batch-norm, linear
-        # by default: representation (features)=512, hidden (both heads)=1024, out=256
+        # architecture is: linear w/ relu, batch-norm, linear by default: representation (features)=512, hidden (both heads)=1024, out=256
         # so projection_head is 512->1024,relu/BN,1024->256
         # and prediction_head is 256->1024,relu/BN,1024->256
         self.projection_head = BYOLProjectionHead(features, proj["hidden"], proj["out"])
         self.prediction_head = BYOLProjectionHead(proj["out"], proj["hidden"], proj["out"])
 
-        self.backbone_momentum = copy.deepcopy(self.backbone)
+        self.encoder_momentum = copy.deepcopy(self.encoder)
         self.projection_head_momentum = copy.deepcopy(self.projection_head)
 
-        deactivate_requires_grad(self.backbone_momentum)
+        deactivate_requires_grad(self.encoder_momentum)
         deactivate_requires_grad(self.projection_head_momentum)
-
         self.criterion = lightly.loss.NegativeCosineSimilarity()
 
         self.dummy_param = nn.Parameter(torch.empty(0))
 
-        self.m = config["model"]["m"]
+        self.m = self.config["model"]["m"]
 
     def forward(self, x):
-        return self.backbone(x)  # dimension (batch, features), features from config e.g. 512
+        return self.encoder(x)  # dimension (batch, features), features from config e.g. 512
 
     def project(self, x):
         # representation
-        y = self.backbone(x).flatten(start_dim=1)
+        y = self.encoder(x).flatten(start_dim=1)
         # projection
         z = self.projection_head(y)
         # prediction (of proj of target network)
@@ -63,14 +63,14 @@ class BYOL(Lightning_Eval):
         return p
 
     def project_momentum(self, x):
-        y = self.backbone_momentum(x).flatten(start_dim=1)
+        y = self.encoder_momentum(x).flatten(start_dim=1)
         z = self.projection_head_momentum(y)
         z = z.detach()
         return z
 
     def training_step(self, batch, batch_idx):
         # Update momentum value
-        update_momentum(self.backbone, self.backbone_momentum, m=self.m)
+        update_momentum(self.encoder, self.encoder_momentum, m=self.m)
         update_momentum(self.projection_head, self.projection_head_momentum, m=self.m)
 
         # Load in data
@@ -90,18 +90,29 @@ class BYOL(Lightning_Eval):
             self.update_m()
 
     def configure_optimizers(self):
+        # Scale learning rate with batch size
+        self.config["model"]["optimizer"]["lr"] *= self.config["model"]["optimizer"]["batch_size"] / 256
+
         params = (
-            list(self.backbone.parameters())
+            list(self.encoder.parameters())
             + list(self.projection_head.parameters())
             + list(self.prediction_head.parameters())
         )
 
-        return _optimizer(params, self.config)
+        opt = _optimizer(params, **self.config["model"]["optimizer"])
+
+        if self.config["model"]["scheduler"]["decay_type"].lower() == "none":
+            return opt
+        else:
+            scheduler = _scheduler(
+                opt, self.config["model"]["n_epochs"], **self.config["model"]["scheduler"]
+            )
+            return [opt], [scheduler]
 
     def update_m(self):
         with torch.no_grad():
             epoch = self.current_epoch
-            n_epochs = self.config["model"]["n_epochs"]
+            n_epochs = self.config["model"]["model"]["n_epochs"]
             self.m = 1 - (1 - self.m) * (cos(pi * epoch / n_epochs) + 1) / 2
 
 
@@ -199,7 +210,7 @@ class BYOL_Supervised(BYOL):
 
     def configure_optimizers(self):
         params = (
-            list(self.backbone.parameters())
+            list(self.encoder.parameters())
             + list(self.projection_head.parameters())
             + list(self.prediction_head.parameters())
             # need to add supervised head parameters to optimizer
@@ -212,7 +223,7 @@ class BYOL_Supervised(BYOL):
 
     def represent(self, x):
         # representation
-        return self.backbone(x).flatten(start_dim=1)
+        return self.encoder(x).flatten(start_dim=1)
 
     def project(self, y):
         # now takes representation y as input
@@ -227,9 +238,9 @@ class BYOL_Supervised(BYOL):
         log_on_step = True
 
         # Update momentum value
-        # aka update self.backbone_momentum with exp. moving av. of self.backbone
+        # aka update self.encoder_momentum with exp. moving av. of self.encoder
         # (similarly for heads)
-        update_momentum(self.backbone, self.backbone_momentum, m=self.m)
+        update_momentum(self.encoder, self.encoder_momentum, m=self.m)
         update_momentum(self.projection_head, self.projection_head_momentum, m=self.m)
         # prediction head not EMA'd as target (averaged) network doesn't need one
         # similarly don't need to EMA the supervised head as target network doesn't need one

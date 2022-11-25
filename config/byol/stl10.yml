@@ -17,7 +17,7 @@ data:
     classes: 10
     rotate: False
     input_height: 96
-    pretrain_batch_size: 64
+    batch_size: 64
 
 optimizer:
   type: 'sgd'

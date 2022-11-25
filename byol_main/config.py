@@ -44,7 +44,7 @@ def update_config(config):
     # Create unpackable dictionary for logistic regression model
     optimizers = {"adam": Adam, "sgd": SGD}
     config["logreg"] = {
-        "input_dim": config["model"]["features"],
+        # "input_dim": config["model"]["features"],
         "num_classes": config["data"]["classes"],
         "learning_rate": config["linear"]["lr"],
         "optimizer": optimizers[config["linear"]["opt"]],
@@ -73,7 +73,7 @@ def update_config(config):
     # Create unpackable dictionary for training dataloaders
     config["train_dataloader"] = {
         "shuffle": False,
-        "batch_size": config["data"]["pretrain_batch_size"],
+        "batch_size": config["data"]["batch_size"],
         **dataloading,
     }
 
@@ -83,3 +83,30 @@ def update_config(config):
         "batch_size": config["dataloading"]["val_batch_size"],
         **dataloading,
     }
+
+    config["model"]["optimizer"]["batch_size"] = config["data"]["batch_size"]
+
+    # Set finetuning config to values from rest of config
+    config["model"]["architecture"]["n_c"] = config["data"]["color_channels"]
+    config["finetune"]["n_classes"] = config["data"]["classes"]
+    config["finetune"]["dim"] = config["model"]["architecture"]["features"]
+    # if config["type"] == "mae":
+    #     config["finetune"]["dim"] = config["model"]["vit"]["dim"]
+
+
+def load_config_finetune():
+    """Helper function to load yaml config file, convert to python dictionary and return."""
+
+    path = path_dict["config"] / "finetune.yml"
+
+    # load data-set specific config
+    with open(path, "r") as ymlconfig:
+        config = yaml.load(ymlconfig, Loader=yaml.FullLoader)
+
+        # if loading a benchmark, use load the specific config
+        # if (preset := config["finetune"]["preset"]) != "none":
+        path = path_dict["config"] / "finetune.yml"
+        with open(path, "r") as ymlconfig:
+            config = yaml.load(ymlconfig, Loader=yaml.FullLoader)
+
+    return config

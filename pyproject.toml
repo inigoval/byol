@@ -1,2 +1,5 @@
 [tool.black]
 line-length = 105
+
+[tool.pyright]
+# reportMissingImports = false

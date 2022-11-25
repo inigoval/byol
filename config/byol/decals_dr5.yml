@@ -52,7 +52,7 @@ p_blur: 0.
 lr: 0.06
 momentum: 0.9
 weight_decay: 0.0005
-pretrain_batch_size: 512
+batch_size: 512
 opt: 'sgd'
 # Scheduler
 scheduler: 'cosine' # ['none', 'cosine', 'warmupcosine']
