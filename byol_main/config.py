@@ -43,17 +43,6 @@ def update_config(config):
 
     # Create unpackable dictionary for logistic regression model
     optimizers = {"adam": Adam, "sgd": SGD}
-    config["logreg"] = {
-        # "input_dim": config["model"]["features"],
-        "num_classes": config["data"]["classes"],
-        "learning_rate": config["linear"]["lr"],
-        "optimizer": optimizers[config["linear"]["opt"]],
-    }
-
-    if optimizers[config["linear"]["opt"]] == SGD:
-        config["logreg"]["momentum"] = config["linear"]["momentum"]
-        config["logreg"]["nesterov"] = config["linear"]["nesterov"]
-        config["logreg"]["weight_decay"] = config["linear"]["weight_decay"]
 
     # Generic dataloading settings
     dataloading = {
@@ -61,13 +50,6 @@ def update_config(config):
         "pin_memory": config["dataloading"]["pin_memory"],
         "prefetch_factor": config["dataloading"]["prefetch_factor"],
         "persistent_workers": config["dataloading"]["persistent_workers"],
-    }
-
-    # Create unpackable dictionary for logreg training dataloader
-    config["logreg_dataloader"] = {
-        "batch_size": config["linear"]["batch_size"],
-        "shuffle": True,
-        **dataloading,
     }
 
     # Create unpackable dictionary for training dataloaders

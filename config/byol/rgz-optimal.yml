@@ -20,7 +20,7 @@ data:
     batch_size: 256
     val_batch_size: 500
     cut_threshold: 27
-    test_frac: 0.3 
+    test_size: 0.3 
 
 optimizer:
   type: 'sgd'

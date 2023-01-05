@@ -10,7 +10,7 @@ model:
         features: 512     # Number of encoded features (null just uses original resnet output)
         downscale: True
         block_type: 'basic'
-        layers: !!python/tuple [3, 3, 4, 2]
+        layers: !!python/tuple [2, 3, 5, 3]
 
     projection_head:
         hidden: 512
@@ -37,26 +37,17 @@ data:
     input_height: 128 # Keep this at 128 and adjust center_crop_size
     batch_size: 1024 
     val_batch_size: 500
-    cut_threshold: 27
-    test_frac: 0.3 
-
-linear:
-    n_epochs: 100
-    opt: 'adam'
-    lr: 0.0003
-    batch_size: 300
-    momentum: 0
-    nesterov: False
-    weight_decay: 0
+    cut_threshold: 20
+    test_size: 0.2
 
 ## DATA ## 
 augmentations:
-  center_crop_size: 80
+  center_crop_size: 70
   random_crop_scale: !!python/tuple [0.8, 1]
-
-  s: 0 # Set to 0 to disable
-  rotation: False
   center_crop: True
+
+  rotation: True
   random_crop: True
-  flip: False
-  p_blur: 0 #set to 0 to disable blurring
+  flip: True
+  s: 0.5 # Set to 0 to disable
+  p_blur: 0.1 # set to 0 to disable blurring

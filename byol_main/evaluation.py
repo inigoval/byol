@@ -216,7 +216,7 @@ class Linear_Eval(Data_Eval):
         # Could shorten this with recursion but might be less clear
         for acc in pl_module.lin_acc["val"].values():
             acc.reset()
-        for acc in pl_module.acc["test"].values():
+        for acc in pl_module.lin_acc["test"].values():
             acc.reset()
 
     def step(self, pl_module, X, y, val_name, stage):
@@ -225,90 +225,13 @@ class Linear_Eval(Data_Eval):
         X = self.scaler.transform(X)
         preds = self.model.predict(X)
 
-        self.acc[stage][val_name].update(torch.tensor(preds), y)
+        pl_module.lin_acc[stage][val_name].update(torch.tensor(preds), y)
 
     def end(self, pl_module, stage):
 
-        for val_name, acc in self.acc[stage].items():
+        for val_name, acc in pl_module.lin_acc[stage].items():
             # Grab evaluation data-set name directly from dataloader
             pl_module.log(f"{stage}/{self.train_data_name}/linear_acc/{val_name}", acc.compute())
-
-
-class Linear_Eval_PL(Data_Eval):
-    """
-    Callback to perform linear evaluation at the end of each epoch.
-
-    Attributes:
-        data: Data dictionary containing 'train', 'val', 'test' and 'name' keys.
-        clf: Linear classification model.
-
-    """
-
-    def __init__(self, train_data_name, val_list, test_list):
-        """
-        Args:
-            data: Data dictionary containing 'train', 'val', 'test' and 'name' keys.
-        """
-        super().__init__(train_data_name, val_list, test_list)
-
-        self.acc = {
-            "val": {val: tm.Accuracy(average="micro", threshold=0) for val in self.val_list},
-            "test": {test: tm.Accuracy(average="micro", threshold=0) for test in self.test_list},
-        }
-
-    def setup(self, pl_module, data):
-        ## Train linear classifier ##
-
-        # Enable gradients to train linear model but freeze encoder
-        torch.set_grad_enabled(True)
-        freeze_model(pl_module.encoder)
-        pl_module.encoder.eval()
-
-        # Calculate mean and std in feature space and save normalization constants
-        mean, std = compute_encoded_mu_sig(data, pl_module)
-        self.normalize = Normalize(mean, std)
-
-        # Define data-loader and initialize logistic regression model
-        train_dataloader = DataLoader(data, **pl_module.config["logreg_dataloader"])
-        model = LogisticRegression(**pl_module.config["logreg"]).to(pl_module.device)
-
-        for epoch in np.arange(pl_module.config["linear"]["n_epochs"]):
-            for data in train_dataloader:
-                X, y = data
-                X, y = X.to(pl_module.device), y.to(pl_module.device)
-                X = pl_module(X)
-                X = self.normalize(X)
-                model.training_step(X, y)
-
-        # Disable gradients to train linear model
-        torch.set_grad_enabled(False)
-
-        # Save model
-        model.eval()
-        self.model = model
-        unfreeze_model(pl_module.encoder)
-
-        # Could shorten this with recursion but might be less clear
-        for acc in self.acc["val"].values():
-            acc.reset()
-        for acc in self.acc["test"].values():
-            acc.reset()
-
-    def step(self, pl_module, X, y, dataloader_idx, stage):
-        X = pl_module.encoder(X)
-        X = self.normalize(X)
-        preds = self.model(X).detach().cpu()
-
-        self.acc[stage][dataloader_idx].update(preds, y.detach().cpu())
-        # self.acc.update(preds, y.detach().cpu())
-
-    def end(self, pl_module, stage):
-        for dataloader_idx, acc in self.acc[stage].items():
-            # Grab evaluation data-set name directly from dataloader
-            eval_name, _ = pl_module.trainer.datamodule.data[stage][dataloader_idx]
-            pl_module.log(f"{stage}/{self.train_data_name}/linear_acc/{eval_name}", acc.compute())
-
-        # pl_module.log(f"{stage}/{self.name}/linear_acc", self.acc.compute())
 
 
 class FineTune(pl.LightningModule):

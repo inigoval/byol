@@ -13,8 +13,7 @@ from dataloading.datamodules import datasets, finetune_datasets
 from paths import Path_Handler, create_path
 
 from finetune.finetune import run_finetuning
-
-from supervised import Supervised
+from finetune.dataloading import finetune_datasets
 
 # TODO put elsewhere
 # https://colab.research.google.com/github/wandb/examples/blob/master/colabs/pytorch-lightning/Profile_PyTorch_Code.ipynb#scrollTo=qRoUXZdtJIUD
@@ -115,7 +114,7 @@ def run_contrastive_pretraining(config, wandb_logger):
     )
 
     # Initialise model #
-    models = {"byol": BYOL, "supervised": Supervised, "mae": MAE}
+    models = {"byol": BYOL, "mae": MAE}
     model = models[config["type"]](config)
 
     # profile_art = wandb.Artifact(f"trace-{wandb.run.id}", type="profile")

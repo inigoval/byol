@@ -96,7 +96,7 @@ class FineTuning_DataModule(pl.LightningDataModule):
             self.data["train"],
             batch_size=self.config["finetune"]["batch_size"],
             num_workers=8,
-            prefetch_factor=30,
+            prefetch_factor=20,
             shuffle=True,
         )
         return loader
@@ -106,7 +106,7 @@ class FineTuning_DataModule(pl.LightningDataModule):
             self.data["val"],
             batch_size=200,
             num_workers=8,
-            prefetch_factor=30,
+            prefetch_factor=20,
             shuffle=False,
         )
         return loader
@@ -116,7 +116,7 @@ class FineTuning_DataModule(pl.LightningDataModule):
             self.data["test"],
             batch_size=200,
             num_workers=8,
-            prefetch_factor=30,
+            prefetch_factor=20,
             shuffle=False,
         )
         return loader

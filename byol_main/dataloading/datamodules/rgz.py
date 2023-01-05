@@ -11,6 +11,7 @@ else:
 
 from PIL import Image
 from torchvision.datasets.utils import download_url, check_integrity
+from torch.utils.data import DataLoader
 
 from .vision import Base_DataModule, FineTuning_DataModule
 from dataloading.utils import rgz_cut
@@ -44,7 +45,7 @@ class RGZ_DataModule(Base_DataModule):
             "root": self.path,
             "transform": self.T_test,
             "aug_type": "torchvision",
-            "test_size": self.config["data"]["test_frac"],
+            "test_size": self.config["data"]["test_size"],
         }
         self.data["val"] = [
             ("MB_conf_train", MBFRConfident(**data_dict, train=True)),
@@ -70,7 +71,7 @@ class RGZ_DataModule(Base_DataModule):
         d_conf = MBFRConfident(
             self.path,
             train=False,
-            test_size=self.config["data"]["test_frac"],
+            test_size=self.config["data"]["test_size"],
             transform=self.T_test,
             aug_type="torchvision",
         )
@@ -78,7 +79,7 @@ class RGZ_DataModule(Base_DataModule):
         d_unc = MBFRUncertain(
             self.path,
             train=False,
-            test_size=self.config["data"]["test_frac"],
+            test_size=self.config["data"]["test_size"],
             transform=self.T_test,
             aug_type="torchvision",
         )
@@ -102,7 +103,7 @@ class RGZ_DataModule_Finetune(FineTuning_DataModule):
             [
                 T.RandomRotation(180),
                 T.CenterCrop(center_crop),
-                T.RandomResizedCrop(center_crop, scale=random_crop),
+                T.RandomResizedCrop(center_crop, scale=[0.9, 1]),
                 T.RandomHorizontalFlip(),
                 T.RandomVerticalFlip(),
                 T.ToTensor(),
@@ -126,7 +127,7 @@ class RGZ_DataModule_Finetune(FineTuning_DataModule):
         data_dict = {
             "root": self.path,
             "aug_type": "torchvision",
-            "test_size": self.config["finetune"]["test_frac"],
+            "test_size": self.config["finetune"]["test_size"],
             "seed": self.config["finetune"]["seed"],
         }
 
@@ -986,7 +987,7 @@ if __name__ == "__main__":
     )
 
     train_data = RGZ20k_test("data", train=True, download=True, transform=transform)
-    train_loader = torch.utils.data.DataLoader(train_data, batch_size=batch_size, shuffle=True)
+    train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
 
     # get some random training images
     dataiter = iter(train_loader)
