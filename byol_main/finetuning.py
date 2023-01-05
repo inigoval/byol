@@ -4,7 +4,6 @@ import logging
 
 from pathlib import Path
 
-from dataloading.datamodules import finetune_datasets
 from paths import Path_Handler
 from config import load_config, update_config, load_config_finetune
 from finetune.finetune import run_finetuning
@@ -25,10 +24,11 @@ def main():
     # Load up finetuning config
     config_finetune = load_config_finetune()
 
-    ## Run pretraining ##
+    ## Run finetuning ##
     for seed in range(config_finetune["finetune"]["iterations"]):
+        # for seed in range(1, 10):
 
-        if config_finetune["finetune"]["run_id"].lower() is not "none":
+        if config_finetune["finetune"]["run_id"].lower() != "none":
             experiment_dir = path_dict["files"] / config_finetune["finetune"]["run_id"] / "checkpoints"
             model = BYOL.load_from_checkpoint(experiment_dir / "last.ckpt")
         else:
@@ -38,7 +38,10 @@ def main():
         config = model.config
         config.update(config_finetune)
         config["finetune"]["dim"] = model.encoder.dim
-        project_name = f"{config['project_name']}_finetune"
+        # project_name = f"{config['project_name']}_finetune"
+        # project_name = "BYOL_LDecay_finetune"
+        project_name = "BYOL_LabelVolume_finetune"
+        # project_name = "BYOL_nlayers_finetune"
 
         config["finetune"]["seed"] = seed
         pl.seed_everything(seed)
@@ -48,7 +51,7 @@ def main():
 
         logger = pl.loggers.WandbLogger(
             project=project_name,
-            save_dir=path_dict["files"] / str(wandb.run.id),
+            save_dir=path_dict["files"] / "finetune" / str(wandb.run.id),
             reinit=True,
             config=config,
         )
@@ -56,6 +59,7 @@ def main():
         finetune_datamodule = finetune_datasets[config["dataset"]](config)
         run_finetuning(config, model.encoder, finetune_datamodule, logger)
         logger.experiment.finish()
+        wandb.finish()
 
 
 if __name__ == "__main__":

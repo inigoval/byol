@@ -18,8 +18,6 @@ from architectures.resnet import _get_resnet
 
 from byol_main.evaluation import Lightning_Eval
 
-# from byol_main.networks.models import _get_backbone
-
 
 class BYOL(Lightning_Eval):
     def __init__(self, config):
