@@ -6,11 +6,11 @@ model:
     m_decay: False
 
     architecture:
-        preset: 'none' # ['resnet18', 'resnet34', 'resnet50', 'none']
+        preset: 'resnet18' # ['resnet18', 'resnet34', 'resnet50', 'none']
         features: 512     # Number of encoded features (null just uses original resnet output)
         downscale: True
         block_type: 'basic'
-        layers: !!python/tuple [2, 3, 5, 3]
+        layers: !!python/tuple [2, 2, 2, 2]
 
     projection_head:
         hidden: 512
@@ -50,4 +50,4 @@ augmentations:
   random_crop: True
   flip: True
   s: 0.5 # Set to 0 to disable
-  p_blur: 0.1 # set to 0 to disable blurring
+  p_blur: 0 # set to 0 to disable blurring

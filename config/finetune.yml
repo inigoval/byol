@@ -2,7 +2,8 @@ finetune:
   # resnet sizes 
   # run_id: 'pppmx4ki' # 10
   # run_id: '1ybdrbl1' # 14
-  run_id: '1dyphjbc' # resnet-18 run_id: 'a6guyfxw' # 22
+  run_id: '1dyphjbc' # resnet-18 
+  # run_id: 'a6guyfxw' # 22
   # run_id: '16bjm8py' # 28
   # run_id: '3vhqpv3g' # resnet-34
 
@@ -75,13 +76,13 @@ finetune:
 
   preset: 'none'
   dataset: 'rgz'
-  n_layers: -1 # -1 finetunes all layers
+  n_layers: 9 # -1 finetunes all layers
   n_classes: 2 
-  iterations: 10
+  iterations: 1
   lr_decay: 0.75
-  n_epochs: 100
+  n_epochs: 300
   batch_size: 64
-  val_size: 0.95
+  val_size: 0
   early_stopping: False
   weight_decay: 0.005
 
@@ -92,3 +93,4 @@ trainer:
   fast_dev_run: False # debugging mode
   precision: 32 # [16, 32, 'bf16'], often overriden
   deterministic: True
+  accelerator: 'gpu'

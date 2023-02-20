@@ -6,9 +6,12 @@ astroaugmentations
 __pycache__
 *ipynb*
 .ipynb*
+wandb
+files
 
 .vscode
 files/wandb
+run_ids.txt
 
 *.egg-info
 *.cpkt
