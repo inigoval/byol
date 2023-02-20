@@ -14,7 +14,6 @@ evaluation:
   finetune: True
   knn_eval: False
   linear_eval: True
-  ridge_eval: False
   n_eval_epochs: 1
   checkpoint_mode: 'last'
   early_stopping: False

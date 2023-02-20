@@ -7,7 +7,6 @@ import logging
 from einops import rearrange
 
 from sklearn.preprocessing import StandardScaler
-from sklearn.linear_model import RidgeClassifier
 from typing import Any, Dict, List, Tuple, Type
 from torch import Tensor
 
@@ -60,14 +59,6 @@ class Lightning_Eval(pl.LightningModule):
                 # Add to list of evaluations
                 self.train_list.append(lin_eval)
 
-            if self.config["evaluation"]["ridge_eval"]:
-                # Initialise linear eval data-set and run setup with training data
-                ridge_eval = Ridge_Eval(self, name, self.val_list, self.test_list)
-                ridge_eval.setup(self, data)
-
-                # Add to list of evaluations
-                self.train_list.append(ridge_eval)
-
     def validation_step(self, batch, batch_idx, dataloader_idx=0):
         x, y = batch
         val_name = self.val_list[dataloader_idx]
@@ -113,65 +104,6 @@ class Data_Eval:
 
     def end(self, pl_module, stage):
         return
-
-
-class Ridge_Eval(Data_Eval):
-    """
-    Callback to perform linear evaluation at the end of each epoch.
-
-    Attributes:
-        data: Data dictionary containing 'train', 'val', 'test' and 'name' keys.
-        clf: Linear classification model.
-
-    """
-
-    def __init__(self, train_data_name, val_list, test_list):
-        """
-        Args:
-            data: Data dictionary containing 'train', 'val', 'test' and 'name' keys.
-        """
-        super().__init__(train_data_name, val_list, test_list)
-
-        self.acc = {
-            "val": {
-                val: tm.Accuracy(average="micro", threshold=0, task="multiclass")
-                for val in self.val_list
-            },
-            "test": {
-                test: tm.Accuracy(average="micro", threshold=0, task="multiclass")
-                for test in self.test_list
-            },
-        }
-
-    def setup(self, pl_module, data):
-        with torch.no_grad():
-            model = RidgeClassifier()
-            X, y = embed_dataset(pl_module.encoder, data)
-            X, y = X.detach().cpu().numpy(), y.detach().cpu().numpy()
-            self.scaler = StandardScaler()
-            self.scaler.fit(X)
-            X = self.scaler.transform(X)
-            model.fit(X, y)
-            self.model = model
-
-        # Could shorten this with recursion but might be less clear
-        for acc in self.acc["val"].values():
-            acc.reset()
-        for acc in self.acc["test"].values():
-            acc.reset()
-
-    def step(self, pl_module, X, y, val_name, stage):
-        X = pl_module(X).squeeze()
-        X, y = X.detach().cpu().numpy(), y.detach().cpu()
-        X = self.scaler.transform(X)
-        preds = self.model.predict(X)
-
-        self.acc[stage][val_name].update(torch.tensor(preds), y)
-
-    def end(self, pl_module, stage):
-        for val_name, acc in self.acc[stage].items():
-            # Grab evaluation data-set name directly from dataloader
-            pl_module.log(f"{stage}/{self.train_data_name}/ridge_acc/{val_name}", acc.compute())
 
 
 class Linear_Eval(Data_Eval):
