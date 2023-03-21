@@ -12,8 +12,6 @@ dataloading:
 
 evaluation:
   finetune: True
-  knn_eval: False
-  linear_eval: True
   n_eval_epochs: 1
   checkpoint_mode: 'last'
   early_stopping: False
@@ -37,6 +35,6 @@ trainer:
   devices: 1
   num_nodes: 1
   strategy: null # set to null to disable multi gpu training
-  fast_dev_run: True # debugging mode
+  fast_dev_run: False # debugging mode
   precision: 32 # [16, 32, 'bf16'], often overriden
   deterministic: True

@@ -3,12 +3,12 @@ import pytorch_lightning as pl
 
 from torch.utils.data import DataLoader
 from torchvision.datasets import ImageFolder
-
-from dataloading.utils import compute_mu_sig_images
-from dataloading.utils import _get_imagenet_norms
 from torchvision.datasets import STL10
-from paths import Path_Handler
-from dataloading.transforms import MultiView, SimpleView, MAEView, _train_view
+
+from byol.dataloading.utils import compute_mu_sig_images
+from byol.dataloading.utils import _get_imagenet_norms
+from byol.paths import Path_Handler
+from byol.dataloading.transforms import MultiView, SimpleView, MAEView, _train_view
 
 
 class Base_DataModule(pl.LightningDataModule):

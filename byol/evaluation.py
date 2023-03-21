@@ -10,8 +10,8 @@ from sklearn.preprocessing import StandardScaler
 from typing import Any, Dict, List, Tuple, Type
 from torch import Tensor
 
-from utilities import log_examples, embed_dataset
-from networks.models import LogisticRegression
+from byol.utilities import log_examples, embed_dataset
+from byol.networks.models import LogisticRegression
 
 
 class Lightning_Eval(pl.LightningModule):
@@ -33,13 +33,13 @@ class Lightning_Eval(pl.LightningModule):
         for name, data in (
             self.trainer.datamodule.data["val"]
             + self.trainer.datamodule.data["test"]
-            + self.trainer.datamodule.data["eval_train"]
+            + [(d["name"], d["data"]) for d in self.trainer.datamodule.data["eval_train"]]
         ):
             logging_params[f"n_{name}"] = len(data)
 
         self.logger.log_hyperparams(logging_params)
 
-        if not self.config["trainer"]["fast_dev_run"] and self.config["type"] != "mae":
+        if not self.config["trainer"]["fast_dev_run"]:
             log_examples(self.logger, self.trainer.datamodule.data["train"])
 
     def on_validation_start(self):
@@ -50,14 +50,13 @@ class Lightning_Eval(pl.LightningModule):
 
         ## Prepare for linear evaluation ##
         # Cycle through validation data-sets
-        for name, data in self.trainer.datamodule.data["eval_train"]:
-            if self.config["evaluation"]["linear_eval"]:
-                # Initialise linear eval data-set and run setup with training data
-                lin_eval = Linear_Eval(self, name, self.val_list, self.test_list)
-                lin_eval.setup(self, data)
+        for d in self.trainer.datamodule.data["eval_train"]:
+            # Initialise linear eval data-set and run setup with training data
+            lin_eval = Linear_Eval(self, d, self.val_list, self.test_list)
+            lin_eval.setup(self, d["data"])
 
-                # Add to list of evaluations
-                self.train_list.append(lin_eval)
+            # Add to list of evaluations
+            self.train_list.append(lin_eval)
 
     def validation_step(self, batch, batch_idx, dataloader_idx=0):
         x, y = batch
@@ -91,8 +90,9 @@ class Data_Eval:
     Parent class for evaluation classes.
     """
 
-    def __init__(self, train_data_name, val_list, test_list):
-        self.train_data_name = train_data_name
+    def __init__(self, train_data_dict, val_list, test_list):
+        self.train_data_name = train_data_dict["name"]
+        self.n_classes = train_data_dict["n_classes"]
         self.val_list = val_list
         self.test_list = test_list
 
@@ -116,20 +116,24 @@ class Linear_Eval(Data_Eval):
 
     """
 
-    def __init__(self, pl_module, train_data_name, val_list, test_list):
+    def __init__(self, pl_module, train_data_dict, val_list, test_list):
         """
         Args:
             data: Data dictionary containing 'train', 'val', 'test' and 'name' keys.
         """
-        super().__init__(train_data_name, val_list, test_list)
+        super().__init__(train_data_dict, val_list, test_list)
 
         pl_module.lin_acc = {
             "val": {
-                val: tm.Accuracy(average="micro", threshold=0, task="multiclass", num_classes=2)
+                val: tm.Accuracy(
+                    average="micro", threshold=0, task="multiclass", num_classes=self.n_classes
+                )
                 for val in self.val_list
             },
             "test": {
-                test: tm.Accuracy(average="micro", threshold=0, task="multiclass")
+                test: tm.Accuracy(
+                    average="micro", threshold=0, task="multiclass", num_classes=self.n_classes
+                )
                 for test in self.test_list
             },
         }

@@ -5,10 +5,11 @@ import logging
 from pathlib import Path
 
 from paths import Path_Handler
-from finetune.finetune import run_finetuning
+from finetune.main import run_finetuning
 from finetune.dataloading import finetune_datasets
 from config import load_config, update_config, load_config_finetune
-from byol import BYOL
+from models import BYOL
+from architectures.models import MLP
 
 
 def main():
@@ -26,7 +27,6 @@ def main():
     ## Run finetuning ##
     for seed in range(config_finetune["finetune"]["iterations"]):
         # for seed in range(1, 10):
-        seed = 9
 
         if config_finetune["finetune"]["run_id"].lower() != "none":
             experiment_dir = path_dict["files"] / config_finetune["finetune"]["run_id"] / "checkpoints"
@@ -42,7 +42,7 @@ def main():
         # project_name = "BYOL_LDecay_finetune"
         # project_name = "BYOL_LabelVolume_finetune"
         # project_name = "BYOL_nlayers_finetune"
-        project_name = "BYOL_laptoptest_finetune"
+        project_name = "BYOL_MLPHead_finetune"
 
         config["finetune"]["seed"] = seed
         pl.seed_everything(seed)
@@ -57,8 +57,35 @@ def main():
             config=config,
         )
 
+        if config["finetune"]["head"] == "mlp":
+            head = MLP(
+                in_channels=model.encoder.dim,
+                out_channels=config["finetune"]["n_classes"],
+                hidden_channels=config["finetune"]["hidden_channels"],
+                normalize_input=True,
+            )
+        elif config["finetune"]["head"] == "linear":
+            head = "linear"
+        else:
+            raise ValueError("Head not implemented")
+
         finetune_datamodule = finetune_datasets[config["dataset"]](config)
-        run_finetuning(config, model.encoder, finetune_datamodule, logger)
+
+        run_finetuning(
+            model.encoder,
+            finetune_datamodule,
+            logger,
+            dim=config["finetune"]["dim"],
+            n_classes=config["finetune"]["n_classes"],
+            head=head,
+            n_epochs=config["finetune"]["n_epochs"],
+            n_layers=config["finetune"]["n_layers"],
+            batch_size=config["finetune"]["batch_size"],
+            lr_decay=config["finetune"]["lr_decay"],
+            seed=config["finetune"]["seed"],
+            weight_decay=config["finetune"]["weight_decay"],
+        )
+
         logger.experiment.finish()
         wandb.finish()
 

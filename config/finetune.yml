@@ -45,6 +45,7 @@ finetune:
   # run_id: '32ptx4d7' # 0.9
 
   # blurring
+  # Old runs
   # run_id: '2tjqc372' # 0
   # run_id: '9vgw2w0y' # 0.1
   # run_id: '1ape16g5' # 0.2
@@ -56,10 +57,20 @@ finetune:
   # run_id: '1q88ghas' # 0.8
   # run_id: '16f3pof5' # 0.9
   # run_id: '8ah7ykh0' # 1
+  #
+  # New blurring
+  # run_id: '17ikvccs' # 0
+  # run_id: '2xjq6t4q' # 0.1
+  # run_id: '1yvpscr0' # 0.2
+  # run_id: '2z05vzgg' # 0.3
+  # run_id: 'uzpk92nw' # 0.5
+  # run_id: '3gos0spa' # 0.7
+  # run_id: '2xoy2iv9' # 0.9
+  # run_id: '2s49s8aa' # 1
 
   # ablations
   # run_id: '9vgw2w0y'
-  # run_id: '3fp2tozs'
+  # run_id: '3fp2tozs' 
   # run_id: '15nfdls4'
   # run_id: '30m49h74'
   # run_id: 'godcwj5u'
@@ -76,16 +87,18 @@ finetune:
 
   preset: 'none'
   dataset: 'rgz'
-  n_layers: 9 # -1 finetunes all layers
+  n_layers: 0 # -1 finetunes all layers
   n_classes: 2 
-  iterations: 1
+  iterations: 10
   lr_decay: 0.75
   n_epochs: 300
   batch_size: 64
   val_size: 0
   early_stopping: False
   weight_decay: 0.005
-
+  head: 'linear'
+  hidden_channels: !!python/tuple [512]
+    
 trainer:
   gpus: 1 # set to 1 to disable multi gpu training
   num_nodes: 1

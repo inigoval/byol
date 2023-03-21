@@ -6,13 +6,12 @@ import torch
 from pytorch_lightning.callbacks import LearningRateMonitor
 from pytorch_lightning.profiler import AdvancedProfiler, PyTorchProfiler
 
-from byol import BYOL
-from mae import MAE
+from models import BYOL
 from config import load_config, update_config
-from dataloading.datamodules import datasets, finetune_datasets
+from dataloading.datamodules import datasets
 from paths import Path_Handler, create_path
 
-from finetune.finetune import run_finetuning
+from finetune.main import run_finetuning
 from finetune.dataloading import finetune_datasets
 
 # TODO put elsewhere
@@ -113,8 +112,7 @@ def run_contrastive_pretraining(config, wandb_logger):
     )
 
     # Initialise model #
-    models = {"byol": BYOL, "mae": MAE}
-    model = models[config["type"]](config)
+    model = BYOL(config)
 
     # profile_art = wandb.Artifact(f"trace-{wandb.run.id}", type="profile")
     # profile_art.add_file(glob.glob(str(experiment_dir / "*.pt.trace.json"))[0], "trace.pt.trace.json")

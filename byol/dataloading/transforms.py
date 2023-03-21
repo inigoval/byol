@@ -7,11 +7,11 @@ import astroaugmentations as AA
 from torch import nn
 from PIL import ImageFilter
 from albumentations.pytorch import ToTensorV2
-
-from paths import Path_Handler
 import cv2
 
 from galaxy_datasets.pytorch.galaxy_datamodule import GalaxyDataModule
+
+from byol.paths import Path_Handler
 
 
 class Circle_Crop(torch.nn.Module):
