@@ -60,10 +60,11 @@ class RGZ_DataModule(Base_DataModule):
 
         # List of (name, train_dataset) tuples to train linear evaluation layer
         self.data["eval_train"] = [
-            (
-                "MB_conf_train",
-                MBFRConfident(**data_dict, train=True),
-            ),
+            {
+                "name": "MB_conf_train",
+                "n_classes": 2,
+                "data": MBFRConfident(**data_dict, train=True),
+            }
         ]
 
     def _test_set(self):
@@ -715,6 +716,22 @@ class RGZ108k(D.Dataset):
             tmp, self.target_transform.__repr__().replace("\n", "\n" + " " * len(tmp))
         )
         return fmt_str
+
+    def get_from_id(self, id):
+        index = np.argwhere(self.rgzid == id)
+        assert len(index) == 1, "Non unique ID"
+
+        img = self.data[index]
+
+        # doing this so that it is consistent with all other datasets
+        # to return a PIL Image
+        img = np.reshape(img, (150, 150))
+        img = Image.fromarray(img, mode="L")
+
+        if self.transform is not None:
+            img = self.transform(img)
+
+        return img
 
 
 class RGZ108k_noisy(D.Dataset):
