@@ -1,6 +1,5 @@
 from byol import BYOL
 import torch
-from dataloading.datamodules.rgz import RGZ108k
 from astroaugmentations.datasets.MiraBest_F import MBFRFull, MBHybrid, MBFRConfident, MBFRUncertain
 import umap
 from einops import pack
@@ -9,7 +8,8 @@ from paths import Path_Handler
 import matplotlib.pyplot as plt
 import torchvision.transforms as T
 
-from utilities import embed_dataset
+from ..utilities import embed_dataset
+from ..dataloading.datamodules.rgz import RGZ108k
 
 
 plt.rc("font", family="Liberation Mono")

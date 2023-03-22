@@ -1,7 +1,5 @@
 from byol import BYOL
-import torch
-from dataloading.datamodules.rgz import RGZ108k
-from astroaugmentations.datasets.MiraBest_F import MBHybrid
+import torch from dataloading.datamodules.rgz import RGZ108k from astroaugmentations.datasets.MiraBest_F import MBHybrid
 import string
 import numpy as np
 
