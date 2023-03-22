@@ -10,8 +10,8 @@ from sklearn.preprocessing import StandardScaler
 from typing import Any, Dict, List, Tuple, Type
 from torch import Tensor
 
-from utilities import log_examples, embed_dataset
-from networks.models import LogisticRegression
+from byol.utilities import log_examples, embed_dataset
+from byol.networks.models import LogisticRegression
 
 
 class Lightning_Eval(pl.LightningModule):

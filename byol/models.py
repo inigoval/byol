@@ -14,8 +14,8 @@ from zoobot.pytorch.estimators import efficientnet_custom, custom_layers
 from zoobot.pytorch.training import losses
 from architectures.resnet import _get_resnet
 
-from evaluation import Lightning_Eval
-from utilities import _optimizer, _scheduler
+from byol.evaluation import Lightning_Eval
+from byol.utilities import _optimizer, _scheduler
 
 
 class BYOL(Lightning_Eval):
@@ -23,6 +23,7 @@ class BYOL(Lightning_Eval):
         super().__init__(config)
         self.config = config
         self.save_hyperparameters()  # save hyperparameters for easy inference
+
         self.encoder = _get_resnet(**self.config["model"]["architecture"])
         self.encoder.dim = self.encoder.features
 

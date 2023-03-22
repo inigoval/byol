@@ -5,10 +5,11 @@ import logging
 from pathlib import Path
 
 from paths import Path_Handler
-from finetune.finetune import run_finetuning
+from finetune.main import run_finetuning
 from finetune.dataloading import finetune_datasets
 from config import load_config, update_config, load_config_finetune
-from byol import BYOL
+from models import BYOL
+from architectures.models import MLP
 
 
 def main():
@@ -26,7 +27,6 @@ def main():
     ## Run finetuning ##
     for seed in range(config_finetune["finetune"]["iterations"]):
         # for seed in range(1, 10):
-        seed = 9
 
         if config_finetune["finetune"]["run_id"].lower() != "none":
             experiment_dir = path_dict["files"] / config_finetune["finetune"]["run_id"] / "checkpoints"

@@ -13,8 +13,8 @@ from PIL import Image
 from torchvision.datasets.utils import download_url, check_integrity
 from torch.utils.data import DataLoader
 
-from .vision import Base_DataModule, FineTuning_DataModule
-from dataloading.utils import rgz_cut
+from byol.dataloading.datamodules.vision import Base_DataModule, FineTuning_DataModule
+from byol.dataloading.utils import rgz_cut
 from astroaugmentations.datasets.MiraBest_F import MBFRFull, MBFRConfident, MBFRUncertain
 
 

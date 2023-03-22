@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader
 from torchvision.utils import make_grid
 from tqdm import tqdm
 
-from paths import Path_Handler
+from byol.paths import Path_Handler
 
 
 # Define paths
@@ -94,7 +94,6 @@ def _scheduler(
     decay_type: str = "warmupcosine",
     warmup_epochs: int = 10,
 ):
-
     if decay_type == "cosine":
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(opt, n_epochs)
         return scheduler
@@ -121,7 +120,6 @@ def _optimizer(
     beta_2: float = 0.999,
     **kwargs,
 ):
-
     betas = (beta_1, beta_2)
 
     # for adam, lr is the step size and is modified by exp. moving av. of prev. gradients
