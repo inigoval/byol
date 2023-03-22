@@ -12,6 +12,8 @@ files
 .vscode
 files/wandb
 run_ids.txt
+imgs
+weights
 
 *.egg-info
 *.cpkt
