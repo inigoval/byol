@@ -42,7 +42,8 @@ def main():
         # project_name = "BYOL_LDecay_finetune"
         # project_name = "BYOL_LabelVolume_finetune"
         # project_name = "BYOL_nlayers_finetune"
-        project_name = "BYOL_laptoptest_finetune"
+        # project_name = "BYOL_laptoptest_finetune"
+        project_name = "BYOL_debugging"
 
         config["finetune"]["seed"] = seed
         pl.seed_everything(seed)

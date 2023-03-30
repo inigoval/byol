@@ -4,7 +4,6 @@ from typing import Type, Any, Callable, Union, List, Optional
 import torch
 import matplotlib.pyplot as plt
 
-from pl_bolts.optimizers.lr_scheduler import LinearWarmupCosineAnnealingLR
 from torch.optim import Optimizer
 from PIL import Image
 from mpl_toolkits.axes_grid1 import ImageGrid

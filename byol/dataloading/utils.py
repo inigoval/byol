@@ -6,7 +6,6 @@ import albumentations as A
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 from torch.utils.data import DataLoader
-from pytorch_lightning.trainer.supporters import CombinedLoader
 
 
 def data_splitter_strat(dset, seed=None, split=1, val_frac=0.2):
