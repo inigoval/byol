@@ -48,6 +48,9 @@ df_rgz = pd.read_csv(csv_path)
 # Add fr_prediction/confidence columns
 df_rgz.insert(len(df_rgz.columns), "fr_prediction", -1)
 df_rgz.insert(len(df_rgz.columns), "fr_vote_fraction", -1)
+df_rgz.insert(len(df_rgz.columns), "fr_entropy", None)
+df_rgz.insert(len(df_rgz.columns), "fr_logit_1", None)
+df_rgz.insert(len(df_rgz.columns), "fr_logit_2", None)
 
 # Load transform
 transform = T.Compose(
@@ -63,8 +66,9 @@ d_rgz = RGZ108k(paths["rgz"], train=True, transform=transform)
 print("Making predictions...")
 model_dir = paths["main"] / "analysis" / "weights"
 # Make predictions on RGZ data
-y = {id: {"pred": [], "softmax": []} for id in d_rgz.rgzid}
+y = {id: {"pred": [], "softmax": [], "logits": [], "entropy": []} for id in d_rgz.rgzid}
 for i, model_path in enumerate(model_dir.iterdir()):
+    checkpoint = torch.load(model_path)
     print(f"Loading model {i}...")
     model = FineTune.load_from_checkpoint(model_path)
     model.eval()
@@ -74,13 +78,13 @@ for i, model_path in enumerate(model_dir.iterdir()):
         zip(DataLoader(d_rgz, batch_size=1, shuffle=False), d_rgz.rgzid), total=len(d_rgz)
     ):
         logits = model(x)
-        preds = logits.softmax(dim=-1)
-        y_softmax, y_pred = torch.max(preds, dim=1)
+        preds = logits.softmax(dim=-1).detach().cpu()
+        y_softmax, y_pred = torch.max(preds, dim=-1)
         y_pred += 1
 
         y[id]["pred"].append(y_pred.item())
         y[id]["softmax"].append(y_softmax.item())
-        y[id]["logits"].append(logits.item())
+        y[id]["logits"].append(logits.detach().cpu().numpy())
         y[id]["entropy"].append(entropy(preds, loss=False).item())
 
 
@@ -98,16 +102,18 @@ def aggregate(preds: list) -> tuple:
 
 
 for id, value in tqdm(y.items()):
-    preds, softmax = value["pred"], value["softmax"]
-    print(preds)
+    preds, softmax, logits, entropy = value["pred"], value["softmax"], value["logits"], value["entropy"]
     agg_pred, vote_frac = aggregate(preds)
+
+    agg_logits = np.mean(logits, axis=0)
 
     pred_idx = np.argwhere(np.array(preds) == agg_pred).flatten().tolist()
 
     df_rgz.loc[df_rgz["rgz_name"] == id, "fr_prediction"] = agg_pred
     df_rgz.loc[df_rgz["rgz_name"] == id, "fr_vote_fraction"] = vote_frac
-    df_rgz.loc[df_rgz["rgz_name"] == id, "fr_avg_entropy"] = np.mean(value["entropy"])
-    df_rgz.loc[df_rgz["rgz_name"] == id, "fr_avg_logits"] = np.mean(value["logits"], axis=0)
+    df_rgz.loc[df_rgz["rgz_name"] == id, "fr_entropy"] = np.mean(entropy)
+    df_rgz.loc[df_rgz["rgz_name"] == id, "fr_logit_1"] = agg_logits[0].item()
+    df_rgz.loc[df_rgz["rgz_name"] == id, "fr_logit_2"] = agg_logits[1].item()
 
 
 df_rgz.to_csv(paths["rgz"] / "rgz_data_preds.csv", index=False)
