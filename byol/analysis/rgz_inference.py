@@ -2,6 +2,7 @@ import pandas as pd
 import torch
 import torchvision.transforms as T
 import logging
+import numpy as np
 
 from torch.utils.data import DataLoader
 from einops import rearrange
@@ -11,6 +12,28 @@ from collections import Counter
 
 from byol.paths import Path_Handler
 from byol.dataloading.datamodules.rgz import RGZ108k
+
+
+def entropy(p, eps=0.0000001, loss=False):
+    """
+    Calculate the entropy of a binary classification prediction given a probability for either of the two classes.
+
+    Keyword arguments:
+    eps -- small additive factor to avoid log(0)
+    loss -- boolean value determines whether to return detached value for inference (False) or differentiable value for training (True)
+    """
+    H_i = -torch.log(p + eps) * p
+    H = torch.sum(H_i, 1).view(-1)
+
+    if not loss:
+        # Clamp to avoid negative values due to eps
+        H = torch.clamp(H, min=0)
+        return H.detach().cpu().numpy()
+
+    H = torch.mean(H)
+
+    return H
+
 
 # Get paths
 print("Getting paths...")
@@ -57,6 +80,8 @@ for i, model_path in enumerate(model_dir.iterdir()):
 
         y[id]["pred"].append(y_pred.item())
         y[id]["softmax"].append(y_softmax.item())
+        y[id]["logits"].append(logits.item())
+        y[id]["entropy"].append(entropy(preds, loss=False).item())
 
 
 print("Aggregating predictions...")
@@ -77,8 +102,12 @@ for id, value in tqdm(y.items()):
     print(preds)
     agg_pred, vote_frac = aggregate(preds)
 
+    pred_idx = np.argwhere(np.array(preds) == agg_pred).flatten().tolist()
+
     df_rgz.loc[df_rgz["rgz_name"] == id, "fr_prediction"] = agg_pred
     df_rgz.loc[df_rgz["rgz_name"] == id, "fr_vote_fraction"] = vote_frac
+    df_rgz.loc[df_rgz["rgz_name"] == id, "fr_avg_entropy"] = np.mean(value["entropy"])
+    df_rgz.loc[df_rgz["rgz_name"] == id, "fr_avg_logits"] = np.mean(value["logits"], axis=0)
 
 
 df_rgz.to_csv(paths["rgz"] / "rgz_data_preds.csv", index=False)

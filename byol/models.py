@@ -22,7 +22,7 @@ class BYOL(Lightning_Eval):
     def __init__(self, config):
         super().__init__(config)
         self.config = config
-        self.save_hyperparameters()  # save hyperparameters for easy inference
+        self.save_hyperparameters(ignore=["encoder"])  # save hyperparameters for easy inference
 
         self.encoder = _get_resnet(**self.config["model"]["architecture"])
         self.encoder.dim = self.encoder.features
