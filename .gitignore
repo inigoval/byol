@@ -16,4 +16,4 @@ imgs
 weights
 
 *.egg-info
-*.cpkt
+*.ckpt
