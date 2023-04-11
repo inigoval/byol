@@ -68,51 +68,6 @@ class RGZ_DataModule(Base_DataModule):
         ]
 
 
-class RGZ_DataModule_Finetune(FineTuning_DataModule):
-    def __init__(self, config):
-        super().__init__(config)
-
-        # Cropping
-        center_crop = config["augmentations"]["center_crop_size"]
-        random_crop = config["augmentations"]["random_crop_scale"]
-
-        self.T_train = T.Compose(
-            [
-                T.RandomRotation(180),
-                T.CenterCrop(center_crop),
-                T.RandomResizedCrop(center_crop, scale=[0.9, 1]),
-                T.RandomHorizontalFlip(),
-                T.RandomVerticalFlip(),
-                T.ToTensor(),
-                T.Normalize(self.mu, self.sig),
-            ]
-        )
-
-        self.T_test = T.Compose(
-            [
-                T.CenterCrop(center_crop),
-                T.ToTensor(),
-                T.Normalize(self.mu, self.sig),
-            ]
-        )
-
-    def prepare_data(self):
-        MBFRFull(self.path, train=False, download=True)
-        MBFRFull(self.path, train=True, download=True)
-
-    def setup(self, stage=None):
-        data_dict = {
-            "root": self.path,
-            "aug_type": "torchvision",
-            "test_size": self.config["finetune"]["test_size"],
-            "seed": self.config["finetune"]["seed"],
-        }
-
-        self.data["train"] = MBFRConfident(**data_dict, train=True, transform=self.T_train)
-        self.data["val"] = MBFRConfident(**data_dict, train=True, transform=self.T_test)
-        self.data["test"] = MBFRConfident(**data_dict, train=False, transform=self.T_test)
-
-
 class RGZ20k(D.Dataset):
     """`RGZ 20k <>`_Dataset
 
