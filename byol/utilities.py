@@ -142,7 +142,7 @@ def _optimizer(
 
 def embed_dataset(encoder, data, batch_size=400):
     print("Embedding dataset...")
-    train_loader = DataLoader(data, batch_size)
+    train_loader = DataLoader(data, batch_size, shuffle=False)
     device = next(encoder.parameters()).device
     feature_bank = []
     target_bank = []

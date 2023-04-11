@@ -67,29 +67,6 @@ class RGZ_DataModule(Base_DataModule):
             }
         ]
 
-    def _test_set(self):
-        d_conf = MBFRConfident(
-            self.path,
-            train=False,
-            test_size=self.config["data"]["test_size"],
-            transform=self.T_test,
-            aug_type="torchvision",
-        )
-
-        d_unc = MBFRUncertain(
-            self.path,
-            train=False,
-            test_size=self.config["data"]["test_size"],
-            transform=self.T_test,
-            aug_type="torchvision",
-        )
-
-        # print(f"test: {len(d_conf)}")
-
-        self.data["test_rgz"] = {"conf": d_conf, "unc": d_unc}
-
-        return d_conf
-
 
 class RGZ_DataModule_Finetune(FineTuning_DataModule):
     def __init__(self, config):
