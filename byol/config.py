@@ -18,8 +18,7 @@ def load_config():
         config = yaml.load(ymlconfig, Loader=yaml.FullLoader)
 
     dataset = config["dataset"]
-    type = config["type"]
-    path = path_dict["config"] / type / f"{dataset}.yml"
+    path = path_dict["config"] / f"{dataset}.yml"
 
     # load data-set specific config
     with open(path, "r") as ymlconfig:
@@ -28,7 +27,7 @@ def load_config():
     # if loading a benchmark, use load the specific config
     preset = dataset_config["preset"]
     if preset != "none":
-        path = path_dict["config"] / type / f"{dataset}-{preset}.yml"
+        path = path_dict["config"] / f"{dataset}-{preset}.yml"
         with open(path, "r") as ymlconfig:
             dataset_config = yaml.load(ymlconfig, Loader=yaml.FullLoader)
 
@@ -72,8 +71,6 @@ def update_config(config):
     config["model"]["architecture"]["n_c"] = config["data"]["color_channels"]
     config["finetune"]["n_classes"] = config["data"]["classes"]
     config["finetune"]["dim"] = config["model"]["architecture"]["features"]
-    # if config["type"] == "mae":
-    #     config["finetune"]["dim"] = config["model"]["vit"]["dim"]
 
 
 def load_config_finetune():
