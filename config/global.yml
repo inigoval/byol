@@ -1,5 +1,5 @@
 type: 'byol'
-project_name: 'BYOL_AblateAugs'
+project_name: 'BYOL_Blur'
 dataset: 'rgz' # ['imagenette', 'rgz', 'gzmnist', 'gz2', 'stl10', 'cifar10']
 seed: 0
 
@@ -8,13 +8,12 @@ dataloading:
   prefetch_factor: 30
   persistent_workers: False  # torch default is False
   pin_memory: True
-  val_batch_size: 500 # validation batch size
+  val_batch_size: 250 # validation batch size
 
 evaluation:
   finetune: True
   knn_eval: False
   linear_eval: True
-  ridge_eval: False
   n_eval_epochs: 1
   checkpoint_mode: 'last'
   early_stopping: False
@@ -34,9 +33,10 @@ precision: 32 # [16, 32, 'bf16'], often overriden
 profiler: 'none'
 
 trainer:
-  gpus: 1 # set to 1 to disable multi gpu training
+  accelerator: 'gpu' # set to 1 to disable multi gpu training
+  devices: 1
   num_nodes: 1
   strategy: null # set to null to disable multi gpu training
-  fast_dev_run: False # debugging mode
+  fast_dev_run: True # debugging mode
   precision: 32 # [16, 32, 'bf16'], often overriden
   deterministic: True

@@ -1,22 +1,100 @@
 finetune:
-  # run_id: '26v8lrkc'
-  run_id: '1cm2z6yo'
-  # run_id: '24uhbe8m'
+  # resnet sizes 
+  # run_id: 'pppmx4ki' # 10
+  # run_id: '1ybdrbl1' # 14
+  run_id: '1dyphjbc' # resnet-18 
+  # run_id: 'a6guyfxw' # 22
+  # run_id: '16bjm8py' # 28
+  # run_id: '3vhqpv3g' # resnet-34
+
+  # cut thresh
+  # run_id: '2f93761w' # 10
+  # run_id: '24s23ev2' # 15 
+  # run_id: '2xrouq9i' # 17 
+  # run_id: '2aw70gac' # 19
+  # run_id: '1gwztfek' # 20
+  # run_id: '275encwc' # 21
+  # run_id: '1l6tph0h' # 22
+  # run_id: '15bxqdry' # 23
+  # run_id: 'vm6gxmzr' # 24
+  # run_id: '2qirt4sj' # 25
+  # run_id: '1doh7b34' # 26
+  # run_id: '1ipcfheh' # 27 
+  # run_id: '34gh9zcc' # 28
+
+  # center crop
+  # run_id: '2cannrby' # 10
+  # run_id: '2fjm9spk' # 20
+  # run_id: 'or4gfy4o' # 30
+  # run_id: '3defflzz' # 40
+  # run_id: '12dzn9x3' # 50
+  # run_id: '2kc8dil6' # 60
+  # run_id: '3gpmuj7h' # 70
+  # run_id: '2j38f0kk' # 80
+  # run_id: '3g1e495m' # 90
+
+  # random crop
+  # run_id: '2v6vog6b' # 0.1
+  # run_id: '1l1otowj' # 0.2
+  # run_id: '2xfoo97k' # 0.3
+  # run_id: 's9f3lx8x' # 0.4
+  # run_id: '2dtixzbx' # 0.5
+  # run_id: '1cyvazi6' # 0.6
+  # run_id: '3e7dtu91' # 0.7
+  # run_id: '3czketkj' # 0.8
+  # run_id: '32ptx4d7' # 0.9
+
+  # blurring
+  # run_id: '2tjqc372' # 0
+  # run_id: '9vgw2w0y' # 0.1
+  # run_id: '1ape16g5' # 0.2
+  # run_id: 'hjw3v1b8' # 0.3
+  # run_id: '3ovqj8qa' # 0.4
+  # run_id: '3ki40f17' # 0.5
+  # run_id: '2rdnzpes' # 0.6
+  # run_id: 'lwgzyuas' # 0.7
+  # run_id: '1q88ghas' # 0.8
+  # run_id: '16f3pof5' # 0.9
+  # run_id: '8ah7ykh0' # 1
+
+  # ablations
+  # run_id: '9vgw2w0y'
+  # run_id: '3fp2tozs'
+  # run_id: '15nfdls4'
+  # run_id: '30m49h74'
+  # run_id: 'godcwj5u'
+  # run_id: '2tjqc372'
+  # run_id: '74fmxwtm'
+  # run_id: '2ocw9ps9'
+  # run_id: '37afz2bn'
+  # run_id: '2r0knef7'
+  # run_id: '2hmjq97s'
+  # run_id: '2m07zlna'
+  # run_id: '3up9q5dy'
+  # run_id: '349296os'
+  # run_id: '1owevmsa'
+
   preset: 'none'
   dataset: 'rgz'
+  n_layers: 0 # -1 finetunes all layers
   n_classes: 2 
   iterations: 10
-  n_layers: 10
   lr_decay: 0.75
-  n_epochs: 100
-  batch_size: 50
-  test_frac: 0.3
+  n_epochs: 300
+  batch_size: 64
+  val_size: 0.25
   early_stopping: False
+  weight_decay: 0.005
+  head: 'mlp'
+  depth: 2
+  width: 256
 
 trainer:
-  gpus: 1 # set to 1 to disable multi gpu training
+  # gpus: 1 # set to 1 to disable multi gpu training
+  devices: 1
   num_nodes: 1
-  strategy: null # set to null to disable multi gpu training
+  # strategy: null # set to null to disable multi gpu training
   fast_dev_run: False # debugging mode
   precision: 32 # [16, 32, 'bf16'], often overriden
   deterministic: True
+  accelerator: 'gpu'

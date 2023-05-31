@@ -20,7 +20,7 @@ data:
     batch_size: 256
     val_batch_size: 500
     cut_threshold: 27
-    test_frac: 0.3 
+    test_size: 0.3 
 
 optimizer:
   type: 'sgd'
@@ -45,10 +45,7 @@ linear:
 
 ## DATA ## 
 augmentations:
-  center_crop_size: 80
+  center_crop_size: 70
   random_crop_scale: !!python/tuple [0.8, 1]
-  p_radio: 0.5
-  p_blur: 0
-  blur_kernel: 3 # Odd non-integer number
+  p_blur: 0.1
   s: 0.5
-  p_aug: 0.5
