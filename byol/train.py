@@ -11,9 +11,6 @@ from config import load_config, update_config
 from dataloading.datamodules import datasets
 from paths import Path_Handler, create_path
 
-from finetune.main import run_finetuning
-from finetune.dataloading import finetune_datasets
-
 # TODO put elsewhere
 # https://colab.research.google.com/github/wandb/examples/blob/master/colabs/pytorch-lightning/Profile_PyTorch_Code.ipynb#scrollTo=qRoUXZdtJIUD
 

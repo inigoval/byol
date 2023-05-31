@@ -85,10 +85,4 @@ def load_config_finetune():
     with open(path, "r") as ymlconfig:
         config = yaml.load(ymlconfig, Loader=yaml.FullLoader)
 
-        # if loading a benchmark, use load the specific config
-        # if (preset := config["finetune"]["preset"]) != "none":
-        path = path_dict["config"] / "finetune.yml"
-        with open(path, "r") as ymlconfig:
-            config = yaml.load(ymlconfig, Loader=yaml.FullLoader)
-
     return config
