@@ -36,7 +36,7 @@ trainer:
   accelerator: 'gpu' # set to 1 to disable multi gpu training
   devices: 1
   num_nodes: 1
-  strategy: null # set to null to disable multi gpu training
+  strategy: 'auto' 
   fast_dev_run: True # debugging mode
   precision: 32 # [16, 32, 'bf16'], often overriden
   deterministic: True

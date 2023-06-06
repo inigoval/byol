@@ -1,22 +1,24 @@
 import logging
-from typing import Type, Any, Callable, Union, List, Optional
+import numpy as np
 
 import torch
+import torch.utils.data as D
 import matplotlib.pyplot as plt
 
 from torch.optim import Optimizer
 from PIL import Image
 from mpl_toolkits.axes_grid1 import ImageGrid
 from torch.utils.data import DataLoader
-from torchvision.utils import make_grid
 from tqdm import tqdm
+from torchvision.utils import make_grid
+from typing import Type, Any, Callable, Union, List, Optional
+from torch.optim.lr_scheduler import LambdaLR
 
 from byol.paths import Path_Handler
 
 
 # Define paths
-paths = Path_Handler()
-path_dict = paths._dict()
+paths = Path_Handler()._dict()
 
 
 def fig2img(fig):
@@ -50,6 +52,32 @@ def batch_eval(fn_dict, dset, batch_size=200):
     return outs
 
 
+def CosineLinearWarmupScheduler(opt, warmup_epochs, max_epochs):
+    """Cosine annealing with linear warmup.
+
+    Args:
+        opt (torch.optim.Optimizer): Optimizer to use.
+        warmup_epochs (int): Number of epochs for warmup.
+        total_epochs (int): Total number of epochs.
+
+    Returns:
+        torch.optim.lr_scheduler.LambdaLR: Learning rate scheduler.
+    """
+    # Reduce linear warmup epochs to account for 0th epoch
+    warmup_epochs -= 1
+
+    # Linear warmup schedule
+    warmup_lr_schedule = lambda t: (t + 1) / warmup_epochs if t <= warmup_epochs else 1.0
+
+    # Cosine annealing schedule
+    cosine_lr_schedule = lambda t: 0.5 * (1 + cos(pi * t / max_epochs))
+
+    # Combine schedules
+    lr_schedule = lambda t: warmup_lr_schedule(t) * cosine_lr_schedule(t)
+
+    return LambdaLR(opt, lr_schedule)
+
+
 def _scheduler(
     opt: Optimizer,
     n_epochs: int,
@@ -61,7 +89,7 @@ def _scheduler(
         return scheduler
 
     elif decay_type == "warmupcosine":
-        scheduler = LinearWarmupCosineAnnealingLR(
+        scheduler = CosineLinearWarmupScheduler(
             opt,
             warmup_epochs,
             max_epochs=n_epochs,

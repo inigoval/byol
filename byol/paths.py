@@ -28,26 +28,6 @@ class Path_Handler:
 
         self.path_dict["rgz"] = self.path_dict["data"] / "rgz"
         self.path_dict["mb"] = self.path_dict["data"] / "mb"
-        self.path_dict["imagenette"] = self.path_dict["data"] / "imagenette-160"
-        self.path_dict["stl10"] = self.path_dict["data"] / "stl10"
-        self.path_dict["cifar10"] = self.path_dict["data"] / "cifar10"
-        self.path_dict["gzmnist"] = self.path_dict["data"] / "gzmnist"
-        self.path_dict["gz2"] = self.path_dict["data"] / "gz2"
-        self.path_dict["legs"] = (
-            self.path_dict["data"] / "does_nothing"
-        )  # will ignore this and use hardcoded paths
-        # TODO this is going to get really ugly, needs a rethink?
-        self.path_dict["legs_and_rings"] = self.path_dict[
-            "data"
-        ]  # sets its own subdirectories in foundation.datasets.legs.legs_and_rings
-        self.path_dict["mixed"] = self.path_dict[
-            "data"
-        ]  # sets its own subdirectories in foundation.datasets.legs.legs_and_rings
-        self.path_dict["decals_dr5"] = self.path_dict["data"] / "decals_dr5"
-        self.path_dict["rings"] = self.path_dict["data"] / "rings"
-        self.path_dict["tidal"] = self.path_dict["data"] / "tidal"
-        self.path_dict["candels"] = self.path_dict["data"] / "candels"
-        self.path_dict["candels"] = self.path_dict["data"] / "hubble"
 
     def create_paths(self):
         """Create missing directories"""

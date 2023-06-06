@@ -10,9 +10,9 @@ from lightly.models.utils import deactivate_requires_grad
 from lightly.models.utils import update_momentum
 from pytorch_lightning.callbacks import Callback
 
-from evaluation import Lightning_Eval
-from utilities import _optimizer, _scheduler
-from resnet import _get_resnet
+from byol.evaluation import Lightning_Eval
+from byol.utilities import _optimizer, _scheduler
+from byol.resnet import _get_resnet
 
 
 class BYOL(Lightning_Eval):

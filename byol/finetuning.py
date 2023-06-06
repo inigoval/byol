@@ -1,29 +1,25 @@
 import wandb
 import pytorch_lightning as pl
 import logging
-
-from pathlib import Path
-
-from paths import Path_Handler
-from finetune.dataloading import finetune_datasets
-from config import load_config, update_config, load_config_finetune
-from models import BYOL
-
-
 import pytorch_lightning as pl
 import torch
 import torchmetrics as tm
 import torch.nn.functional as F
 import torch.nn as nn
-from typing import Union
 
+from pathlib import Path
 from einops import rearrange
-from typing import Any, Dict, List, Tuple, Type
-
+from typing import Any, Dict, List, Tuple, Type, Union
 from torch import Tensor
+from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
+
+from paths import Path_Handler
+from config import load_config, update_config, load_config_finetune
+from models import BYOL
+from datamodules import RGZ_DataModule_Finetune
+
 
 # from models import LogisticRegression
-from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 
 
 class LogisticRegression(torch.nn.Module):
@@ -313,7 +309,7 @@ def main():
             experiment_dir = path_dict["files"] / config_finetune["finetune"]["run_id"] / "checkpoints"
             model = BYOL.load_from_checkpoint(experiment_dir / "last.ckpt")
         else:
-            model = BYOL.load_from_checkpoint("model.ckpt")
+            model = BYOL.load_from_checkpoint("byol.ckpt")
 
         ## Load up config from model to save correct hparams for easy logging ##
         config = model.config
@@ -325,7 +321,7 @@ def main():
         # project_name = "BYOL_nlayers_finetune"
         # project_name = "BYOL_laptoptest_finetune"
         # project_name = "BYOL_debugging"
-        project_name = "BYOL_finetune_mlp"
+        project_name = "BYOL_finetune_reproduce"
 
         config["finetune"]["seed"] = seed
         pl.seed_everything(seed)
@@ -340,7 +336,7 @@ def main():
             config=config,
         )
 
-        finetune_datamodule = finetune_datasets[config["dataset"]](config)
+        finetune_datamodule = RGZ_DataModule_Finetune(config)
         run_finetuning(config, model.encoder, finetune_datamodule, logger)
         logger.experiment.finish()
         wandb.finish()

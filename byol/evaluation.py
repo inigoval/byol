@@ -11,7 +11,18 @@ from typing import Any, Dict, List, Tuple, Type
 from torch import Tensor
 
 from byol.utilities import log_examples, embed_dataset
-from byol.networks.models import LogisticRegression
+
+
+class LogisticRegression(torch.nn.Module):
+    def __init__(self, input_dim, output_dim):
+        super().__init__()
+        self.batchnorm = nn.BatchNorm1d(input_dim)
+        self.linear = torch.nn.Linear(input_dim, output_dim)
+
+    def forward(self, x):
+        x = self.batchnorm(x)
+        x = self.linear(x)
+        return x
 
 
 class Lightning_Eval(pl.LightningModule):
@@ -167,128 +178,3 @@ class Linear_Eval(Data_Eval):
         for val_name, acc in pl_module.lin_acc[stage].items():
             # Grab evaluation data-set name directly from dataloader
             pl_module.log(f"{stage}/{self.train_data_name}/linear_acc/{val_name}", acc.compute())
-
-
-class FineTune(pl.LightningModule):
-    """
-    Parent class for self-supervised LightningModules to perform linear evaluation with multiple
-    data-sets.
-    """
-
-    def __init__(
-        self,
-        encoder,
-        dim,
-        n_classes,
-        n_epochs=100,
-        n_layers=0,
-        batch_size=1024,
-        lr_decay=0.75,
-        seed=0,
-        **kwargs,
-    ):
-        super().__init__()
-        self.n_layers = n_layers
-        self.freeze = True if n_layers == 0 else False
-        self.batch_size = batch_size
-        self.encoder = encoder
-        self.lr_decay = lr_decay
-        self.head = LogisticRegression(input_dim=dim, output_dim=n_classes)
-        self.n_epochs = n_epochs
-        self.seed = seed
-
-        self.val_acc = tm.Accuracy(average="micro", threshold=0)
-        self.test_acc = tm.Accuracy(average="micro", threshold=0)
-
-    def forward(self, x: Tensor) -> Tensor:
-        x = self.encoder(x)
-        x = rearrange(x, "b c h w -> b (c h w)")
-        x = self.head(x)
-        return x
-
-    def on_fit_start(self):
-        # Log size of data-sets #
-        logging_params = {key: len(value) for key, value in self.trainer.datamodule.data.items()}
-        self.logger.log_hyperparams(logging_params)
-
-    def training_step(self, batch, batch_idx):
-        # Load data and targets
-        x, y = batch
-        logits = self.forward(x)
-        y_pred = logits.softmax(dim=-1)
-        loss = F.cross_entropy(y_pred, y, label_smoothing=0.1 if self.freeze else 0)
-        self.log("finetune/train_loss_{self.seed}", loss, on_step=False, on_epoch=True)
-        return loss
-
-    def validation_step(self, batch, batch_idx, dataloader_idx=0):
-        x, y = batch
-        preds = self.forward(x)
-        self.val_acc(preds, y)
-        self.log("finetuning/val_acc_{self.seed}", self.val_acc, on_step=False, on_epoch=True)
-
-    def test_step(self, batch, batch_idx, dataloader_idx=0):
-        x, y = batch
-        preds = self.forward(x)
-        self.test_acc(preds, y)
-        self.log("finetuning/test_acc_{self.seed}", self.test_acc, on_step=False, on_epoch=True)
-
-    def configure_optimizers(self):
-        if self.freeze:
-            # Scale base lr=0.1
-            lr = 0.1 * self.batch_size / 256
-            params = self.head.parameters()
-            return torch.optim.SGD(params, momentum=0.9, lr=lr)
-        else:
-            lr = 0.001 * self.batch_size / 256
-            params = [{"params": self.head.parameters(), "lr": lr}]
-            layers = self.encoder.finetuning_layers[::-1]
-            # layers.reverse()
-            assert self.n_layers <= len(
-                layers
-            ), f"Network only has {len(layers)} layers, {self.n_layers} specified for finetuning"
-            for i, layer in enumerate(layers[: self.n_layers]):
-                params.append({"params": layer.parameters(), "lr": lr * (self.lr_decay**i)})
-
-            opt = torch.optim.AdamW(params, weight_decay=0.05, betas=(0.9, 0.999))
-            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(opt, self.n_epochs)
-            return [opt], [scheduler]
-
-
-def finetune(config, encoder, datamodule, logger):
-    checkpoint = pl.callbacks.ModelCheckpoint(
-        monitor=None,
-        every_n_epochs=1,
-        save_on_train_epoch_end=True,
-        auto_insert_metric_name=False,
-        verbose=True,
-        dirpath=config["files"] / config["run_id"] / "finetuning",
-        # e.g. byol/files/(run_id)/checkpoints/12-344-18.134.ckpt.
-        filename="{epoch}",  # filename may not work here TODO
-        save_weights_only=True,
-        # save_top_k=3,
-    )
-
-    trainer_settings = {
-        "slurm": {"gpus": 1, "num_nodes": 1},
-        "gpu": {"devices": 1, "accelerator": "gpu"},
-    }
-    config["trainer_settings"] = trainer_settings[config["compute"]]
-
-    ## Initialise pytorch lightning trainer ##
-    trainer = pl.Trainer(
-        **trainer_settings[config["compute"]],
-        fast_dev_run=config["trainer"]["fast_dev_run"],
-        max_epochs=config["finetune"]["n_epochs"],
-        logger=logger,
-        deterministic=True,
-        callbacks=[checkpoint],
-        precision=config["precision"],
-    )
-
-    model = FineTune(encoder, **config["finetune"])
-
-    trainer.fit(model, datamodule)
-
-    trainer.test(model)
-
-    return checkpoint, model
