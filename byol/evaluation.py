@@ -2,7 +2,7 @@ import pytorch_lightning as pl
 import torch
 import torchmetrics as tm
 import torch.nn.functional as F
-import sklearn
+from sklearn import linear_model
 import logging
 from einops import rearrange
 
@@ -151,7 +151,7 @@ class Linear_Eval(Data_Eval):
 
     def setup(self, pl_module, data):
         with torch.no_grad():
-            model = sklearn.linear_model.LogisticRegression(penalty="none")
+            model = linear_model.LogisticRegression(penalty="none")
             X, y = embed_dataset(pl_module.encoder, data)
             X, y = X.detach().cpu().numpy(), y.detach().cpu().numpy()
             self.scaler = StandardScaler()

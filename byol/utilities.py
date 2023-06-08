@@ -13,6 +13,7 @@ from tqdm import tqdm
 from torchvision.utils import make_grid
 from typing import Type, Any, Callable, Union, List, Optional
 from torch.optim.lr_scheduler import LambdaLR
+from math import cos, pi
 
 from byol.paths import Path_Handler
 

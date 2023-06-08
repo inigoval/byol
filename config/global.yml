@@ -1,5 +1,5 @@
 type: 'byol'
-project_name: 'BYOL_Blur'
+project_name: 'BYOL_Debug'
 dataset: 'rgz' # ['imagenette', 'rgz', 'gzmnist', 'gz2', 'stl10', 'cifar10']
 seed: 0
 
@@ -37,6 +37,6 @@ trainer:
   devices: 1
   num_nodes: 1
   strategy: 'auto' 
-  fast_dev_run: True # debugging mode
+  fast_dev_run: False # debugging mode
   precision: 32 # [16, 32, 'bf16'], often overriden
   deterministic: True

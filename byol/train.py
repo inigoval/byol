@@ -4,30 +4,16 @@ import logging
 import torch
 
 from pytorch_lightning.callbacks import LearningRateMonitor
-from pytorch_lightning.profiler import AdvancedProfiler, PyTorchProfiler
 
 from models import BYOL
 from config import load_config, update_config
-from dataloading.datamodules import datasets
+from datamodules import RGZ_DataModule
 from paths import Path_Handler, create_path
+from finetuning import run_finetuning
+from datamodules import RGZ_DataModule, RGZ_DataModule_Finetune
 
 # TODO put elsewhere
 # https://colab.research.google.com/github/wandb/examples/blob/master/colabs/pytorch-lightning/Profile_PyTorch_Code.ipynb#scrollTo=qRoUXZdtJIUD
-
-
-class TorchTensorboardProfilerCallback(pl.Callback):
-    """Quick-and-dirty Callback for invoking TensorboardProfiler during training.
-
-    For greater robustness, extend the pl.profiler.profilers.BaseProfiler. See
-    https://pytorch-lightning.readthedocs.io/en/stable/advanced/profiler.html"""
-
-    def __init__(self, profiler):
-        super().__init__()
-        self.profiler = profiler
-
-    def on_train_batch_end(self, trainer, pl_module, outputs, *args, **kwargs):
-        self.profiler.step()
-        pl_module.log_dict(outputs)  # also logging the loss, while we're here
 
 
 def run_contrastive_pretraining(config, wandb_logger):
@@ -36,9 +22,6 @@ def run_contrastive_pretraining(config, wandb_logger):
     # Save model for test evaluation
     # TODO might be better to use val/supervised_loss when available
     loss_to_monitor = "train/loss"
-
-    if (config["type"] == "byol_supervised") and (config["supervised_loss_weight"] > 0):
-        loss_to_monitor = "val/supervised_loss/dataloader_idx_2"
 
     checkpoint_mode = {
         "min_loss": {"mode": "min", "monitor": loss_to_monitor},
@@ -66,7 +49,7 @@ def run_contrastive_pretraining(config, wandb_logger):
     logging.info(f"checkpoint monitoring: {checkpoint_mode[config['evaluation']['checkpoint_mode']]}")
 
     ## Initialise data and run set up ##
-    pretrain_data = datasets[config["dataset"]](config)
+    pretrain_data = RGZ_DataModule(config)
     pretrain_data.prepare_data()
     pretrain_data.setup()
     logging.info(f"mean: {pretrain_data.mu}, sigma: {pretrain_data.sig}")
@@ -82,18 +65,6 @@ def run_contrastive_pretraining(config, wandb_logger):
     # if config['profiler'] == 'kineto':
     # callbacks += [profiler_callback]
 
-    ## Add profiler ##
-    if config["profiler"] == "advanced":
-        logging.info("Using advanced profiler")
-        profiler = AdvancedProfiler(dirpath=experiment_dir, filename="advanced_profile")  # .txt
-    elif config["profiler"] == "pytorch":
-        logging.info("Using pytorch profiler")
-        # .txt
-        profiler = PyTorchProfiler(dirpath=experiment_dir, filename="pytorch_profile", row_limit=-1)
-    else:
-        logging.info("No profiler used")
-        profiler = None
-
     logging.info(f"Threads: {torch.get_num_threads()}")
 
     ## Initialise pytorch lightning trainer ##
@@ -104,7 +75,6 @@ def run_contrastive_pretraining(config, wandb_logger):
         logger=wandb_logger,
         callbacks=callbacks,
         log_every_n_steps=200,
-        profiler=profiler,
         # max_steps = 200  # TODO temp
     )
 

@@ -1,7 +1,7 @@
 preset: 'none'
 
 model:
-    n_epochs: 500
+    n_epochs: 5
     m: 0.996 # Controls EMA hyperparameter for BYOL momentum encoder
     m_decay: False
 
