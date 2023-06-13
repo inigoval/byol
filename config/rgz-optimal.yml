@@ -1,7 +1,7 @@
 preset: 'none'
 
 model:
-    n_epochs: 5
+    n_epochs: 300
     m: 0.996 # Controls EMA hyperparameter for BYOL momentum encoder
     m_decay: False
 
@@ -36,16 +36,12 @@ data:
     rotate: True
     input_height: 128 # Keep this at 128 and adjust center_crop_size
     batch_size: 1024 
-    val_batch_size: 500
-    cut_threshold: 20
+    cut_threshold: 25
     test_size: 0.2
 
-## DATA ## 
 augmentations:
   center_crop_size: 70
   random_crop_scale: !!python/tuple [0.8, 1]
-  center_crop: True
-
   rotation: True
   random_crop: True
   flip: True

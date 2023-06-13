@@ -42,12 +42,10 @@ data:
 
 ## DATA ## 
 augmentations:
-  center_crop_size: 70
-  random_crop_scale: !!python/tuple [0.8, 1]
-  center_crop: True
+  center_crop: 70
+  random_crop: !!python/tuple [0.8, 1]
 
   rotation: True
-  random_crop: True
   flip: True
   s: 0.5 # Set to 0 to disable
   p_blur: 0 # set to 0 to disable blurring

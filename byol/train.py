@@ -16,7 +16,7 @@ from datamodules import RGZ_DataModule, RGZ_DataModule_Finetune
 # https://colab.research.google.com/github/wandb/examples/blob/master/colabs/pytorch-lightning/Profile_PyTorch_Code.ipynb#scrollTo=qRoUXZdtJIUD
 
 
-def run_contrastive_pretraining(config, wandb_logger):
+def run_contrastive_pretraining(config, datamodule, wandb_logger):
     pl.seed_everything(config["seed"])
 
     # Save model for test evaluation
@@ -48,12 +48,6 @@ def run_contrastive_pretraining(config, wandb_logger):
     )
     logging.info(f"checkpoint monitoring: {checkpoint_mode[config['evaluation']['checkpoint_mode']]}")
 
-    ## Initialise data and run set up ##
-    pretrain_data = RGZ_DataModule(config)
-    pretrain_data.prepare_data()
-    pretrain_data.setup()
-    logging.info(f"mean: {pretrain_data.mu}, sigma: {pretrain_data.sig}")
-
     ## Initialise callbacks ##
     callbacks = [pretrain_checkpoint]
 
@@ -81,13 +75,9 @@ def run_contrastive_pretraining(config, wandb_logger):
     # Initialise model #
     model = BYOL(config)
 
-    # profile_art = wandb.Artifact(f"trace-{wandb.run.id}", type="profile")
-    # profile_art.add_file(glob.glob(str(experiment_dir / "*.pt.trace.json"))[0], "trace.pt.trace.json")
-    # wandb.run.log_artifact(profile_art)
-
     # Train model #
-    pre_trainer.fit(model, pretrain_data)
-    pre_trainer.test(model, dataloaders=pretrain_data)
+    pre_trainer.fit(model, datamodule)
+    pre_trainer.test(model, dataloaders=datamodule)
 
     return pretrain_checkpoint, model
 
@@ -105,29 +95,38 @@ def main():
     wandb.init(project=config["project_name"])
     config["run_id"] = str(wandb.run.id)
 
-    path_dict = Path_Handler()._dict()
+    paths = Path_Handler()._dict()
 
     wandb_logger = pl.loggers.WandbLogger(
         project=config["project_name"],
         # and will then add e.g. run-20220513_122412-l5ikqywp automatically
-        save_dir=path_dict["files"] / config["run_id"],
+        save_dir=paths["files"] / config["run_id"],
         # log_model="True",
         # reinit=True,
         config=config,
     )
 
-    config["files"] = path_dict["files"]
+    config["files"] = paths["files"]
+
+    datamodule = RGZ_DataModule(
+        path=paths["rgz"],
+        batch_size=config["data"]["batch_size"],
+        center_crop=config["augmentations"]["center_crop"],
+        random_crop=config["augmentations"]["random_crop"],
+        s=config["augmentations"]["s"],
+        p_blur=config["augmentations"]["p_blur"],
+        flip=config["augmentations"]["flip"],
+        rotation=config["augmentations"]["rotation"],
+        cut_threshold=config["data"]["cut_threshold"],
+        prefetch_factor=config["dataloading"]["prefetch_factor"],
+        num_workers=config["dataloading"]["num_workers"],
+    )
 
     ## Run pretraining ##
-    pretrain_checkpoint, model = run_contrastive_pretraining(config, wandb_logger)
+    pretrain_checkpoint, model = run_contrastive_pretraining(config, datamodule, wandb_logger)
 
     wandb.save(pretrain_checkpoint.best_model_path)
     # wadnb.save()
-
-    if config["evaluation"]["finetune"] is True and not config["trainer"]["fast_dev_run"]:
-        finetune_datamodule = finetune_datasets[config["dataset"]](config)
-        run_finetuning(config, model.encoder, finetune_datamodule, wandb_logger)
-
     wandb_logger.experiment.finish()
 
 
