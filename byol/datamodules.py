@@ -257,16 +257,20 @@ class RGZ_DataModule(Base_DataModule):
 
 
 class FineTuning_DataModule(pl.LightningDataModule):
-    def __init__(self, config):
+    def __init__(
+        self,
+        path,
+        batch_size,
+        num_workers=0,
+        prefetch_factor=20,
+        pin_memory=False,
+    ):
         super().__init__()
-
-        # override default paths via config if desired
-        path_dict = Path_Handler()._dict()
-        self.path = path_dict[config["dataset"]]
-
-        self.config = config
-
-        self.mu, self.sig = config["data"]["mu"], config["data"]["sig"]
+        self.path = path
+        self.batch_size = batch_size
+        self.num_workers = num_workers
+        self.prefetch_factor = prefetch_factor
+        self.pin_memory = pin_memory
 
         self.data = {}
 
@@ -276,9 +280,10 @@ class FineTuning_DataModule(pl.LightningDataModule):
     def train_dataloader(self):
         loader = DataLoader(
             self.data["train"],
-            batch_size=self.config["finetune"]["batch_size"],
-            num_workers=8,
-            prefetch_factor=30,
+            batch_size=self.batch_size,
+            num_workers=self.num_workers,
+            prefetch_factor=self.prefetch_factor,
+            pin_memory=self.pin_memory,
             shuffle=True,
         )
         return loader
@@ -286,32 +291,61 @@ class FineTuning_DataModule(pl.LightningDataModule):
     def val_dataloader(self):
         loader = DataLoader(
             self.data["val"],
-            batch_size=200,
-            num_workers=8,
-            prefetch_factor=30,
+            batch_size=self.batch_size,
+            num_workers=self.num_workers,
+            prefetch_factor=self.prefetch_factor,
+            pin_memory=self.pin_memory,
             shuffle=False,
         )
         return loader
 
     def test_dataloader(self):
         loaders = [
-            DataLoader(data, **self.config["val_dataloader"]) for data in self.data["test"].values()
+            DataLoader(
+                data,
+                batch_size=self.batch_size,
+                num_workers=self.num_workers,
+                prefetch_factor=self.prefetch_factor,
+                pin_memory=self.pin_memory,
+                shuffle=False,
+            )
+            for data in self.data["test"].values()
         ]
         return loaders
 
 
 class RGZ_DataModule_Finetune(FineTuning_DataModule):
-    def __init__(self, config):
-        super().__init__(config)
+    def __init__(
+        self,
+        path,
+        batch_size,
+        center_crop,
+        val_size=0.2,
+        num_workers=0,
+        prefetch_factor=20,
+        pin_memory=False,
+        seed=69,
+    ):
+        super().__init__(
+            path,
+            batch_size,
+            num_workers=num_workers,
+            prefetch_factor=prefetch_factor,
+            pin_memory=pin_memory,
+        )
 
-        # Cropping
-        center_crop = config["augmentations"]["center_crop_size"]
+        self.mu = (0.008008896,)
+        self.sig = (0.05303395,)
+
+        self.center_crop = center_crop
+        self.val_size = val_size
+        self.seed = seed
 
         self.train_transform = T.Compose(
             [
                 T.RandomRotation(180),
-                T.CenterCrop(center_crop),
-                T.RandomResizedCrop(center_crop, scale=(0.9, 1)),
+                T.CenterCrop(self.center_crop),
+                T.RandomResizedCrop(self.center_crop, scale=(0.9, 1)),
                 T.RandomHorizontalFlip(),
                 T.RandomVerticalFlip(),
                 T.ToTensor(),
@@ -360,14 +394,14 @@ class RGZ_DataModule_Finetune(FineTuning_DataModule):
             },
         )
 
-        if self.config["finetune"]["val_size"] != 0:
+        if self.val_size != 0:
             data = MBFRConfident(self.path, aug_type="torchvision", train=True)
             idx = np.arange(len(data))
             idx_train, idx_val = train_test_split(
                 idx,
-                test_size=self.config["finetune"]["val_size"],
+                test_size=self.val_size,
                 stratify=data.full_targets,
-                random_state=self.config["finetune"]["seed"],
+                random_state=self.seed,
             )
 
             self.data["train"] = Subset(
@@ -402,17 +436,35 @@ class RGZ_DataModule_Finetune(FineTuning_DataModule):
 
 
 class RGZ_DataModule_Finetune_Regression(FineTuning_DataModule):
-    def __init__(self, config):
-        super().__init__(config)
+    def __init__(
+        self,
+        path,
+        batch_size,
+        center_crop,
+        val_size=0.2,
+        num_workers=0,
+        prefetch_factor=20,
+        pin_memory=False,
+        seed=69,
+    ):
+        super().__init__(
+            path,
+            batch_size,
+            num_workers=num_workers,
+            prefetch_factor=prefetch_factor,
+            pin_memory=pin_memory,
+        )
 
-        # Cropping
-        center_crop = config["augmentations"]["center_crop_size"]
+        self.mu = (0.008008896,)
+        self.sig = (0.05303395,)
+
+        self.center_crop = center_crop
 
         self.train_transform = T.Compose(
             [
                 T.RandomRotation(180),
-                T.CenterCrop(center_crop),
-                T.RandomResizedCrop(center_crop, scale=(0.9, 1)),
+                T.CenterCrop(self.center_crop),
+                T.RandomResizedCrop(self.center_crop, scale=(0.9, 1)),
                 T.RandomHorizontalFlip(),
                 T.RandomVerticalFlip(),
                 T.ToTensor(),
@@ -451,14 +503,14 @@ class RGZ_DataModule_Finetune_Regression(FineTuning_DataModule):
             },
         )
 
-        if self.config["finetune"]["val_size"] != 0:
+        if self.val_size != 0:
             data = MBFRConfident(self.path, aug_type="torchvision", train=True)
             idx = np.arange(len(data))
             idx_train, idx_val = train_test_split(
                 idx,
-                test_size=self.config["finetune"]["val_size"],
+                test_size=self.val_size,
                 stratify=data.full_targets,
-                random_state=self.config["finetune"]["seed"],
+                random_state=self.seed,
             )
 
             self.data["train"] = Subset(

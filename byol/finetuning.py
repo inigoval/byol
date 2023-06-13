@@ -296,7 +296,7 @@ def main():
     )
 
     # Load paths
-    path_dict = Path_Handler()._dict()
+    paths = Path_Handler()._dict()
 
     # Load up finetuning config
     config_finetune = load_config_finetune()
@@ -306,7 +306,7 @@ def main():
         # for seed in range(1, 10):
 
         if config_finetune["finetune"]["run_id"].lower() != "none":
-            experiment_dir = path_dict["files"] / config_finetune["finetune"]["run_id"] / "checkpoints"
+            experiment_dir = paths["files"] / config_finetune["finetune"]["run_id"] / "checkpoints"
             model = BYOL.load_from_checkpoint(experiment_dir / "last.ckpt")
         else:
             model = BYOL.load_from_checkpoint("byol.ckpt")
@@ -331,12 +331,21 @@ def main():
 
         logger = pl.loggers.WandbLogger(
             project=project_name,
-            save_dir=path_dict["files"] / "finetune" / str(wandb.run.id),
+            save_dir=paths["files"] / "finetune" / str(wandb.run.id),
             reinit=True,
             config=config,
         )
 
-        finetune_datamodule = RGZ_DataModule_Finetune(config)
+        finetune_datamodule = RGZ_DataModule_Finetune(
+            paths["rgz"],
+            batch_size=config["finetune"]["batch_size"],
+            center_crop=config["augmentations"]["center_crop"],
+            val_size=config["finetune"]["val_size"],
+            num_workers=config["dataloading"]["num_workers"],
+            prefetch_factor=config["dataloading"]["prefetch_factor"],
+            pin_memory=config["dataloading"]["pin_memory"],
+            seed=config["finetune"]["seed"],
+        )
         run_finetuning(config, model.encoder, finetune_datamodule, logger)
         logger.experiment.finish()
         wandb.finish()

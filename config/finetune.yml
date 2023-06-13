@@ -1,6 +1,7 @@
 finetune:
   # resnet sizes 
   run_id: 'none' # resnet-18 
+  seed: 69
 
   preset: 'optimal'
   dataset: 'rgz'
