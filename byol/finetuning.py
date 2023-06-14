@@ -19,9 +19,6 @@ from models import BYOL
 from datamodules import RGZ_DataModule_Finetune
 
 
-# from models import LogisticRegression
-
-
 class LogisticRegression(torch.nn.Module):
     def __init__(self, input_dim, output_dim):
         super().__init__()
@@ -316,14 +313,10 @@ def main():
         config.update(config_finetune)
         config["finetune"]["dim"] = model.encoder.dim
 
+        # Compatibility with old style config
         if config["augmentations"]["center_crop"] is True:
             config["augmentations"]["center_crop"] = config["augmentations"]["center_crop_size"]
-        # project_name = f"{config['project_name']}_finetune"
-        # project_name = "BYOL_LDecay_finetune"
-        # project_name = "BYOL_LabelVolume_finetune"
-        # project_name = "BYOL_nlayers_finetune"
-        # project_name = "BYOL_laptoptest_finetune"
-        # project_name = "BYOL_debugging"
+
         project_name = "BYOL_finetune_reproduce"
 
         config["finetune"]["seed"] = seed
