@@ -191,7 +191,7 @@ class RGZ_DataModule(Base_DataModule):
 
         # Re-initialise dataset with new mu and sig values
         d_rgz = RGZ108k(self.path, train=True, transform=self.train_transform)
-        d_rgz = rgz_cut(d_rgz, self.cut_threshold, mb_cut=True, remove_duplicates=False)
+        d_rgz = rgz_cut(d_rgz, self.cut_threshold, mb_cut=True, remove_duplicates=True)
         self.data["train"] = d_rgz
 
         self.data["val"] = [
@@ -482,15 +482,10 @@ class RGZ_DataModule_Finetune_Regression(FineTuning_DataModule):
         pass
 
     def setup(self, stage=None):
+        self.data["train"] = RGZ108k(self.path, train=True, transform=self.train_transform)
+
         self.data["test"] = OrderedDict(
             {
-                "MB_conf_test": MBFRConfident(
-                    self.path,
-                    aug_type="torchvision",
-                    train=False,
-                    test_size=None,
-                    transform=self.test_transform,
-                ),
                 "MB_unc_test": MBFRUncertain(
                     self.path,
                     aug_type="torchvision",
