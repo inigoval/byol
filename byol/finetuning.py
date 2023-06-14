@@ -315,6 +315,9 @@ def main():
         config = model.config
         config.update(config_finetune)
         config["finetune"]["dim"] = model.encoder.dim
+
+        if config["augmentations"]["center_crop"] is True:
+            config["augmentations"]["center_crop"] = config["augmentations"]["center_crop_size"]
         # project_name = f"{config['project_name']}_finetune"
         # project_name = "BYOL_LDecay_finetune"
         # project_name = "BYOL_LabelVolume_finetune"

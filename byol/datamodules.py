@@ -365,35 +365,6 @@ class RGZ_DataModule_Finetune(FineTuning_DataModule):
         pass
 
     def setup(self, stage=None):
-        # Get test set which is held out and does not change
-        # self.data["test"] = MBFRConfident(
-        #     self.path,
-        #     aug_type="torchvision",
-        #     train=False,
-        #     # test_size=self.config["finetune"]["test_size"],
-        #     test_size=None,
-        #     transform=self.test_transform,
-        # )
-
-        self.data["test"] = OrderedDict(
-            {
-                "MB_conf_test": MBFRConfident(
-                    self.path,
-                    aug_type="torchvision",
-                    train=False,
-                    test_size=None,
-                    transform=self.test_transform,
-                ),
-                "MB_unc_test": MBFRUncertain(
-                    self.path,
-                    aug_type="torchvision",
-                    train=False,
-                    test_size=None,
-                    transform=self.test_transform,
-                ),
-            },
-        )
-
         if self.val_size != 0:
             data = MBFRConfident(self.path, aug_type="torchvision", train=True)
             idx = np.arange(len(data))
@@ -428,11 +399,36 @@ class RGZ_DataModule_Finetune(FineTuning_DataModule):
 
         else:
             self.data["train"] = MBFRConfident(
-                self.path, aug_type="torchvision", train=True, transform=self.train_transform
+                self.path,
+                aug_type="torchvision",
+                train=True,
+                transform=self.train_transform,
             )
             self.data["val"] = MBFRConfident(
-                self.path, aug_type="torchvision", train=True, transform=self.test_transform
+                self.path,
+                aug_type="torchvision",
+                train=True,
+                transform=self.test_transform,
             )
+
+        self.data["test"] = OrderedDict(
+            {
+                "MB_conf_test": MBFRConfident(
+                    self.path,
+                    aug_type="torchvision",
+                    train=False,
+                    test_size=None,
+                    transform=self.test_transform,
+                ),
+                "MB_unc_test": MBFRUncertain(
+                    self.path,
+                    aug_type="torchvision",
+                    train=False,
+                    test_size=None,
+                    transform=self.test_transform,
+                ),
+            },
+        )
 
 
 class RGZ_DataModule_Finetune_Regression(FineTuning_DataModule):
@@ -459,6 +455,8 @@ class RGZ_DataModule_Finetune_Regression(FineTuning_DataModule):
         self.sig = (0.05303395,)
 
         self.center_crop = center_crop
+        self.val_size = val_size
+        self.seed = seed
 
         self.train_transform = T.Compose(
             [
