@@ -14,6 +14,7 @@ from torchvision.utils import make_grid
 from typing import Type, Any, Callable, Union, List, Optional
 from torch.optim.lr_scheduler import LambdaLR
 from math import cos, pi
+from sklearn.model_selection import train_test_split
 
 from byol.paths import Path_Handler
 
@@ -297,3 +298,34 @@ def compute_mu_sig_features(dset, batch_size=0):
     else:
         x, _ = dset2tens(dset)
         return torch.mean(x).item(), torch.std(x).item()
+
+
+def train_val_test_split(dset, test_size=0.2, val_size=0.2, val_seed=69, test_seed=69):
+    """Split a dataset into train, validation and test sets"""
+
+    idx = np.arange(len(dset))
+    idx_train_val, idx_test = train_test_split(idx, test_size=test_size, random_state=test_seed)
+    idx_train, idx_val = train_test_split(idx_train_val, test_size=val_size, random_state=val_seed)
+
+    dset_train = D.Subset(dset, idx_train)
+    dset_val = D.Subset(dset, idx_val)
+    dset_test = D.Subset(dset, idx_test)
+
+    return dset_train, dset_val, dset_test
+
+
+def iterative_split(idx, *args, seed=69):
+    """Return a list of random subsets of idx"""
+
+    generator = np.random.default_rng(seed)
+    generator.shuffle(idx)
+
+    split_idx = []
+    for i in idx:
+        split_idx.append(len(split_idx) + i * (len(idx) - len(split_idx)))
+
+    subset_idx = []
+    j = 0
+    for i in range(len(split_idx)):
+        subset_idx[i] = idx[split_idx[i - 1 : i]]
+        j = split_idx[i]

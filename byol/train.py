@@ -17,6 +17,8 @@ from datamodules import RGZ_DataModule, RGZ_DataModule_Finetune
 
 
 def run_contrastive_pretraining(config, datamodule, wandb_logger):
+    paths = Path_Handler()._dict()
+
     pl.seed_everything(config["seed"])
 
     # Save model for test evaluation
@@ -28,8 +30,7 @@ def run_contrastive_pretraining(config, datamodule, wandb_logger):
         "last": {"monitor": None},
     }
     ## Creates experiment path if it doesn't exist already ##
-    experiment_dir = config["files"] / config["run_id"]
-    create_path(experiment_dir)
+    create_path(config["checkpoints"] / config["run_id"])
 
     ## Initialise checkpoint ##
     pretrain_checkpoint = pl.callbacks.ModelCheckpoint(
@@ -39,7 +40,7 @@ def run_contrastive_pretraining(config, datamodule, wandb_logger):
         save_on_train_epoch_end=True,
         auto_insert_metric_name=False,
         verbose=True,
-        dirpath=experiment_dir / "checkpoints",
+        dirpath=paths["checkpoints"] / config["run_id"],
         save_last=True,
         # e.g. byol/files/(run_id)/checkpoints/12-344-18.134.ckpt.
         # filename="{epoch}-{step}-{loss_to_monitor:.4f}",  # filename may not work here TODO
