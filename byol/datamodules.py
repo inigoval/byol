@@ -9,7 +9,7 @@ from sklearn.model_selection import train_test_split
 from typing import Any, Dict, List, Tuple, Type, Optional
 from torch.utils.data import Subset
 
-from byol.utilities import rgz_cut
+from byol.utilities import rgz_cut, train_val_test_split
 from byol.paths import Path_Handler
 from byol.datasets import MBFRConfident, MBFRUncertain, RGZ108k, MBFRFull
 
@@ -190,8 +190,15 @@ class RGZ_DataModule(Base_DataModule):
         # self.update_transforms(d_train)
 
         # Re-initialise dataset with new mu and sig values
-        d_rgz = RGZ108k(self.path, train=True, transform=self.train_transform)
-        d_rgz = rgz_cut(d_rgz, self.cut_threshold, mb_cut=True, remove_duplicates=True)
+        d_rgz = RGZ108k(
+            self.path,
+            train=True,
+            transform=self.train_transform,
+            remove_duplicates=True,
+            cut_threshold=self.cut_threshold,
+            mb_cut=True,
+        )
+
         self.data["train"] = d_rgz
 
         self.data["val"] = [
@@ -482,56 +489,21 @@ class RGZ_DataModule_Finetune_Regression(FineTuning_DataModule):
         pass
 
     def setup(self, stage=None):
-        self.data["train"] = RGZ108k(self.path, train=True, transform=self.train_transform)
-
-        self.data["test"] = OrderedDict(
-            {
-                "MB_unc_test": MBFRUncertain(
-                    self.path,
-                    aug_type="torchvision",
-                    train=False,
-                    test_size=None,
-                    transform=self.test_transform,
-                ),
-            },
+        rgz = RGZ108k(
+            self.path,
+            train=True,
+            transform=self.train_transform,
+            remove_duplicates=False,
+            mb_cut=True,
+            cut_threshold=25,
         )
 
-        if self.val_size != 0:
-            data = MBFRConfident(self.path, aug_type="torchvision", train=True)
-            idx = np.arange(len(data))
-            idx_train, idx_val = train_test_split(
-                idx,
-                test_size=self.val_size,
-                stratify=data.full_targets,
-                random_state=self.seed,
-            )
+        self.data["test"] = OrderedDict({})
 
-            self.data["train"] = Subset(
-                MBFRConfident(
-                    self.path,
-                    aug_type="torchvision",
-                    train=True,
-                    test_size=None,
-                    transform=self.train_transform,
-                ),
-                idx_train,
-            )
-
-            self.data["val"] = Subset(
-                MBFRConfident(
-                    self.path,
-                    aug_type="torchvision",
-                    train=True,
-                    test_size=None,
-                    transform=self.test_transform,
-                ),
-                idx_val,
-            )
-
-        else:
-            self.data["train"] = MBFRConfident(
-                self.path, aug_type="torchvision", train=True, transform=self.train_transform
-            )
-            self.data["val"] = MBFRConfident(
-                self.path, aug_type="torchvision", train=True, transform=self.test_transform
-            )
+        self.data["train"], self.data["val"], self.data["test"]["rgz"] = train_val_test_split(
+            rgz,
+            val_size=self.val_size,
+            test_size=0.2,
+            val_seed=self.seed,
+            test_seed=69,
+        )
