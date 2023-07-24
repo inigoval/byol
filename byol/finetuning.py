@@ -152,7 +152,11 @@ class FineTune(pl.LightningModule):
         preds = self.forward(x)
         self.test_acc[dataloader_idx](preds, y)
         self.log(
-            f"finetuning/test/{name}_acc", self.test_acc[dataloader_idx], on_step=False, on_epoch=True
+            f"finetuning/test/{name}_acc",
+            self.test_acc[dataloader_idx],
+            on_step=False,
+            on_epoch=True,
+            add_dataloader_idx=False,
         )
 
     def configure_optimizers(self):
