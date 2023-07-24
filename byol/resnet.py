@@ -175,11 +175,6 @@ class ResNet(nn.Module):
             )
         )
 
-        # self.layers.append(self._make_layer(block, 64, layers[0]))
-        # self.layers.append(self._make_layer(block, 128, layers[1], stride=2))
-        # self.layers.append(self._make_layer(block, 256, layers[2], stride=2))
-        # self.layers.append(self._make_layer(block, 512, layers[3], stride=2))
-
         # Add resnet layers
         self.layers += self._make_layer(block, 64, layers[0])
         self.layers += self._make_layer(block, 128, layers[1], stride=2)
