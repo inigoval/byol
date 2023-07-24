@@ -15,7 +15,7 @@
 ## Fine-tuning
 - We provide a pre-trained checkpoint which you can download [here](https://www.dropbox.com/s/3ai64rgtzeim682/byol.ckpt?dl=0).
 - Place `byol.ckpt` into the main directory of the project (same directory as `finetuning.py`).
-- This checkpoint is the model with optimized hyper-parameters which achieves ~97.5% accuracy when fine-tuned on all MiraBest Confident training data and evaluated on the MiraBest Confident test set. To reproduce this benchmark, simply run the `finetuning.py` script.
+- This checkpoint is the model with optimized hyper-parameters which achieves an average of ~98% accuracy when fine-tuned on all MiraBest Confident training data and evaluated on the MiraBest Confident test set. To reproduce this benchmark, simply run the `finetuning.py` script.
 - If you would like to reproduce a different result or test other settings, specify hyper-parameters/settings in `finetune.yml`, **making sure that** `run_id: 'none'` and `preset: 'none'`. 
 
 ## Pre-training
