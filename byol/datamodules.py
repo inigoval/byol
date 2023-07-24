@@ -180,7 +180,6 @@ class RGZ_DataModule(Base_DataModule):
     def prepare_data(self):
         MBFRFull(self.path, train=False, download=True)
         MBFRFull(self.path, train=True, download=True)
-        RGZ108k(self.path, train=True, download=True)
 
     def setup(self, stage=None):
         # Compute mu and sigma value for data and update normalization constants
