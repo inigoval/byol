@@ -14,9 +14,9 @@
 
 ## Fine-tuning
 - We provide a pre-trained checkpoint which you can download [here](https://www.dropbox.com/s/3ai64rgtzeim682/byol.ckpt?dl=0).
-- This checkpoint is the model with optimized hyper-parameters which achieves ~98% accuracy when fine-tuned on all MiraBest Confident training data and evaluated on the MiraBest Confident test set.
 - Place `byol.ckpt` into the main directory of the project (same directory as `finetuning.py`).
-- Specify settings in `finetune.yml`, **making sure that** `run_id: 'none'`. 
+- This checkpoint is the model with optimized hyper-parameters which achieves ~97.5% accuracy when fine-tuned on all MiraBest Confident training data and evaluated on the MiraBest Confident test set. To reproduce this benchmark, simply run the `finetuning.py` script.
+- If you would like to reproduce a different result or test other settings, specify hyper-parameters/settings in `finetune.yml`, **making sure that** `run_id: 'none'` and `preset: 'none'`. 
 
 ## Pre-training
 The RGZ DR1 data-set is currently proprietary, but will be released in due course, at which point we can release the data-set used to pre-train. All the code required for pre-training is available to view in this repository in `train.py` and `models.py`.
