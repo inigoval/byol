@@ -15,6 +15,40 @@ from byol.utilities import _optimizer, _scheduler
 from byol.resnet import _get_resnet
 
 
+class BYOLProjectionHead(nn.Module):
+    """Projection head used for BYOL.
+
+    "This MLP consists in a linear layer with output size 4096 followed by
+    batch normalization, rectified linear units (ReLU), and a final
+    linear layer with output dimension 256." [0]
+
+    [0]: BYOL, 2020, https://arxiv.org/abs/2006.07733
+
+    """
+
+    def __init__(self, input_dim: int = 2048, hidden_dim: int = 4096, output_dim: int = 256):
+        super().__init__()
+
+        layers = []
+        batch_norm = nn.BatchNorm1d(hidden_dim)
+        non_linearity = nn.ReLU()
+
+        layers.append(nn.Linear(input_dim, hidden_dim, bias=False))
+        layers.append(batch_norm)
+        layers.append(non_linearity)
+        layers.append(nn.Linear(hidden_dim, output_dim, bias=True))
+        self.layers = nn.Sequential(*layers)
+
+    def forward(self, x: torch.Tensor):
+        """Computes one forward pass through the projection head.
+
+        Args:
+            x:
+                Input of shape bsz x num_ftrs.
+
+        """
+        return self.layers(x)
+
 class BYOL(Lightning_Eval):
     def __init__(self, config):
         super().__init__(config)
