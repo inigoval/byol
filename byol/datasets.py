@@ -1,5 +1,6 @@
 import torch.utils.data as D
 import torch.nn as nn
+import torch
 import numpy as np
 import os
 import sys
@@ -19,9 +20,10 @@ from collections import OrderedDict
 from sklearn.model_selection import train_test_split
 from typing import Any, Dict, List, Tuple, Type, Optional
 from torch.utils.data import Subset
+from einops import rearrange
+from torchvision.transforms.functional import center_crop, resize
 
 from byol.utilities import rgz_cut
-
 from byol.paths import Path_Handler
 
 
@@ -76,7 +78,7 @@ class MiraBest_F(data.Dataset):
         target_transform=None,
         download=False,
         test_size=None,
-        aug_type="albumentations",
+        aug_type="torchvision",
         data_type="double",
     ):
         self.root = os.path.expanduser(root)
@@ -123,7 +125,9 @@ class MiraBest_F(data.Dataset):
                     self.filenames.extend(entry["filenames"])
 
         # Extract metadata
-        self.las = [float(filename[-10:-4]) for filename in self.filenames]
+        self.las = [float(filename[-11:-4]) for filename in self.filenames]
+        self.ra = [float(filename[-26:-19]) for filename in self.filenames]
+        self.dec = [float(filename[-34:-27]) for filename in self.filenames]
 
         self.data = np.vstack(self.data).reshape(-1, 1, 150, 150)
         self.data = self.data.transpose((0, 2, 3, 1))
@@ -515,7 +519,7 @@ class RGZ108k(D.Dataset):
 
     base_folder = "rgz108k-batches-py"
 
-    # Need to upload this, for now downloadis commented out
+    # Need to upload this, for now download is commented out
     # url = "http://www.jb.man.ac.uk/research/ascaife/rgz20k-batches-python.tar.gz"
     filename = "rgz108k-batches-python.tar.gz"
     tgz_md5 = "3fef587aa2aa3ece3b01b125977ae19d"
@@ -708,20 +712,22 @@ class RGZ108k(D.Dataset):
         """
 
         img = self.data[index]
-        las = self.sizes[index]
-        mbf = self.mbflg[index]
-        rgz = self.rgzid[index]
+        las = self.sizes[index].squeeze()
+        mbf = self.mbflg[index].squeeze()
+        rgz = self.rgzid[index].squeeze()
 
         # doing this so that it is consistent with all other datasets
         # to return a PIL Image
-        img = np.reshape(img, (150, 150))
+        # img = np.reshape(img, (150, 150))
+        img = img.squeeze()
         img = Image.fromarray(img, mode="L")
 
         if self.transform is not None:
             img = self.transform(img)
 
-        return img, self.sizes[index].squeeze()
-        # return img, rgz, las, mbf
+        # return img, self.sizes[index].squeeze()
+
+        return img, {"size": las, "mb": mbf, "id": rgz, "index": index}
 
     def __len__(self):
         return len(self.data)
