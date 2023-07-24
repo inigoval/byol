@@ -1,9 +1,8 @@
 finetune:
-  # resnet sizes 
-  run_id: 'none' # resnet-18 
+  run_id: 'none'
 
   preset: 'optimal'
-  dataset: 'rgz'
+  dataset: 'mb'
   n_layers: -1 # -1 finetunes all layers
   n_classes: 2 
   iterations: 10

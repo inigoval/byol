@@ -4,7 +4,7 @@ finetune:
   seed: 69
 
   preset: 'optimal'
-  dataset: 'rgz'
+  dataset: 'mb'
   n_layers: 0 # -1 finetunes all layers
   n_classes: 2 
   iterations: 10
