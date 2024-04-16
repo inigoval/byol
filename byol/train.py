@@ -29,8 +29,9 @@ def run_contrastive_pretraining(config, datamodule, wandb_logger):
         "min_loss": {"mode": "min", "monitor": loss_to_monitor},
         "last": {"monitor": None},
     }
+
     ## Creates experiment path if it doesn't exist already ##
-    create_path(config["checkpoints"] / config["run_id"])
+    create_path(paths["files"] / "pretrain" / config["run_id"])
 
     ## Initialise checkpoint ##
     pretrain_checkpoint = pl.callbacks.ModelCheckpoint(
@@ -40,7 +41,7 @@ def run_contrastive_pretraining(config, datamodule, wandb_logger):
         save_on_train_epoch_end=True,
         auto_insert_metric_name=False,
         verbose=True,
-        dirpath=paths["checkpoints"] / config["run_id"],
+        dirpath=paths["files"] / "pretrain" / config["run_id"],
         save_last=True,
         # e.g. byol/files/(run_id)/checkpoints/12-344-18.134.ckpt.
         # filename="{epoch}-{step}-{loss_to_monitor:.4f}",  # filename may not work here TODO
@@ -112,8 +113,8 @@ def main():
     datamodule = RGZ_DataModule(
         path=paths["rgz"],
         batch_size=config["data"]["batch_size"],
-        center_crop=config["augmentations"]["center_crop"],
-        random_crop=config["augmentations"]["random_crop"],
+        center_crop=config["augmentations"]["center_crop_size"],
+        random_crop=config["augmentations"]["random_crop_scale"],
         s=config["augmentations"]["s"],
         p_blur=config["augmentations"]["p_blur"],
         flip=config["augmentations"]["flip"],
@@ -121,6 +122,7 @@ def main():
         cut_threshold=config["data"]["cut_threshold"],
         prefetch_factor=config["dataloading"]["prefetch_factor"],
         num_workers=config["dataloading"]["num_workers"],
+        remove_duplicates=True,
     )
 
     ## Run pretraining ##

@@ -1,5 +1,6 @@
 from typing import Optional
 from astropy.io import fits
+from astropy.stats import sigma_clipped_stats
 import pandas as pd
 import numpy as np
 import pandas as pd
@@ -17,10 +18,27 @@ from tqdm import tqdm
 from torch.utils.data import DataLoader
 from collections import Counter
 from mpl_toolkits.axes_grid1 import ImageGrid
+from PIL import Image
 
 from byol.paths import Path_Handler
-from finetune.main import FineTune
-from byol.dataloading.utils import compute_mu_sig_images
+from byol.finetuning import FineTune
+from byol.utilities import compute_mu_sig_images
+
+
+def array_to_png(img):
+    im = Image.fromarray(img)
+    im = im.convert("L")
+    return im
+
+
+def rescale_image(img, low):
+    img_max = np.max(img)
+    img_min = low
+    # img -= img_min
+    img /= max(1e-7, img_max - img_min)  # clamp divisor so it can't be zero
+    # img /= img_max - img_min
+    img *= 255.0
+    return img
 
 
 def image_preprocessing(image: np.ndarray, field: str) -> np.ndarray:
@@ -76,9 +94,8 @@ def catalogue_preprocessing(df: pd.DataFrame, random_state: Optional[int] = None
     # df.drop(df[df["S_INT"] < 0.0003].index, inplace=True)
     # df.drop(df[df["S_INT"] < 0.0002].index, inplace=True)
 
-    
     # Drop values below SNR
-    df['SNR'] = df.apply(lambda row: row.S_PEAK/ row.ISL_RMS, axis=1)
+    df["SNR"] = df.apply(lambda row: row.S_PEAK / row.ISL_RMS, axis=1)
     df.drop(df[df["SNR"] < 20].index, inplace=True)
 
     # Sort by field
@@ -93,15 +110,21 @@ class MighteeCataData:
         self.transform = transform
 
     def __getitem__(self, index: int) -> tuple:
-        rms = self.catadata.df.loc[index, "ISL_RMS"]
+        # rms = self.catadata.df.loc[index, "ISL_RMS"]
 
         img = self.catadata[index]
+
+        _, _, rms = sigma_clipped_stats(img)
+
+        # Remove NaNs
+        img = np.nan_to_num(img, nan=0.0)
 
         # Clip values below 3 sigma
         img[np.where(img <= 3 * rms)] = 0.0
 
-        # Remove NaNs
-        img = np.nan_to_num(img, nan=0.0)
+        img = rescale_image(img, 3 * rms)
+
+        img = array_to_png(np.squeeze(img))
 
         img = self.transform(np.squeeze(img))
 
@@ -131,6 +154,7 @@ def _mightee_dataset(data_dir: Path, transform):
         image_paths=image_paths,
         field_names=field_names,
         cutout_width=114,
+        # cutout_width=120,
         catalogue_preprocessing=catalogue_preprocessing,
         image_preprocessing=image_preprocessing,
     )
@@ -166,7 +190,8 @@ if __name__ == "__main__":
             T.ToTensor(),
             T.Resize(70),  # Rescale to adjust for resolution difference between MIGHTEE & RGZ
             # T.CenterCrop(70),
-            T.Normalize(1.59965605788234e-05, 0.0038063037602458706),
+            # T.Normalize(1.59965605788234e-05, 0.0038063037602458706),
+            T.Normalize(0.008008896, 0.05303395),
         ]
     )
 

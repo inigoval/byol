@@ -1,20 +1,19 @@
 finetune:
-  run_id: 'local'
+  # resnet sizes 
+  run_id: 'none' # resnet-18 
+  seed: 69
 
-  preset: 'optimal'
-  dataset: 'mb'
+  preset: 'none'
+  dataset: 'rgz'
   n_layers: -1 # -1 finetunes all layers
-  n_classes: 2 
-  iterations: 10
+  n_out: 1 
+  iterations: 1
   lr_decay: 0.75
-  n_epochs: 300
-  batch_size: 64
+  n_epochs: 100
+  batch_size: 256
   val_size: 0
   early_stopping: False
   weight_decay: 0.005
-  head: 'linear'
-  depth: 0
-  width: 0
 
 trainer:
   # gpus: 1 # set to 1 to disable multi gpu training

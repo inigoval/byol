@@ -13,10 +13,15 @@ from typing import Any, Dict, List, Tuple, Type, Union
 from torch import Tensor
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 
-from paths import Path_Handler
-from config import load_config, update_config, load_config_finetune
-from models import BYOL
-from datamodules import RGZ_DataModule_Finetune
+from byol.paths import Path_Handler
+from byol.config import load_config, update_config, load_config_finetune
+from byol.models import BYOL
+from byol.datamodules import (
+    RGZ_DataModule_Finetune,
+    MIGHTEE_DataModule_Finetune,
+    MIGHTEE_RGZ_DataModule_Finetune,
+)
+from byol.resnet import _get_resnet
 
 
 class LogisticRegression(torch.nn.Module):
@@ -52,7 +57,8 @@ class FineTune(pl.LightningModule):
     ):
         super().__init__()
 
-        self.save_hyperparameters(ignore=["encoder", "head"])
+        # self.save_hyperparameters(ignore=["encoder", "head"])
+        self.save_hyperparameters()
 
         self.n_layers = n_layers
         self.batch_size = batch_size
@@ -121,7 +127,17 @@ class FineTune(pl.LightningModule):
         )
 
         logging_params = {f"n_{key}": len(value) for key, value in self.trainer.datamodule.data.items()}
-        self.logger.log_hyperparams(logging_params)
+
+        # self.logger.log_hyperparams(logging_params)
+
+        self.logger.log_hyperparams(
+            {
+                "n_train": len(self.trainer.datamodule.data["train"]),
+                "n_test": {
+                    f"n_{key}": len(value) for key, value in self.trainer.datamodule.data.items()
+                },
+            }
+        )
 
         # Make sure network that isn't being finetuned is frozen
         # probably unnecessary but best to be sure
@@ -226,9 +242,9 @@ def run_finetuning(config, encoder, datamodule, logger):
         save_on_train_epoch_end=True,
         auto_insert_metric_name=False,
         verbose=True,
-        # dirpath=config["files"] / config["run_id"] / "finetuning",
+        dirpath=logger.save_dir,
         # e.g. byol/files/(run_id)/checkpoints/12-344-18.134.ckpt.
-        filename="{epoch}",  # filename may not work here TODO
+        filename="epoch_{epoch}",  # filename may not work here TODO
         save_weights_only=True,
         # save_top_k=3,
     )
@@ -306,11 +322,14 @@ def main():
     for seed in range(config_finetune["finetune"]["iterations"]):
         # for seed in range(1, 10):
 
-        if config_finetune["finetune"]["run_id"].lower() != "none":
+        if config_finetune["finetune"]["run_id"].lower() == "local":
+            model = BYOL.load_from_checkpoint("byol_15.ckpt")
+            # elif config_finetune["finetune"]["run_id"].lower() == "none":
+            #     model = BYOL.load_from_checkpoint("byol.ckpt")
+            model.encoder = _get_resnet(**model.config["model"]["architecture"])
+        else:
             experiment_dir = paths["files"] / config_finetune["finetune"]["run_id"] / "checkpoints"
             model = BYOL.load_from_checkpoint(experiment_dir / "last.ckpt")
-        else:
-            model = BYOL.load_from_checkpoint("byol.ckpt")
 
         ## Load up config from model to save correct hparams for easy logging ##
         config = model.config
@@ -318,10 +337,12 @@ def main():
         config["finetune"]["dim"] = model.encoder.dim
 
         # Compatibility with old style config
-        if config["augmentations"]["center_crop"] is True:
-            config["augmentations"]["center_crop"] = config["augmentations"]["center_crop_size"]
+        if "center_crop" in config["augmentations"]:
+            if config["augmentations"]["center_crop"] is not True:
+                config["augmentations"]["center_crop"] = config["augmentations"]["center_crop_size"]
 
-        project_name = "BYOL_finetune_reproduce"
+        # project_name = "BYOL_finetune_reproduce"
+        project_name = "BYOL_inference_finetune"
 
         config["finetune"]["seed"] = seed
         pl.seed_everything(seed)
@@ -331,21 +352,45 @@ def main():
 
         logger = pl.loggers.WandbLogger(
             project=project_name,
-            save_dir=paths["files"] / "finetune" / str(wandb.run.id),
+            save_dir=paths["files"] / "finetune" / config["finetune"]["run_id"],
             reinit=True,
             config=config,
         )
 
-        finetune_datamodule = RGZ_DataModule_Finetune(
-            paths["rgz"],
-            batch_size=config["finetune"]["batch_size"],
-            center_crop=config["augmentations"]["center_crop"],
-            val_size=config["finetune"]["val_size"],
-            num_workers=config["dataloading"]["num_workers"],
-            prefetch_factor=config["dataloading"]["prefetch_factor"],
-            pin_memory=config["dataloading"]["pin_memory"],
-            seed=config["finetune"]["seed"],
-        )
+        if config["finetune"]["dataset"] == "mb":
+            finetune_datamodule = RGZ_DataModule_Finetune(
+                paths["mb"],
+                batch_size=config["finetune"]["batch_size"],
+                center_crop=config["augmentations"]["center_crop_size"],
+                val_size=config["finetune"]["val_size"],
+                num_workers=config["dataloading"]["num_workers"],
+                prefetch_factor=config["dataloading"]["prefetch_factor"],
+                pin_memory=config["dataloading"]["pin_memory"],
+                seed=config["finetune"]["seed"],
+            )
+        elif config["finetune"]["dataset"] == "mightee":
+            finetune_datamodule = MIGHTEE_DataModule_Finetune(
+                paths["mightee"],
+                batch_size=config["finetune"]["batch_size"],
+                center_crop=config["augmentations"]["center_crop"],
+                val_size=config["finetune"]["val_size"],
+                num_workers=config["dataloading"]["num_workers"],
+                prefetch_factor=config["dataloading"]["prefetch_factor"],
+                pin_memory=config["dataloading"]["pin_memory"],
+                seed=config["finetune"]["seed"],
+            )
+        elif config["finetune"]["dataset"] == "mightee+mb":
+            finetune_datamodule = MIGHTEE_RGZ_DataModule_Finetune(
+                paths["mightee"],
+                batch_size=config["finetune"]["batch_size"],
+                center_crop=config["augmentations"]["center_crop"],
+                val_size=config["finetune"]["val_size"],
+                num_workers=config["dataloading"]["num_workers"],
+                prefetch_factor=config["dataloading"]["prefetch_factor"],
+                pin_memory=config["dataloading"]["pin_memory"],
+                seed=config["finetune"]["seed"],
+            )
+
         run_finetuning(config, model.encoder, finetune_datamodule, logger)
         logger.experiment.finish()
         wandb.finish()

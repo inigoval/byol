@@ -36,7 +36,7 @@ data:
     rotate: True
     input_height: 128 # Keep this at 128 and adjust center_crop_size
     batch_size: 1024 
-    cut_threshold: 25
+    cut_threshold: 20
     test_size: 0.2
 
 augmentations:

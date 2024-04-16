@@ -1,4 +1,4 @@
-preset: 'none'
+preset: 'optimal'
 
 model:
     n_epochs: 5
@@ -39,6 +39,7 @@ data:
     val_batch_size: 500
     cut_threshold: 20
     test_size: 0.2
+    crop_resize: True
 
 ## DATA ## 
 augmentations:

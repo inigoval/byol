@@ -2,7 +2,7 @@ import yaml
 
 from torch.optim import Adam, SGD
 
-from paths import Path_Handler
+from byol.paths import Path_Handler
 
 # Define paths
 paths = Path_Handler()
@@ -84,6 +84,23 @@ def load_config_finetune():
 
     if config["finetune"]["preset"] == "optimal":
         path = path_dict["config"] / "finetune_optimal.yml"
+        with open(path, "r") as ymlconfig:
+            config = yaml.load(ymlconfig, Loader=yaml.FullLoader)
+
+    return config
+
+
+def load_config_regression():
+    """Helper function to load yaml config file, convert to python dictionary and return."""
+
+    path = path_dict["config"] / "finetune_regression.yml"
+
+    # load data-set specific config
+    with open(path, "r") as ymlconfig:
+        config = yaml.load(ymlconfig, Loader=yaml.FullLoader)
+
+    if config["finetune"]["preset"] == "optimal":
+        path = path_dict["config"] / "finetune_regression_optimal.yml"
         with open(path, "r") as ymlconfig:
             config = yaml.load(ymlconfig, Loader=yaml.FullLoader)
 

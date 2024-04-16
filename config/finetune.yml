@@ -1,11 +1,11 @@
 finetune:
   # resnet sizes 
-  run_id: 'none' # resnet-18 
+  run_id: 'local' # resnet-18 
   seed: 69
 
   preset: 'optimal'
-  dataset: 'mb'
-  n_layers: 0 # -1 finetunes all layers
+  dataset: 'mightee+mb'
+  n_layers: -1 # -1 finetunes all layers
   n_classes: 2 
   iterations: 10
   lr_decay: 0.75

@@ -2,6 +2,8 @@ import torch.nn as nn
 import numpy as np
 import torchvision.transforms as T
 import pytorch_lightning as pl
+import torch
+import pandas as pd
 
 from torch.utils.data import DataLoader
 from collections import OrderedDict
@@ -11,7 +13,7 @@ from torch.utils.data import Subset
 
 from byol.utilities import rgz_cut, train_val_test_split
 from byol.paths import Path_Handler
-from byol.datasets import MBFRConfident, MBFRUncertain, RGZ108k, MBFRFull
+from byol.datasets import MBFRConfident, MBFRUncertain, RGZ108k, MBFRFull, MighteeZoo
 
 
 class SimpleView(nn.Module):
@@ -139,6 +141,7 @@ class RGZ_DataModule(Base_DataModule):
         num_workers=0,
         prefetch_factor=20,
         pin_memory=False,
+        remove_duplicates=True,
     ):
         super().__init__(batch_size, num_workers, prefetch_factor, pin_memory)
 
@@ -177,6 +180,8 @@ class RGZ_DataModule(Base_DataModule):
             ]
         )
 
+        self.remove_duplicates = remove_duplicates
+
     def prepare_data(self):
         MBFRFull(self.path, train=False, download=True)
         MBFRFull(self.path, train=True, download=True)
@@ -193,7 +198,7 @@ class RGZ_DataModule(Base_DataModule):
             self.path,
             train=True,
             transform=self.train_transform,
-            remove_duplicates=True,
+            remove_duplicates=self.remove_duplicates,
             cut_threshold=self.cut_threshold,
             mb_cut=True,
         )
@@ -433,6 +438,10 @@ class RGZ_DataModule_Finetune(FineTuning_DataModule):
                     test_size=None,
                     transform=self.test_transform,
                 ),
+                "mightee": MighteeZoo(
+                    self.path.parent / "mightee",
+                    transform=self.test_transform,
+                ),
             },
         )
 
@@ -505,4 +514,239 @@ class RGZ_DataModule_Finetune_Regression(FineTuning_DataModule):
             test_size=0.2,
             val_seed=self.seed,
             test_seed=69,
+        )
+
+
+class MIGHTEE_DataModule_Finetune(FineTuning_DataModule):
+    def __init__(
+        self,
+        path,
+        batch_size,
+        center_crop,
+        val_size=0.2,
+        num_workers=0,
+        prefetch_factor=20,
+        pin_memory=False,
+        seed=69,
+    ):
+        super().__init__(
+            path,
+            batch_size,
+            num_workers=num_workers,
+            prefetch_factor=prefetch_factor,
+            pin_memory=pin_memory,
+        )
+
+        self.mu = (0.00630,)
+        self.sig = (0.0488,)
+
+        self.center_crop = center_crop
+        self.val_size = val_size
+        self.seed = seed
+
+        self.train_transform = T.Compose(
+            [
+                T.RandomRotation(180),
+                T.CenterCrop(self.center_crop),
+                T.RandomResizedCrop(self.center_crop, scale=(0.9, 1)),
+                T.RandomHorizontalFlip(),
+                T.RandomVerticalFlip(),
+                T.ToTensor(),
+                T.Normalize(self.mu, self.sig),
+            ]
+        )
+
+        self.test_transform = T.Compose(
+            [
+                T.CenterCrop(center_crop),
+                T.ToTensor(),
+                T.Normalize(self.mu, self.sig),
+            ]
+        )
+
+    def prepare_data(self):
+        pass
+
+    def setup(self, stage=None):
+        data = MighteeZoo(self.path)
+        idx = np.arange(len(data))
+        idx_train, idx_test = train_test_split(
+            idx,
+            test_size=0.3,
+            stratify=data.targets,
+            random_state=self.seed,
+        )
+
+        print("\n\nData statistics:")
+        # print(f"FRIS: {np.count_nonzero(data.targets == 0)}")
+        print(f"FRIS: {np.count_nonzero(data.targets == 0) / len(data.targets)*100}%")
+        # print(f"FRIIs: {np.count_nonzero(data.targets==1)}")
+        print(f"FRIIs: {np.count_nonzero(data.targets==1) / len(data.targets)*100}%")
+        print(f"Total number of samples: {len(data)}")
+        print(f"Possible class values: {np.unique(data.targets)}")
+        print("\n\n")
+
+        self.data["train"] = Subset(
+            MighteeZoo(
+                self.path,
+                transform=self.train_transform,
+            ),
+            idx_train,
+        )
+
+        self.data["val"] = Subset(
+            MighteeZoo(
+                self.path,
+                transform=self.train_transform,
+            ),
+            idx_train,
+        )
+
+        self.data["test"] = OrderedDict(
+            {
+                "mightee": Subset(
+                    MighteeZoo(
+                        self.path,
+                        transform=self.test_transform,
+                    ),
+                    idx_test,
+                ),
+                "MB_conf_test": MBFRConfident(
+                    self.path.parent / "mb",
+                    aug_type="torchvision",
+                    train=False,
+                    test_size=None,
+                    transform=self.test_transform,
+                ),
+                "MB_unc_test": MBFRUncertain(
+                    self.path.parent / "mb",
+                    aug_type="torchvision",
+                    train=False,
+                    test_size=None,
+                    transform=self.test_transform,
+                ),
+            },
+        )
+
+
+class MIGHTEE_RGZ_DataModule_Finetune(FineTuning_DataModule):
+    def __init__(
+        self,
+        path,
+        batch_size,
+        center_crop,
+        val_size=0.2,
+        num_workers=0,
+        prefetch_factor=20,
+        pin_memory=False,
+        seed=69,
+    ):
+        super().__init__(
+            path,
+            batch_size,
+            num_workers=num_workers,
+            prefetch_factor=prefetch_factor,
+            pin_memory=pin_memory,
+        )
+
+        self.mu = (0.008008896,)
+        self.sig = (0.05303395,)
+
+        self.center_crop = center_crop
+        self.val_size = val_size
+        self.seed = seed
+
+        self.train_transform = T.Compose(
+            [
+                T.RandomRotation(180),
+                T.CenterCrop(self.center_crop),
+                T.RandomResizedCrop(self.center_crop, scale=(0.9, 1)),
+                T.RandomHorizontalFlip(),
+                T.RandomVerticalFlip(),
+                T.ToTensor(),
+                T.Normalize(self.mu, self.sig),
+            ]
+        )
+
+        self.test_transform = T.Compose(
+            [
+                T.CenterCrop(center_crop),
+                T.ToTensor(),
+                T.Normalize(self.mu, self.sig),
+            ]
+        )
+
+    def prepare_data(self):
+        pass
+
+    def setup(self, stage=None):
+        data = MighteeZoo(self.path)
+        idx = np.arange(len(data))
+        idx_train, idx_test = train_test_split(
+            idx,
+            test_size=0.3,
+            stratify=data.targets,
+            random_state=self.seed,
+        )
+
+        print("\n\nData statistics:")
+        # print(f"FRIS: {np.count_nonzero(data.targets == 0)}")
+        print(f"FRIS: {np.count_nonzero(data.targets == 0) / len(data.targets)*100}%")
+        # print(f"FRIIs: {np.count_nonzero(data.targets==1)}")
+        print(f"FRIIs: {np.count_nonzero(data.targets==1) / len(data.targets)*100}%")
+        print(f"Total number of samples: {len(data)}")
+        print(f"Possible class values: {np.unique(data.targets)}")
+        print("\n\n")
+
+        # Concatenate MiraBest Confident and MighteeZoo
+        self.data["train"] = torch.utils.data.ConcatDataset(
+            [
+                Subset(
+                    MighteeZoo(
+                        self.path,
+                        transform=self.train_transform,
+                    ),
+                    idx_train,
+                ),
+                MBFRConfident(
+                    self.path.parent / "mb",
+                    aug_type="torchvision",
+                    train=True,
+                    transform=self.train_transform,
+                ),
+            ]
+        )
+
+        self.data["val"] = Subset(
+            MighteeZoo(
+                self.path,
+                transform=self.train_transform,
+            ),
+            idx_train,
+        )
+
+        self.data["test"] = OrderedDict(
+            {
+                "mightee": Subset(
+                    MighteeZoo(
+                        self.path,
+                        transform=self.test_transform,
+                    ),
+                    idx_test,
+                ),
+                "MB_conf_test": MBFRConfident(
+                    self.path.parent / "mb",
+                    aug_type="torchvision",
+                    train=False,
+                    test_size=None,
+                    transform=self.test_transform,
+                ),
+                "MB_unc_test": MBFRUncertain(
+                    self.path.parent / "mb",
+                    aug_type="torchvision",
+                    train=False,
+                    test_size=None,
+                    transform=self.test_transform,
+                ),
+            },
         )

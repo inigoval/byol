@@ -28,6 +28,7 @@ class Path_Handler:
 
         self.path_dict["rgz"] = self.path_dict["data"] / "rgz"
         self.path_dict["mb"] = self.path_dict["data"] / "mb"
+        self.path_dict["mightee"] = self.path_dict["data"] / "mightee"
 
     def create_paths(self):
         """Create missing directories"""
@@ -43,4 +44,4 @@ class Path_Handler:
 
 def create_path(path):
     if not Path.exists(path):
-        Path.mkdir(path)
+        Path.mkdir(path, parents=True)
