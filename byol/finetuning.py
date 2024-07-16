@@ -337,7 +337,7 @@ def main():
         )
 
         finetune_datamodule = RGZ_DataModule_Finetune(
-            paths["rgz"],
+            paths["mb"],
             batch_size=config["finetune"]["batch_size"],
             center_crop=config["augmentations"]["center_crop"],
             val_size=config["finetune"]["val_size"],

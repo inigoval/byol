@@ -2,7 +2,7 @@ import yaml
 
 from torch.optim import Adam, SGD
 
-from paths import Path_Handler
+from byol.paths import Path_Handler
 
 # Define paths
 paths = Path_Handler()
